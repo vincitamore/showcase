@@ -19,7 +19,7 @@ export default function Home() {
         <div className="container relative mx-auto px-4 py-32 sm:py-48">
           <div className="text-center">
             {/* Logo */}
-            <div className="mx-auto mb-6 h-16 w-16">
+            <div className="mx-auto mb-6 h-14 w-14">
               <img
                 src="/favicon.ico"
                 alt="Heart and Crown Logo"
