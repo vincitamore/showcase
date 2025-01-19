@@ -179,4 +179,4 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
 - [Next.js](https://nextjs.org/) for the React framework
 - [Vercel](https://vercel.com) for hosting and analytics
-- GitHub Actions and GitHub CLI for automated deployment workflow and secure repository mirroring
+- GitHub Actions and GitHub CLI for automated deployment workflows and secure repository mirroring
