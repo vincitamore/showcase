@@ -24,7 +24,9 @@ jobs:
           REPO: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
           echo "Setting up private remote..."
-          REPO_URL="https://oauth2:${TOKEN}@${REPO}"
+          # Remove any trailing slashes from REPO
+          CLEAN_REPO=$(echo "${REPO}" | sed 's#/$##')
+          REPO_URL="https://oauth2:${TOKEN}@${CLEAN_REPO}"
           git remote add private "${REPO_URL}"
           
           echo "Pushing to private repository..."
