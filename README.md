@@ -12,7 +12,7 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - Dynamic image modals for project showcases
 - Real-time form validation and submission
 - Built with performance and accessibility in mind
-- Automated deployment via GitHub Actions
+- Automated deployment via GitHub Actions and Vercel
 
 ## Tech Stack
 
