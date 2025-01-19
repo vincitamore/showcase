@@ -29,12 +29,12 @@ jobs:
       - name: Push to Private Repository
         env:
           REPO: ${{ secrets.PRIVATE_REPO_URL }}
-          GH_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          TARGET_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
           echo "Setting up private remote..."
           # Remove any trailing slashes and ensure proper URL format
           CLEAN_REPO=$(echo "${REPO}" | sed 's#/$##')
-          REPO_URL="https://${GH_TOKEN}@github.com/${CLEAN_REPO}"
+          REPO_URL="https://${TARGET_TOKEN}@github.com/${CLEAN_REPO}"
           
           git remote add private "${REPO_URL}"
           echo "Remote added, attempting push..."
