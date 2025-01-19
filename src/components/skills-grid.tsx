@@ -10,55 +10,56 @@ import {
   Wifi,
   Database,
   Settings,
+  Factory,
 } from "lucide-react"
 
 const skillCategories = [
   {
     title: "Network Engineering",
     icon: Network,
-    description: "Expert in enterprise network infrastructure, specializing in fiber optics and wireless solutions.",
+    description: "Expert in enterprise and industrial networks, specializing in fiber optics, wireless solutions, and IT/OT integration.",
     highlights: [
       "Fiber Optic Networks",
-      "Network Infrastructure",
+      "SCADA Networks & Protocols",
       "Wireless Technologies",
       "Network Security",
-      "Performance Optimization"
+      "IT/OT Integration"
     ]
   },
   {
     title: "System Administration",
     icon: Server,
-    description: "Comprehensive management of enterprise systems, focusing on Active Directory and cloud integration.",
+    description: "Comprehensive experience in managing enterprise systems, endpoint management, and IT service delivery.",
     highlights: [
-      "Active Directory",
-      "Azure AD Integration",
-      "Windows Server",
-      "Linux Systems",
-      "Infrastructure Monitoring"
+      "Active Directory & Azure AD",
+      "Windows Server Administration",
+      "Unified Endpoint Management (UEM)",
+      "IT Service Management & Ticketing",
+      "System Monitoring & Maintenance"
     ]
   },
   {
     title: "Cybersecurity",
     icon: Shield,
-    description: "Implementation of robust security solutions with Security Onion and enterprise-grade protection.",
+    description: "Implementation and management of security solutions to protect enterprise and industrial assets.",
     highlights: [
-      "Security Onion Suite",
-      "Threat Detection",
-      "Access Management",
-      "Security Policies",
-      "Network Protection"
+      "EDR/XDR Implementation",
+      "Security Onion & SIEM",
+      "OT/ICS Security",
+      "Threat Detection & Response",
+      "Security Compliance"
     ]
   },
   {
     title: "Software Development",
     icon: Code,
-    description: "Full-stack development with modern technologies, creating efficient and scalable solutions.",
+    description: "Full-stack development with modern technologies, focusing on automation and enterprise solutions.",
     highlights: [
+      "Enterprise Software Solutions",
+      "Automation Tools",
       "TypeScript & React",
-      "Next.js Applications",
       "Python Development",
-      "API Integration",
-      "Database Design"
+      "API Integration"
     ]
   },
   {
@@ -76,13 +77,13 @@ const skillCategories = [
   {
     title: "Infrastructure",
     icon: Wifi,
-    description: "Extensive experience in designing and implementing enterprise-grade network infrastructure.",
+    description: "Extensive experience in designing and implementing critical infrastructure solutions for enterprise and industrial environments.",
     highlights: [
-      "Network Architecture",
-      "Infrastructure Planning",
-      "Performance Optimization",
-      "Scalable Solutions",
-      "Disaster Recovery"
+      "Industrial Control Systems",
+      "PLC Programming & Automation",
+      "Enterprise Infrastructure",
+      "Redundancy Planning",
+      "Automated Monitoring"
     ]
   },
   {

@@ -8,12 +8,13 @@ const experiences = [
     title: "IT/OT Specialist",
     company: "Municipal Utilities",
     period: "2021 - Present",
-    description: "Led IT infrastructure and software development initiatives for critical utility services.",
+    description: "Lead enterprise IT operations while managing IT/OT integration initiatives. Responsible for maintaining corporate networks, systems, and security infrastructure alongside SCADA networks and industrial control systems. Drive modernization efforts across both IT and OT environments.",
     highlights: [
-      "Developed and maintained enterprise software solutions",
-      "Managed network infrastructure and security systems",
-      "Implemented automated monitoring and reporting tools",
-      "Coordinated cross-departmental technical projects"
+      "Manage enterprise IT infrastructure and systems",
+      "Maintain corporate networks and security",
+      "Implement IT/OT integration solutions",
+      "Support SCADA and PLC systems",
+      "Drive technology modernization initiatives"
     ],
     icon: Wrench
   },
