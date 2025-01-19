@@ -34,9 +34,8 @@ jobs:
           REPO: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
           echo "Setting up private remote..."
-          # Remove any trailing slashes and ensure proper URL format
-          CLEAN_REPO=$(echo "${REPO}" | sed 's#/$##')
-          REPO_URL="https://${TARGET_TOKEN}@github.com/${CLEAN_REPO}"
+          # The PRIVATE_REPO_URL should be in the format "owner/repo"
+          REPO_URL="https://${TARGET_TOKEN}@github.com/${REPO}"
           
           git remote add private "${REPO_URL}"
           echo "Remote added, attempting push..."
