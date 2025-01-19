@@ -179,4 +179,5 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
 - [Next.js](https://nextjs.org/) for the React framework
 - [Vercel](https://vercel.com) for hosting and analytics
+- [Cursor](https://cursor.com/) for the AI-powered development environment
 - GitHub Actions for automated cross-repository workflow management
