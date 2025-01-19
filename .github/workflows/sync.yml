@@ -20,11 +20,12 @@ jobs:
 
       - name: Push to Private Repository
         env:
-          TARGET_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
-          PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
+          TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
+          REPO: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
           echo "Setting up private remote..."
-          git remote add private "https://${TARGET_TOKEN}@${PRIVATE_REPO_URL}"
+          REPO_URL="https://oauth2:${TOKEN}@${REPO}"
+          git remote add private "${REPO_URL}"
           
           echo "Pushing to private repository..."
           git push private main:main --force 
