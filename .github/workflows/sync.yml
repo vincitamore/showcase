@@ -15,14 +15,12 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    env:
-      TARGET_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
     steps:
-      - name: Checkout Public Repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TARGET_REPO_TOKEN }}
           
       - name: Configure Git
         run: |
@@ -32,10 +30,31 @@ jobs:
       - name: Push to Private Repository
         env:
           REPO: ${{ secrets.PRIVATE_REPO_URL }}
+          TARGET_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
           echo "Setting up private remote..."
-          # The PRIVATE_REPO_URL should be in the format "owner/repo"
-          REPO_URL="https://${TARGET_TOKEN}@github.com/${REPO}"
+          # Remove any trailing slashes and ensure proper URL format
+          CLEAN_REPO=$(echo "${REPO}" | sed 's#/$##')
+          REPO_URL="https://${TARGET_TOKEN}@github.com/${CLEAN_REPO}"
+          
+          # Create .github/workflows directory if it doesn't exist
+          mkdir -p .github/workflows
+          
+          # Disable workflows in the private repo to prevent token errors
+          cat > .github/workflows/sync.yml << 'EOL'
+          name: Placeholder
+          on:
+            push:
+              branches: [ none ]
+          jobs:
+            placeholder:
+              runs-on: ubuntu-latest
+              steps:
+                - run: 'echo "This workflow is disabled"'
+          EOL
+          
+          git add .github/workflows/sync.yml
+          git commit -m "ci: disable workflow in private repo"
           
           git remote add private "${REPO_URL}"
           echo "Remote added, attempting push..."
