@@ -10,6 +10,7 @@ permissions:
   checks: write
   pull-requests: write
   packages: write
+  statuses: write  # This is needed for workflow permissions
 
 jobs:
   sync:
