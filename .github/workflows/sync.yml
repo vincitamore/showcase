@@ -18,12 +18,31 @@ jobs:
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
 
+      - name: Debug Info
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Repository contents:"
+          ls -la
+          echo "Git status:"
+          git status
+          echo "Git remote:"
+          git remote -v
+
       - name: Push to Private Repository
         env:
           TARGET_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
         run: |
+          echo "Removing existing private remote if it exists..."
+          git remote remove private || true
+          
           echo "Setting up private remote..."
-          git remote add private https://vincitamore:${TARGET_TOKEN}@github.com/vincitamore/private-showcase.git || echo "Remote already exists"
+          git remote add private "https://${TARGET_TOKEN}@github.com/vincitamore/private-showcase.git"
+          
+          echo "Fetching from private remote..."
+          git fetch private || echo "Failed to fetch from private remote"
+          
           echo "Pushing to private repository..."
-          git push private main:main --force || echo "Push failed with status $?"
-          echo "Done" 
+          git push private main:main --force
+          
+          echo "Verifying push..."
+          git ls-remote private 
