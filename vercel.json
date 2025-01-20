@@ -2,7 +2,8 @@
   "build": {
     "env": {
       "NODE_OPTIONS": "--max-old-space-size=4096",
-      "NEXT_TELEMETRY_DISABLED": "1"
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "NEXT_SHARP_PATH": "/tmp/node_modules/sharp"
     }
   },
   "functions": {
@@ -10,7 +11,7 @@
       "memory": 3008
     }
   },
-  "buildCommand": "npm install && npm run build",
+  "buildCommand": "npm install --no-save && npm run build",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
   "installCommand": "npm install --force"
 } 

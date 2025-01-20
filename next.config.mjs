@@ -13,11 +13,7 @@ const nextConfig = {
     // Disable all experimental features
     esmExternals: false,
     // Modify build trace options
-    turbotrace: {
-      logLevel: 'error',
-      logDetail: true,
-      memoryLimit: 4096
-    }
+    turbotrace: false
   },
   transpilePackages: ['twitter-api-v2'],
   output: 'standalone',
@@ -43,10 +39,10 @@ const nextConfig = {
         tls: false,
       };
     }
-    // Optimize bundle size
-    config.optimization = {
-      ...config.optimization,
-      minimize: true,
+    // Add module resolution aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': '/vercel/path0/src'
     };
     return config;
   },
