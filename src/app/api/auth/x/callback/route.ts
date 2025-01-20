@@ -1,29 +1,42 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getReadOnlyClient } from '@/lib/x-api';
+import { headers } from 'next/headers';
+import { TwitterApi } from 'twitter-api-v2';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const state = searchParams.get('state');
-    const code = searchParams.get('code');
+    const headersList = headers();
+    const domain = headersList.get('host') || '';
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${domain}`;
+
+    const url = new URL(request.url);
+    const state = url.searchParams.get('state');
+    const code = url.searchParams.get('code');
     
     const storedState = cookies().get('x_oauth_state')?.value;
     const codeVerifier = cookies().get('x_oauth_code_verifier')?.value;
 
     if (!state || !code || !storedState || !codeVerifier) {
-      return NextResponse.redirect(new URL('/auth-error', request.url));
+      return NextResponse.redirect(new URL('/auth-error', baseUrl));
     }
 
     if (state !== storedState) {
-      return NextResponse.redirect(new URL('/auth-error?error=invalid_state', request.url));
+      return NextResponse.redirect(new URL('/auth-error?error=invalid_state', baseUrl));
     }
 
-    const client = getReadOnlyClient();
+    const client = new TwitterApi({
+      clientId: process.env.TWITTER_CLIENT_ID!,
+      clientSecret: process.env.TWITTER_API_SECRET!,
+    });
+
     const { accessToken, refreshToken } = await client.loginWithOAuth2({
       code,
       codeVerifier,
-      redirectUri: process.env.NEXT_PUBLIC_APP_URL + '/api/auth/x/callback'
+      redirectUri: `${baseUrl}/api/auth/x/callback`
     });
 
     // Clear the OAuth cookies
@@ -48,9 +61,12 @@ export async function GET(request: Request) {
     }
 
     // Redirect back to the blog section
-    return NextResponse.redirect(new URL('/#blog', request.url));
+    return NextResponse.redirect(new URL('/#blog', baseUrl));
   } catch (error) {
     console.error('Error handling OAuth callback:', error);
-    return NextResponse.redirect(new URL('/auth-error', request.url));
+    const domain = headers().get('host') || '';
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${domain}`;
+    return NextResponse.redirect(new URL('/auth-error', baseUrl));
   }
 } 

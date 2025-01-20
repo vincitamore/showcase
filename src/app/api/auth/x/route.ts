@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getOAuthUrl } from '@/lib/x-api';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const { url, state, codeVerifier } = await getOAuthUrl();

@@ -14,7 +14,14 @@ export const getReadOnlyClient = () => {
 
 // Get the OAuth2 URL for login
 export const getOAuthUrl = async () => {
-  const client = getReadOnlyClient();
+  if (!process.env.TWITTER_CLIENT_ID) {
+    throw new Error('Missing Twitter Client ID in environment variables');
+  }
+
+  const client = new TwitterApi({
+    clientId: process.env.TWITTER_CLIENT_ID,
+    clientSecret: process.env.TWITTER_API_SECRET,
+  });
   
   // Generate OAuth 2.0 URL
   const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
