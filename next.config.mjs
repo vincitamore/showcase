@@ -51,11 +51,6 @@ const nextConfig = {
         '**/*.json',
         '**/*.d.ts'
       ]
-    },
-    // Enable verbose logging
-    logging: {
-      level: 'verbose',
-      fullUrl: true
     }
   },
   output: 'standalone',
@@ -99,18 +94,28 @@ const nextConfig = {
         console.log('[DEBUG] Final resolve.alias:', config.resolve.alias);
         console.log('[DEBUG] Final resolve.modules:', config.resolve.modules);
 
-        // Add a resolver plugin for debugging
+        // Add a resolver plugin for debugging with correct hook pattern
         config.plugins.push({
           apply: (compiler) => {
             compiler.hooks.normalModuleFactory.tap('DebugResolver', (nmf) => {
-              nmf.hooks.beforeResolve.tap('DebugResolver', (resolve) => {
-                if (resolve.request.includes('styled-jsx')) {
-                  console.log('[DEBUG] Resolving:', resolve.request);
-                  console.log('[DEBUG] Context:', resolve.context);
+              nmf.hooks.beforeResolve.tap('DebugResolver', (resolveData) => {
+                if (resolveData.request.includes('styled-jsx')) {
+                  console.log('[DEBUG] Resolving:', resolveData.request);
+                  console.log('[DEBUG] Context:', resolveData.context);
                 }
-                return resolve;
+                // Don't return anything, just modify the resolveData if needed
               });
             });
+          }
+        });
+
+        // Add a rule to handle styled-jsx files
+        config.module.rules.push({
+          test: /styled-jsx[/\\].*\.js$/,
+          include: /node_modules/,
+          type: 'javascript/auto',
+          resolve: {
+            fullySpecified: false
           }
         });
       } catch (error) {
@@ -121,4 +126,5 @@ const nextConfig = {
   }
 }
 
+export default nextConfig 
 export default nextConfig 
