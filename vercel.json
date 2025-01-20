@@ -9,7 +9,7 @@
       "memory": 3008
     }
   },
-  "buildCommand": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+  "buildCommand": "npm install && npm run build",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
-  "installCommand": "npm ci"
+  "installCommand": "npm install --force"
 } 
