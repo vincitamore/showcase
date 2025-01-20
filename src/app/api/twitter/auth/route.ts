@@ -2,11 +2,16 @@ import { NextResponse } from 'next/server';
 import { TwitterApi } from 'twitter-api-v2';
 import { cookies } from 'next/headers';
 
+// Mark this route as dynamic
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
-    const host = request.headers.get('host') || '';
-    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${host}`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (
+      process.env.NODE_ENV === 'production' 
+        ? 'https://' + process.env.VERCEL_URL 
+        : 'http://localhost:3000'
+    );
 
     if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
       throw new Error('Missing Twitter credentials');
