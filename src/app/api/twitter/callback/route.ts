@@ -24,8 +24,8 @@ export async function GET(request: Request) {
       throw new Error('Invalid state parameter');
     }
     
-    cookieStore.delete('x_oauth_state', { path: '/' });
-    cookieStore.delete('x_oauth_code_verifier', { path: '/' });
+    cookieStore.delete('x_oauth_state');
+    cookieStore.delete('x_oauth_code_verifier');
     
     if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
       throw new Error('Missing Twitter credentials');
@@ -66,24 +66,27 @@ export async function GET(request: Request) {
       });
     }
     
-    return NextResponse.redirect(new URL('/blog', request.url), {
+    const response = NextResponse.redirect(new URL('/blog', request.url), {
       status: 302,
-      headers: {
-        'Cache-Control': 'no-store, max-age=0'
-      }
     });
+
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    
+    return response;
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    cookieStore.delete('x_oauth_state', { path: '/' });
-    cookieStore.delete('x_oauth_code_verifier', { path: '/' });
+    cookieStore.delete('x_oauth_state');
+    cookieStore.delete('x_oauth_code_verifier');
     
     const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
-    return NextResponse.redirect(new URL(`/error?message=${encodeURIComponent(errorMessage)}`, request.url), {
-      status: 302,
-      headers: {
-        'Cache-Control': 'no-store, max-age=0'
-      }
-    });
+    const response = NextResponse.redirect(
+      new URL(`/error?message=${encodeURIComponent(errorMessage)}`, request.url),
+      { status: 302 }
+    );
+
+    response.headers.set('Cache-Control', 'no-store, max-age=0');
+    
+    return response;
   }
 } 
