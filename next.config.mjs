@@ -10,9 +10,7 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Disable all experimental features
-    esmExternals: 'loose',
-    serverActions: false
+    esmExternals: 'loose'
   },
   output: 'standalone',
   typescript: {

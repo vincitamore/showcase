@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { TwitterApi } from 'twitter-api-v2';
 import { cookies } from 'next/headers';
-import { headers } from 'next/headers';
 
 export async function GET(request: Request) {
   try {
-    const headersList = headers();
-    const domain = headersList.get('host') || '';
+    const host = request.headers.get('host') || '';
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${domain}`;
+    const baseUrl = `${protocol}://${host}`;
 
     if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
       throw new Error('Missing Twitter credentials');

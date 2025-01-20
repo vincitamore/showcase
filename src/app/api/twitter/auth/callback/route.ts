@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { headers } from 'next/headers';
 import { TwitterApi } from 'twitter-api-v2';
 
 export async function GET(request: Request) {
   try {
-    const headersList = headers();
-    const domain = headersList.get('host') || '';
+    const host = request.headers.get('host') || '';
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${domain}`;
+    const baseUrl = `${protocol}://${host}`;
 
     const url = new URL(request.url);
     const state = url.searchParams.get('state');
@@ -61,9 +59,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL('/#blog', baseUrl));
   } catch (error) {
     console.error('Error handling OAuth callback:', error);
-    const domain = headers().get('host') || '';
+    const host = request.headers.get('host') || '';
     const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${domain}`;
+    const baseUrl = `${protocol}://${host}`;
     return NextResponse.redirect(new URL('/auth-error', baseUrl));
   }
 } 
