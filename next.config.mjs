@@ -18,8 +18,6 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    // Enable server actions
-    serverActions: true,
     // Enable module resolution features
     esmExternals: 'loose',
     // Optimize build performance
@@ -27,6 +25,7 @@ const nextConfig = {
       logLevel: 'error',
       contextDirectory: __dirname,
       processCwd: __dirname,
+      memoryLimit: 4096,
     },
     // Prevent excessive file tracing
     outputFileTracingRoot: __dirname,
@@ -49,6 +48,11 @@ const nextConfig = {
       tls: false,
       crypto: false,
     };
+
+    // Add external dependencies for server-side
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'ws', 'bufferutil', 'utf-8-validate'];
+    }
 
     return config;
   },
