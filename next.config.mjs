@@ -18,6 +18,10 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    // Enable server actions
+    serverActions: true,
+    // Enable module resolution features
+    esmExternals: 'loose',
     // Optimize build performance
     turbotrace: {
       logLevel: 'error',
@@ -35,6 +39,18 @@ const nextConfig = {
         '**/*.{pem,pdf,txt,log,md}',
       ],
     },
+  },
+  webpack: (config, { isServer }) => {
+    // Handle module resolution
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      crypto: false,
+    };
+
+    return config;
   },
 }
 
