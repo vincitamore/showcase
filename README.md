@@ -172,7 +172,7 @@ To generate your preview image:
 ## Project Goals
 
 1. **Visual Appeal**
-   - Modern, clean design with consistent theming
+   - Modern, clean designs with consistent theming
    - Smooth animations and transitions
    - Interactive elements that enhance UX
    - Responsive image modals and galleries
