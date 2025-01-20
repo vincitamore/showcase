@@ -12,6 +12,7 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    serverComponentsExternalPackages: ['twitter-api-v2'],
     // Disable build traces collection which is causing the stack overflow
     outputFileTracingIncludes: {},
     outputFileTracingExcludes: {
