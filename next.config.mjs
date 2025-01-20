@@ -37,9 +37,17 @@ const nextConfig = {
     ],
   },
   experimental: {
+    // Disable features that might cause trace collection issues
     serverActions: {
       bodySizeLimit: '2mb'
-    }
+    },
+    // Configure turbotrace properly
+    turbotrace: {
+      memoryLimit: 4096,
+      logLevel: 'error'
+    },
+    // Optimize module resolution
+    optimizePackageImports: ['twitter-api-v2']
   },
   output: 'standalone',
   typescript: {
@@ -57,6 +65,12 @@ const nextConfig = {
   generateEtags: false,
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
   distDir: '.next',
+  // Simplify module resolution
+  modularizeImports: {
+    'twitter-api-v2': {
+      transform: 'twitter-api-v2/dist/{{member}}'
+    }
+  },
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       Object.assign(config.resolve.alias, {
@@ -64,11 +78,8 @@ const nextConfig = {
       });
     }
     if (isServer) {
-      config.externals = [
-        ...config.externals,
-        'styled-jsx',
-        'styled-jsx/style'
-      ];
+      // Simplify externals handling
+      config.externals = ['styled-jsx', ...config.externals];
     }
     return config;
   }

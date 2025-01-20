@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { TwitterApi } from 'twitter-api-v2';
+import { createTwitterClient, getBaseUrl } from '@/lib/twitter-client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,20 +27,8 @@ export async function GET(request: Request) {
     cookieStore.delete('x_oauth_state');
     cookieStore.delete('x_oauth_code_verifier');
     
-    if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
-      throw new Error('Missing Twitter credentials');
-    }
-    
-    const client = new TwitterApi({
-      clientId: process.env.TWITTER_CLIENT_ID,
-      clientSecret: process.env.TWITTER_API_SECRET,
-    });
-    
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (
-      process.env.NODE_ENV === 'production' 
-        ? 'https://' + process.env.VERCEL_URL 
-        : 'http://localhost:3000'
-    );
+    const client = createTwitterClient();
+    const baseUrl = getBaseUrl();
     
     const { accessToken, refreshToken } = await client.loginWithOAuth2({
       code,
