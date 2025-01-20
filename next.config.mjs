@@ -91,22 +91,34 @@ const nextConfig = {
     if (isServer) {
       const originalExternals = config.externals;
       config.externals = (context, request, callback) => {
-        // First check if it's a styled-jsx module
+        // Skip externals for app directory pages and internal Next.js requests
+        if (context?.issuer?.includes('/app/') || request.startsWith('next/')) {
+          return callback();
+        }
+
+        // Handle styled-jsx modules
         if (request.startsWith('styled-jsx')) {
           return callback(null, `commonjs ${request}`);
         }
-        // If it's not styled-jsx, use the original externals
+
+        // Handle original externals
         if (typeof originalExternals === 'function') {
           return originalExternals(context, request, callback);
-        } else if (Array.isArray(originalExternals)) {
-          // Handle array of externals
+        }
+        
+        if (Array.isArray(originalExternals)) {
           for (const external of originalExternals) {
             if (typeof external === 'function') {
-              return external(context, request, callback);
+              try {
+                return external(context, request, callback);
+              } catch (err) {
+                console.warn(`[DEBUG] External handler error:`, err);
+              }
             }
           }
         }
-        // If no externals matched, continue with default behavior
+
+        // Default behavior
         callback();
       };
     }
