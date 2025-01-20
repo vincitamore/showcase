@@ -118,6 +118,29 @@ const nextConfig = {
             fullySpecified: false
           }
         });
+
+        // Force styled-jsx to be included in the server bundle
+        config.externals = ['next', ...config.externals].filter(external => {
+          if (typeof external === 'string') {
+            return !external.includes('styled-jsx');
+          }
+          return true;
+        });
+
+        // Add a specific rule for styled-jsx
+        config.module.rules.push({
+          test: /styled-jsx\/.*\.js$/,
+          include: /node_modules/,
+          use: [
+            {
+              loader: 'babel-loader',
+              options: {
+                presets: ['@babel/preset-env'],
+                plugins: ['@babel/plugin-transform-modules-commonjs']
+              }
+            }
+          ]
+        });
       } catch (error) {
         console.log('[DEBUG] Error in webpack config:', error);
       }
