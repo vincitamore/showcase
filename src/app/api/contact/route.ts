@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const { name, email, message } = await req.json()
+    const body = await request.json()
+    const { name, email, message } = body
 
-    // Validate input
-    if (!name?.trim() || !email?.trim() || !message?.trim()) {
+    // Validate required fields
+    if (!name || !email || !message) {
       return NextResponse.json(
-        { error: "All fields are required" },
+        { error: 'Name, email, and message are required' },
         { status: 400 }
       )
     }
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json(
-        { error: "Invalid email format" },
+        { error: 'Invalid email format' },
         { status: 400 }
       )
     }
@@ -81,11 +83,15 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Contact form error:", error)
     return NextResponse.json(
-      { error: "Failed to process request" },
+      { message: 'Message sent successfully' },
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error('Contact form error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to send message'
+    return NextResponse.json(
+      { error: errorMessage },
       { status: 500 }
     )
   }
