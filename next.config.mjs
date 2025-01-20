@@ -12,27 +12,23 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    serverComponentsExternalPackages: ['twitter-api-v2'],
-  },
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        crypto: false,
-        https: false,
-        http: false,
-        zlib: false,
-        path: false,
-        stream: false,
-        util: false,
-        url: false,
-        os: false,
-      };
-    }
-    return config;
+    // Optimize build performance
+    turbotrace: {
+      logLevel: 'error',
+      contextDirectory: __dirname,
+      processCwd: __dirname,
+    },
+    // Prevent excessive file tracing
+    outputFileTracingRoot: __dirname,
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/@swc/core-linux-x64-gnu',
+        'node_modules/@swc/core-linux-x64-musl',
+        'node_modules/@esbuild/linux-x64',
+        '.git/**/*',
+        '**/*.{pem,pdf,txt,log,md}',
+      ],
+    },
   },
 }
 

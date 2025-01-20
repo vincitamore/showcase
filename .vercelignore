@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+node_modules
+.next
+.vercel
+README.md
+*.log
+*.lock
+*.md
+.gitignore
+.eslintrc*
+.prettier*
+tsconfig.tsbuildinfo 
