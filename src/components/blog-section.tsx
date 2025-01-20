@@ -62,20 +62,47 @@ const BlogSection = () => {
   const fetchTweets = async () => {
     try {
       const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME
+      if (!username) {
+        console.error('Twitter username not configured');
+        toast({
+          title: "Configuration Error",
+          description: "Twitter username is not configured.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch(
         `/api/twitter?action=fetch_tweets&username=${username}`
       )
-      if (!response.ok) throw new Error('Failed to fetch tweets')
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch tweets:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        
+        toast({
+          title: "Error Loading Tweets",
+          description: errorData.error || "Failed to load tweets. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       const data = await response.json()
       // Ensure we have an array of tweets with required fields
       const validTweets = Array.isArray(data) ? data : []
       setTweets(validTweets)
     } catch (error) {
-      console.error('Error fetching tweets:', error)
+      console.error('Error fetching tweets:', error);
       toast({
         title: "Error",
-        description: "Failed to load tweets. Please try again later.",
+        description: error instanceof Error 
+          ? `Failed to load tweets: ${error.message}`
+          : "Failed to load tweets. Please try again later.",
         variant: "destructive",
       })
     }
