@@ -66,14 +66,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={false}
-          storageKey="theme-preference"
-          forcedTheme={process.env.NODE_ENV === 'production' ? 'light' : undefined}
-        >
+        <ThemeProvider>
           <div className="relative flex min-h-screen flex-col">
             <NavBar />
             {children}

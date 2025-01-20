@@ -11,20 +11,24 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
     setMounted(true)
   }, [])
 
-  if (!mounted) {
-    return (
-      <div style={{ visibility: 'hidden' }}>
-        {children}
-      </div>
-    )
+  // During SSR and initial client render, use a default theme
+  const defaultTheme = {
+    theme: 'light',
+    setTheme: () => null,
+    themes: ['light', 'dark', 'dim', 'system'],
+    systemTheme: 'light',
+    resolvedTheme: 'light',
   }
 
   return (
     <NextThemesProvider
       {...props}
+      defaultTheme="light"
+      forcedTheme={!mounted ? 'light' : undefined}
+      enableSystem={mounted}
       themes={["light", "dark", "dim", "system"]}
-      enableSystem
-      enableColorScheme
+      attribute="class"
+      disableTransitionOnChange
     >
       {children}
     </NextThemesProvider>

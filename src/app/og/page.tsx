@@ -13,17 +13,19 @@ export default function OGPreviewPage() {
     setMounted(true)
   }, [])
 
+  // During SSR and initial mount, render a static version
   if (!mounted) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-4">
         <div className="flex gap-4">
-          <Button variant="outline">Light</Button>
+          <Button variant="default">Light</Button>
           <Button variant="outline">Dim</Button>
           <Button variant="outline">Dark</Button>
         </div>
         <div className="scale-[0.35] origin-top sm:scale-[0.45] lg:scale-[0.55]">
           <OGImage />
         </div>
+        <p className="text-center text-sm text-muted-foreground">Loading theme preferences...</p>
       </div>
     )
   }
