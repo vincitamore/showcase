@@ -10,13 +10,10 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Completely disable all experimental features and tracing
-    esmExternals: false,
-    turbotrace: false,
-    serverActions: false,
-    serverComponentsExternalPackages: ['twitter-api-v2']
+    // Disable all experimental features
+    esmExternals: 'loose',
+    serverActions: false
   },
-  transpilePackages: ['twitter-api-v2'],
   output: 'standalone',
   typescript: {
     // !! WARN !!
@@ -28,11 +25,11 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   // Simplify the build process
   swcMinify: true,
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{member}}'
-    }
-  }
+  poweredByHeader: false,
+  compress: true,
+  generateEtags: false,
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  distDir: '.next'
 }
 
 export default nextConfig 

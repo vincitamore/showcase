@@ -1,11 +1,15 @@
 {
-  "framework": "nextjs",
-  "buildCommand": "next build",
-  "devCommand": "next dev",
-  "installCommand": "npm install",
+  "version": 2,
+  "builds": [
+    {
+      "src": "next.config.mjs",
+      "use": "@vercel/next"
+    }
+  ],
   "functions": {
     "src/app/api/**/*": {
-      "memory": 3008
+      "memory": 3008,
+      "maxDuration": 60
     }
   }
 } 
