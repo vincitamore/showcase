@@ -47,6 +47,11 @@ const nextConfig = {
       fs: false,
       net: false,
       tls: false,
+      crypto: false,
+      stream: false,
+      http: false,
+      https: false,
+      zlib: false,
     };
 
     if (isServer) {
@@ -63,18 +68,6 @@ const nextConfig = {
       ...config.resolve.alias,
       '@': './src',
     };
-
-    if (!isServer) {
-      // Client-side polyfills
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        crypto: require.resolve('crypto-browserify'),
-        stream: require.resolve('stream-browserify'),
-        https: require.resolve('https-browserify'),
-        http: require.resolve('stream-http'),
-        zlib: require.resolve('browserify-zlib'),
-      };
-    }
 
     return config;
   },
