@@ -6,10 +6,14 @@ export async function getReadOnlyClient() {
     throw new Error('Missing Twitter API credentials in environment variables');
   }
 
-  return new TwitterApi({
+  // Create client with app-only auth
+  const client = new TwitterApi({
     appKey: process.env.TWITTER_API_KEY,
     appSecret: process.env.TWITTER_API_SECRET,
   });
+
+  // Get app-only client
+  return await client.appLogin();
 }
 
 // Get the OAuth2 URL for login
