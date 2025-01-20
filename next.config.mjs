@@ -51,18 +51,27 @@ const nextConfig = {
   distDir: '.next',
   webpack: (config, { isServer }) => {
     if (isServer) {
-      const originalExternals = config.externals;
-      config.externals = [
-        ({ context, request }, callback) => {
-          if (request.startsWith('styled-jsx')) {
-            return callback(null, false);
+      // Add styled-jsx to the server bundle
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'styled-jsx': 'styled-jsx/style.js',
+        'styled-jsx/style': 'styled-jsx/style.js'
+      };
+
+      // Ensure styled-jsx is included in the bundle
+      config.module.rules.push({
+        test: /styled-jsx\/style\.js$/,
+        sideEffects: false,
+        use: [
+          {
+            loader: 'next-swc-loader',
+            options: {
+              isServer: true,
+              pagesDir: true
+            }
           }
-          if (typeof originalExternals[0] === 'function') {
-            return originalExternals[0]({ context, request }, callback);
-          }
-          return callback(null, true);
-        }
-      ];
+        ]
+      });
     }
     return config;
   }
