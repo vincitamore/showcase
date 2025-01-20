@@ -37,23 +37,9 @@ const nextConfig = {
   generateEtags: false,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
+  // Let Next.js handle module bundling
   transpilePackages: ['styled-jsx'],
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Remove styled-jsx from externals to bundle it
-      const externals = [...config.externals];
-      config.externals = externals.map((external) => {
-        if (typeof external !== 'function') return external;
-        return (ctx, req, cb) => {
-          if (req.startsWith('styled-jsx')) {
-            return cb();
-          }
-          return external(ctx, req, cb);
-        };
-      });
-    }
-    return config;
-  }
+  serverComponentsExternalPackages: ['styled-jsx']
 }
 
 export default nextConfig 
