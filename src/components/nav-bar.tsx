@@ -26,7 +26,7 @@ const navigation = [
 ]
 
 export function NavBar() {
-  const { setTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const [isOpen, setIsOpen] = React.useState(false)
   const { scrollToSection } = useSmoothScroll()
 
@@ -67,19 +67,19 @@ export function NavBar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setTheme("light")}>
+              <DropdownMenuItem onClick={() => setTheme("light")} className={theme === "light" ? "bg-accent" : ""}>
                 <Sun className="mr-2 h-4 w-4" />
                 Light
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dim")}>
+              <DropdownMenuItem onClick={() => setTheme("dim")} className={theme === "dim" ? "bg-accent" : ""}>
                 <Laptop className="mr-2 h-4 w-4" />
                 Dim
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")}>
+              <DropdownMenuItem onClick={() => setTheme("dark")} className={theme === "dark" ? "bg-accent" : ""}>
                 <Moon className="mr-2 h-4 w-4" />
                 Dark
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")}>
+              <DropdownMenuItem onClick={() => setTheme("system")} className={theme === "system" ? "bg-accent" : ""}>
                 <Monitor className="mr-2 h-4 w-4" />
                 System
               </DropdownMenuItem>

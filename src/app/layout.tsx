@@ -15,8 +15,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Vincit Amore | Portfolio",
-  description: "Building technology that empowers and endures",
+  title: "Showcase",
+  description: "A showcase of modern web development",
   metadataBase: new URL('https://amore.build'),
   icons: {
     icon: [
@@ -64,20 +64,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head />
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange
+          disableTransitionOnChange={false}
+          storageKey="theme-preference"
         >
           <div className="relative flex min-h-screen flex-col">
             <NavBar />
             {children}
           </div>
-          <Analytics />
           <Toaster />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
