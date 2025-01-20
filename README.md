@@ -11,6 +11,7 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - Smooth scroll navigation with section highlighting
 - Dynamic image modals for project showcases
 - Real-time form validation and submission
+- X (Twitter) Integration with OAuth authentication
 - Built with performance and accessibility in mind
 - Automated deployment via GitHub Actions and Vercel
 
@@ -24,6 +25,7 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - **Animations**: CSS transforms & transitions
 - **Theme Management**: next-themes
 - **Email**: Nodemailer with SMTP
+- **Social**: X (Twitter) API v2
 - **Analytics**: Vercel Analytics
 
 ## Project Structure
@@ -31,13 +33,13 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 ```
 src/
 ├── app/              # Next.js app directory
-│   ├── api/         # API routes for form handling
+│   ├── api/         # API routes for form handling and X auth
 │   └── og/          # OpenGraph image generation
 ├── components/       # React components
 │   ├── ui/          # shadcn/ui components
 │   └── ...          # Custom components
 ├── hooks/           # Custom React hooks
-└── lib/             # Utility functions
+└── lib/             # Utility functions and API clients
 ```
 
 ## Getting Started
@@ -57,25 +59,41 @@ bun install
 # Copy the example environment file
 cp .env.local.example .env.local
 
-# Edit .env.local with your SMTP credentials:
+# Edit .env.local with your credentials:
+# SMTP Configuration
 SMTP_HOST=your-smtp-host
 SMTP_PORT=your-smtp-port
 SMTP_USER=your-smtp-username
 SMTP_PASS=your-smtp-password
+
+# X (Twitter) API Configuration
+TWITTER_API_KEY=your-api-key
+TWITTER_API_SECRET=your-api-secret
+TWITTER_USERNAME=your-username-without-@
+NEXT_PUBLIC_TWITTER_USERNAME=your-username-without-@
+
+# Application URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
 ```
 
-   For serverless deployment (e.g., Vercel):
-   - Go to your project settings in the deployment platform
-   - Add the environment variables in the Environment Variables section
-   - Include all variables from `.env.local`
-   - Deploy your project to apply the changes
+4. Configure X API Access:
+   - Visit the [X Developer Portal](https://developer.twitter.com/en/portal/dashboard)
+   - Create a new project and app
+   - Enable OAuth 2.0 and set up authentication
+   - Add your callback URL: `{NEXT_PUBLIC_APP_URL}/api/auth/x/callback`
+   - Get your API key and secret
+   - Configure User authentication settings:
+     - Enable OAuth 2.0
+     - Set App permissions to Read and Write
+     - Add the callback URL
+     - Request email from users (optional)
 
-4. Run the development server:
+5. Run the development server:
 ```bash
 bun run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Customization Guide
 
@@ -94,15 +112,49 @@ bun run dev
    - Update your professional timeline in `src/components/experience-timeline.tsx`
    - Adjust skill icons and descriptions to match your expertise
 
-4. **Theme & Styling**
+4. **Blog Section**
+   - Configure X API credentials in `.env.local`
+   - Customize the tweet display in `src/components/blog-section.tsx`
+   - Adjust authentication settings in X Developer Portal
+   - Modify post composer styling and behavior
+
+5. **Theme & Styling**
    - Modify colors in `src/app/globals.css`
    - Adjust component styles in `src/components/ui/`
    - Update fonts and typography settings
 
-5. **Email Setup**
+6. **Email Setup**
    - Configure SMTP settings in `.env.local`
    - Update email templates in `src/app/api/contact/route.ts`
    - Test form submission with your email service
+
+## Blog Section Features
+
+The blog section integrates with X (formerly Twitter) to provide:
+
+1. **Authentication**
+   - Secure OAuth 2.0 authentication flow
+   - Session management with httpOnly cookies
+   - Automatic token refresh handling
+   - CSRF protection with state verification
+
+2. **Content Display**
+   - Real-time tweet fetching
+   - Engagement metrics (likes, replies, retweets)
+   - Formatted timestamps
+   - Responsive card layout
+
+3. **Post Composer**
+   - Authenticated posting to X
+   - Real-time validation
+   - Loading states and error handling
+   - Success notifications
+
+4. **Security**
+   - Server-side token management
+   - Protected API endpoints
+   - Secure cookie handling
+   - Rate limiting and validation
 
 ## OpenGraph Preview
 
@@ -158,6 +210,8 @@ To generate your preview image:
 - Project image modals
 - OpenGraph image generation
 - Analytics integration
+- X integration with OAuth authentication
+- Blog section with post composer
 
 ### In Progress
 - Project filtering and sorting
@@ -165,7 +219,6 @@ To generate your preview image:
 - SEO enhancements
 
 ### Upcoming
-- Blog section integration
 - Case studies for major projects
 - Advanced image optimization
 - Internationalization support

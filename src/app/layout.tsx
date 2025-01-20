@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { NavBar } from "@/components/nav-bar"
 import { Analytics } from "@vercel/analytics/react"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
     title: 'Vincit Amore | Portfolio',
     description: 'Building technology that empowers and endures',
     images: ['/og-image.png'],
-    creator: '@yourusername'
+    creator: '@vincit_amore'
   },
 }
 
@@ -77,8 +78,9 @@ export default function RootLayout({
             <NavBar />
             {children}
           </div>
+          <Analytics />
+          <Toaster />
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )
