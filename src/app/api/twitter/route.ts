@@ -34,55 +34,60 @@ const debugModuleResolution = () => {
 
 // Enhanced debug helper for Twitter API configuration
 const debugTwitterConfig = () => {
-  console.log('[TWITTER DEBUG] Environment check:');
-  console.log('[TWITTER DEBUG] TWITTER_API_KEY exists:', !!process.env.TWITTER_API_KEY);
-  console.log('[TWITTER DEBUG] TWITTER_API_SECRET exists:', !!process.env.TWITTER_API_SECRET);
-  console.log('[TWITTER DEBUG] TWITTER_USERNAME exists:', !!process.env.TWITTER_USERNAME);
-  console.log('[TWITTER DEBUG] NEXT_PUBLIC_TWITTER_USERNAME exists:', !!process.env.NEXT_PUBLIC_TWITTER_USERNAME);
+  console.warn('[TWITTER CONFIG] Starting environment check...');
+  const config = {
+    TWITTER_API_KEY: !!process.env.TWITTER_API_KEY,
+    TWITTER_API_SECRET: !!process.env.TWITTER_API_SECRET,
+    TWITTER_USERNAME: !!process.env.TWITTER_USERNAME,
+    NEXT_PUBLIC_TWITTER_USERNAME: !!process.env.NEXT_PUBLIC_TWITTER_USERNAME,
+    NODE_ENV: process.env.NODE_ENV
+  };
   
-  // Log masked versions of keys for verification
+  console.warn('[TWITTER CONFIG] Environment variables:', config);
+  
   if (process.env.TWITTER_API_KEY) {
     const maskedKey = `${process.env.TWITTER_API_KEY.slice(0, 4)}...${process.env.TWITTER_API_KEY.slice(-4)}`;
-    console.log('[TWITTER DEBUG] API Key format:', maskedKey);
+    console.warn('[TWITTER CONFIG] API Key format:', maskedKey);
   }
+  
+  return config;
 }
 
 // Initialize Twitter client with enhanced error handling
 const getTwitterClient = () => {
-  debugTwitterConfig();
+  const config = debugTwitterConfig();
   
   if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
-    console.error('[TWITTER ERROR] Missing required environment variables');
-    throw new Error('Twitter API credentials not configured');
+    const error = new Error('Twitter API credentials not configured');
+    console.warn('[TWITTER ERROR] Initialization failed:', error.message, '\nConfig:', config);
+    throw error;
   }
 
   try {
-    console.log('[TWITTER DEBUG] Initializing Twitter client...');
+    console.warn('[TWITTER CLIENT] Initializing...');
     const client = new TwitterApi({
       appKey: process.env.TWITTER_API_KEY,
       appSecret: process.env.TWITTER_API_SECRET,
     });
-    console.log('[TWITTER DEBUG] Twitter client initialized successfully');
+    console.warn('[TWITTER CLIENT] Initialized successfully');
     return client;
   } catch (error) {
-    console.error('[TWITTER ERROR] Failed to initialize Twitter client:', error);
+    console.warn('[TWITTER ERROR] Client initialization failed:', error);
     throw error;
   }
 };
 
 export async function GET(request: Request) {
-  debugModuleResolution();
-  
   try {
-    console.log('[TWITTER DEBUG] Processing GET request...');
+    console.warn('[TWITTER REQUEST] Starting GET request processing');
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const username = searchParams.get('username')?.replace('@', '');
 
-    console.log('[TWITTER DEBUG] Request params:', { action, username });
+    console.warn('[TWITTER REQUEST] Params:', { action, username });
 
     if (!action) {
-      console.log('[TWITTER DEBUG] Missing action parameter');
+      console.warn('[TWITTER REQUEST] Missing action parameter');
       return NextResponse.json({ error: 'Action is required' }, { status: 400 });
     }
 
@@ -91,20 +96,20 @@ export async function GET(request: Request) {
     switch (action) {
       case 'fetch_tweets': {
         if (!username) {
-          console.log('[TWITTER DEBUG] Missing username parameter');
+          console.warn('[TWITTER REQUEST] Missing username parameter');
           return NextResponse.json({ error: 'Username is required' }, { status: 400 });
         }
 
-        console.log('[TWITTER DEBUG] Fetching user data for:', username);
+        console.warn('[TWITTER REQUEST] Fetching user data for:', username);
         const user = await client.v2.userByUsername(username);
         
         if (!user.data) {
-          console.log('[TWITTER DEBUG] User not found:', username);
+          console.warn('[TWITTER REQUEST] User not found:', username);
           return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        console.log('[TWITTER DEBUG] Found user:', user.data.id);
-        console.log('[TWITTER DEBUG] Fetching tweets...');
+        console.warn('[TWITTER REQUEST] Found user:', user.data.id);
+        console.warn('[TWITTER REQUEST] Fetching tweets...');
         
         const tweets = await client.v2.userTimeline(user.data.id, {
           exclude: ['replies', 'retweets'],
@@ -114,20 +119,28 @@ export async function GET(request: Request) {
           max_results: 10,
         });
 
-        console.log('[TWITTER DEBUG] Fetched tweets:', tweets.data);
+        console.warn('[TWITTER REQUEST] Tweets fetched successfully');
         return NextResponse.json(tweets.data);
       }
 
       default:
-        console.log('[TWITTER DEBUG] Invalid action:', action);
+        console.warn('[TWITTER REQUEST] Invalid action:', action);
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error) {
-    console.error('[TWITTER ERROR] Request failed:', error);
-    // Log the full error object for debugging
-    console.error('[TWITTER ERROR] Full error:', JSON.stringify(error, null, 2));
+    // Enhanced error logging
+    console.warn('[TWITTER ERROR] Request failed:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error: JSON.stringify(error, null, 2)
+    });
+
     return NextResponse.json(
-      { error: 'Failed to process Twitter request', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Failed to process Twitter request', 
+        details: error instanceof Error ? error.message : 'Unknown error',
+        env: process.env.NODE_ENV
+      },
       { status: 500 }
     );
   }
