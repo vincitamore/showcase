@@ -17,9 +17,12 @@ const nextConfig = {
     ],
   },
   experimental: {
+    // Ensure proper module resolution
     esmExternals: 'loose',
-    // Ensure styled-jsx is properly handled
-    externalDir: true,
+    // Bundle styled-jsx with the server code
+    serverActions: {
+      bodySizeLimit: '2mb'
+    },
     // Disable build traces collection
     outputFileTracingRoot: undefined,
     outputFileTracingExcludes: {
@@ -46,13 +49,25 @@ const nextConfig = {
   generateEtags: false,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
-  // Ensure Next.js includes styled-jsx in the server bundle
   webpack: (config, { isServer }) => {
     if (isServer) {
-      const styledJsxPath = dirname(require.resolve('styled-jsx/package.json'));
-      config.resolve.alias['styled-jsx'] = styledJsxPath;
-      config.resolve.alias['styled-jsx/package.json'] = join(styledJsxPath, 'package.json');
+      // Force styled-jsx to be included in the server bundle
+      config.externals = ['styled-jsx', ...(Array.isArray(config.externals) ? config.externals : [])];
     }
+
+    // Add styled-jsx to the bundle
+    config.module.rules.push({
+      test: /styled-jsx\/.*\.js$/,
+      use: [
+        {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+          },
+        },
+      ],
+    });
+
     return config;
   }
 }
