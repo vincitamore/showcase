@@ -61,7 +61,7 @@ const nextConfig = {
     // Add module aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': '/vercel/path0/src',
+      '@': './src',
     };
 
     return config;
