@@ -50,23 +50,20 @@ const nextConfig = {
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
   webpack: (config, { isServer }) => {
-    // Prevent styled-jsx from being externalized
     if (isServer) {
-      const originalExternals = [...config.externals];
+      const originalExternals = config.externals;
       config.externals = [
-        (ctx, req, cb) => {
-          if (req.startsWith('styled-jsx')) {
-            return cb(null, false);
+        ({ context, request }, callback) => {
+          if (request.startsWith('styled-jsx')) {
+            return callback(null, false);
           }
           if (typeof originalExternals[0] === 'function') {
-            return originalExternals[0](ctx, req, cb);
+            return originalExternals[0]({ context, request }, callback);
           }
-          return cb(null, true);
-        },
-        ...(Array.isArray(originalExternals) ? originalExternals.slice(1) : [])
+          return callback(null, true);
+        }
       ];
     }
-
     return config;
   }
 }
