@@ -1,3 +1,10 @@
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const require = createRequire(import.meta.url);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -40,12 +47,11 @@ const nextConfig = {
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
   // Ensure Next.js includes styled-jsx in the server bundle
-  webpack: async (config, { isServer }) => {
+  webpack: (config, { isServer }) => {
     if (isServer) {
-      const path = await import('path');
-      const styledJsxPath = path.dirname(await import.meta.resolve('styled-jsx'));
+      const styledJsxPath = dirname(require.resolve('styled-jsx/package.json'));
       config.resolve.alias['styled-jsx'] = styledJsxPath;
-      config.resolve.alias['styled-jsx/package.json'] = path.join(styledJsxPath, 'package.json');
+      config.resolve.alias['styled-jsx/package.json'] = join(styledJsxPath, 'package.json');
     }
     return config;
   }
