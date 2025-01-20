@@ -68,35 +68,12 @@ const nextConfig = {
       transform: 'twitter-api-v2/dist/{{member}}'
     }
   },
-  webpack: (config, { isServer }) => {
-    // Add styled-jsx to the resolve aliases
-    config.resolve = {
-      ...config.resolve,
-      alias: {
-        ...config.resolve?.alias,
-        'styled-jsx': require.resolve('styled-jsx'),
-        'styled-jsx/style': require.resolve('styled-jsx/style')
-      }
-    };
-
-    // Only handle externals for server-side
-    if (isServer) {
-      const originalExternals = config.externals;
-      config.externals = (ctx, callback) => {
-        // Handle styled-jsx modules
-        if (ctx.request?.startsWith('styled-jsx')) {
-          return callback(null, `commonjs ${ctx.request}`);
-        }
-        // Use original externals
-        if (typeof originalExternals === 'function') {
-          return originalExternals(ctx, callback);
-        }
-        // Default behavior
-        callback();
-      };
-    }
-
-    return config;
+  // Static export configuration
+  trailingSlash: true,
+  skipTrailingSlashRedirect: true,
+  // Disable server features in production
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
   }
 }
 
