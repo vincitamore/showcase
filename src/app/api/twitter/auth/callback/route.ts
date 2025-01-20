@@ -4,7 +4,6 @@ import { TwitterApi } from 'twitter-api-v2';
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 
 export async function GET(request: Request) {
   try {
@@ -55,6 +54,7 @@ export async function GET(request: Request) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 1 week
+      path: '/'
     });
     
     if (refreshToken) {
@@ -62,14 +62,27 @@ export async function GET(request: Request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30 // 30 days
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: '/'
       });
     }
     
     // Redirect back to blog section
-    return NextResponse.redirect(new URL('/blog', request.url));
+    const redirectUrl = new URL('/blog', request.url);
+    return NextResponse.redirect(redirectUrl, {
+      status: 302,
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
+    });
   } catch (error) {
     console.error('OAuth callback error:', error);
-    return NextResponse.redirect(new URL('/error?message=Authentication+failed', request.url));
+    const errorUrl = new URL('/error?message=Authentication+failed', request.url);
+    return NextResponse.redirect(errorUrl, {
+      status: 302,
+      headers: {
+        'Cache-Control': 'no-store, max-age=0'
+      }
+    });
   }
 } 
