@@ -53,9 +53,24 @@ const debugTwitterConfig = () => {
   return config;
 }
 
+// Simple logging helper that works in Vercel
+function log(level: 'info' | 'error', message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logData = {
+    timestamp,
+    level,
+    message,
+    ...data,
+    // Add request ID or other context if available
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
+  };
+
+  // Force log to stderr for Vercel
+  console.error(JSON.stringify(logData));
+}
+
 // Initialize Twitter client with enhanced error handling
 const getTwitterClient = () => {
-  // Log environment state
   const envState = {
     hasApiKey: !!process.env.TWITTER_API_KEY,
     hasApiSecret: !!process.env.TWITTER_API_SECRET,
@@ -63,10 +78,11 @@ const getTwitterClient = () => {
     vercelEnv: process.env.VERCEL_ENV
   };
   
+  log('info', 'Initializing Twitter client', { envState });
+  
   if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
     const error = new Error('Twitter API credentials not configured');
-    // Use error level for important issues
-    console.error('Twitter client initialization failed:', { 
+    log('error', 'Twitter client initialization failed', { 
       error: error.message,
       envState 
     });
@@ -79,7 +95,7 @@ const getTwitterClient = () => {
       appSecret: process.env.TWITTER_API_SECRET,
     });
   } catch (error) {
-    console.error('Twitter client creation failed:', { 
+    log('error', 'Twitter client creation failed', { 
       error: error instanceof Error ? error.message : 'Unknown error',
       envState
     });
@@ -93,14 +109,14 @@ export async function GET(request: Request) {
     const action = searchParams.get('action');
     const username = searchParams.get('username')?.replace('@', '');
 
-    // Log request details
-    console.log('Processing Twitter request:', {
+    log('info', 'Processing Twitter request', {
       action,
       username,
       url: request.url
     });
 
     if (!action) {
+      log('error', 'Missing action parameter');
       return NextResponse.json({ error: 'Action is required' }, { status: 400 });
     }
 
@@ -109,13 +125,14 @@ export async function GET(request: Request) {
     switch (action) {
       case 'fetch_tweets': {
         if (!username) {
+          log('error', 'Missing username parameter');
           return NextResponse.json({ error: 'Username is required' }, { status: 400 });
         }
 
         const user = await client.v2.userByUsername(username);
         
         if (!user.data) {
-          console.error('Twitter user not found:', { username });
+          log('error', 'User not found', { username });
           return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
@@ -127,8 +144,7 @@ export async function GET(request: Request) {
           max_results: 10,
         });
 
-        // Log success
-        console.log('Tweets fetched successfully:', {
+        log('info', 'Tweets fetched successfully', {
           userId: user.data.id,
           tweetCount: tweets.data.meta?.result_count || 0
         });
@@ -137,11 +153,11 @@ export async function GET(request: Request) {
       }
 
       default:
+        log('error', 'Invalid action', { action });
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
   } catch (error) {
-    // Log the full error details
-    console.error('Twitter request failed:', {
+    const errorDetails = {
       error: error instanceof Error ? {
         message: error.message,
         stack: error.stack,
@@ -151,9 +167,10 @@ export async function GET(request: Request) {
         node: process.env.NODE_ENV,
         vercel: process.env.VERCEL_ENV
       }
-    });
+    };
 
-    // Return a structured error response
+    log('error', 'Twitter request failed', errorDetails);
+
     return NextResponse.json({
       error: 'Failed to process Twitter request',
       details: error instanceof Error ? error.message : 'Unknown error',
@@ -163,10 +180,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  debugModuleResolution();
-  
   try {
     const { text, accessToken } = await request.json();
+
+    log('info', 'Processing POST request', { hasText: !!text, hasToken: !!accessToken });
 
     if (!text?.trim()) {
       return NextResponse.json({ error: 'Tweet text is required' }, { status: 400 });
@@ -182,9 +199,14 @@ export async function POST(request: Request) {
     const client = new TwitterApi(accessToken);
     const tweet = await client.v2.tweet(text);
 
+    log('info', 'Tweet posted successfully', { tweetId: tweet.data.id });
+
     return NextResponse.json(tweet.data);
   } catch (error) {
-    console.error('Twitter API error:', error);
+    log('error', 'Failed to post tweet', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
     return NextResponse.json(
       { error: 'Failed to post tweet' },
       { status: 500 }
