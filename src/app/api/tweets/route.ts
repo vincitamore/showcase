@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { fetchTechTweets, postTweet } from '@/lib/x-api'
 
+export const runtime = 'edge'
+
 export async function GET() {
   try {
     const tweets = await fetchTechTweets(process.env.TWITTER_USERNAME!)
