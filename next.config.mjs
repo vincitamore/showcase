@@ -37,20 +37,8 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Ensure proper module resolution
-    esmExternals: true,
-    // Bundle styled-jsx with the server code
     serverActions: {
       bodySizeLimit: '2mb'
-    },
-    // Disable build traces collection
-    outputFileTracingRoot: undefined,
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/**/*',
-        '**/*.json',
-        '**/*.d.ts'
-      ]
     }
   },
   output: 'standalone',
@@ -69,77 +57,20 @@ const nextConfig = {
   generateEtags: false,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
-  webpack: (config, { isServer, dev }) => {
-    // Debug webpack configuration
-    console.log(`[DEBUG] Webpack config for ${isServer ? 'server' : 'client'}`);
-    console.log('[DEBUG] Node modules directory:', join(__dirname, 'node_modules'));
-    
+  webpack: (config, { isServer }) => {
     if (isServer) {
-      try {
-        // Debug styled-jsx resolution
-        const styledJsxPath = require.resolve('styled-jsx');
-        const styledJsxDir = dirname(styledJsxPath);
-        console.log('[DEBUG] styled-jsx resolved path:', styledJsxPath);
-        console.log('[DEBUG] styled-jsx directory:', styledJsxDir);
-        debugModule(styledJsxDir);
-        
-        // Add verbose resolution aliases
-        config.resolve.alias = {
-          ...config.resolve.alias,
-          'styled-jsx': styledJsxPath,
-          'styled-jsx/package.json': join(styledJsxDir, 'package.json')
-        };
-
-        // Debug final config
-        console.log('[DEBUG] Final resolve.alias:', config.resolve.alias);
-        console.log('[DEBUG] Final resolve.modules:', config.resolve.modules);
-
-        // Add a resolver plugin for debugging with correct hook pattern
-        config.plugins.push({
-          apply: (compiler) => {
-            compiler.hooks.normalModuleFactory.tap('DebugResolver', (nmf) => {
-              nmf.hooks.beforeResolve.tap('DebugResolver', (resolveData) => {
-                if (resolveData.request.includes('styled-jsx')) {
-                  console.log('[DEBUG] Resolving:', resolveData.request);
-                  console.log('[DEBUG] Context:', resolveData.context);
-                }
-                // Don't return anything, just modify the resolveData if needed
-              });
-            });
+      const originalExternals = config.externals;
+      config.externals = [
+        (context, request, callback) => {
+          if (request === 'styled-jsx' || request.startsWith('styled-jsx/')) {
+            return callback(null, false);
           }
-        });
-
-        // Ensure styled-jsx is bundled with the server code
-        const originalExternals = config.externals;
-        config.externals = [
-          (context, request, callback) => {
-            if (request === 'styled-jsx' || request.startsWith('styled-jsx/')) {
-              return callback(null, false);
-            }
-            if (typeof originalExternals === 'function') {
-              return originalExternals(context, request, callback);
-            }
-            callback(null, true);
+          if (typeof originalExternals === 'function') {
+            return originalExternals(context, request, callback);
           }
-        ];
-
-        // Add specific rule for styled-jsx
-        config.module.rules.push({
-          test: /styled-jsx[/\\].*\.js$/,
-          include: /node_modules/,
-          use: {
-            loader: 'next-swc-loader',
-            options: {
-              isServer: true,
-              jsc: {
-                target: 'es2017'
-              }
-            }
-          }
-        });
-      } catch (error) {
-        console.log('[DEBUG] Error in webpack config:', error);
-      }
+          callback(null, true);
+        }
+      ];
     }
     return config;
   }
