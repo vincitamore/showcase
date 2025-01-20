@@ -46,12 +46,15 @@ const nextConfig = {
       fs: false,
       net: false,
       tls: false,
-      crypto: false,
     };
 
-    // Add external dependencies for server-side
+    // Ensure these modules are bundled correctly
     if (isServer) {
-      config.externals = [...(config.externals || []), 'ws', 'bufferutil', 'utf-8-validate'];
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'next/dist/compiled/ws': require.resolve('ws'),
+        'next/dist/compiled/jsonwebtoken': require.resolve('jsonwebtoken'),
+      };
     }
 
     return config;
