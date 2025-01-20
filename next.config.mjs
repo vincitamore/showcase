@@ -46,7 +46,7 @@ const nextConfig = {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
     // your project has type errors.
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   // Disable source maps in production
   productionBrowserSourceMaps: false,
@@ -55,21 +55,19 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   generateEtags: false,
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
   distDir: '.next',
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      Object.assign(config.resolve.alias, {
+        'next/error': 'next/dist/pages/_error',
+      });
+    }
     if (isServer) {
-      const originalExternals = config.externals;
       config.externals = [
-        (context, request, callback) => {
-          if (request === 'styled-jsx' || request.startsWith('styled-jsx/')) {
-            return callback(null, false);
-          }
-          if (typeof originalExternals === 'function') {
-            return originalExternals(context, request, callback);
-          }
-          callback(null, true);
-        }
+        ...config.externals,
+        'styled-jsx',
+        'styled-jsx/style'
       ];
     }
     return config;
