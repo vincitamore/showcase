@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getOAuthUrl } from '@/lib/x-api';
 import { cookies } from 'next/headers';
 import { TwitterApi } from 'twitter-api-v2';
 
@@ -7,16 +6,18 @@ import { TwitterApi } from 'twitter-api-v2';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  const cookieStore = cookies();
+  
   try {
+    if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
+      throw new Error('Missing Twitter credentials');
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (
       process.env.NODE_ENV === 'production' 
         ? 'https://' + process.env.VERCEL_URL 
         : 'http://localhost:3000'
     );
-
-    if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
-      throw new Error('Missing Twitter credentials');
-    }
 
     const client = new TwitterApi({
       clientId: process.env.TWITTER_CLIENT_ID,
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
       { scope: ['tweet.read', 'tweet.write', 'users.read'] }
     );
     
-    const cookieStore = cookies();
+    // Store OAuth state and code verifier
     cookieStore.set('x_oauth_state', state, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
@@ -49,9 +50,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ url });
   } catch (error) {
     console.error('Error generating auth URL:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate authentication URL' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate authentication URL';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 } 
