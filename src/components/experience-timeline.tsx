@@ -86,7 +86,7 @@ const experiences = [
   }
 ]
 
-export function ExperienceTimeline() {
+const ExperienceTimeline = () => {
   return (
     <div className="relative">
       {/* Timeline line */}
@@ -135,4 +135,6 @@ export function ExperienceTimeline() {
       })}
     </div>
   )
-} 
+}
+
+export default ExperienceTimeline; 

@@ -56,7 +56,7 @@ const projects = [
   }
 ]
 
-export function ProjectsSection() {
+const ProjectsSection = () => {
   const [selectedProject, setSelectedProject] = useState<typeof projects[0] | null>(null)
 
   return (
@@ -132,4 +132,6 @@ export function ProjectsSection() {
       )}
     </section>
   )
-} 
+}
+
+export default ProjectsSection 

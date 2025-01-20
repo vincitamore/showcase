@@ -1,9 +1,6 @@
 import { Card3D } from "@/components/ui/card"
-import { SkillsGrid } from "@/components/skills-grid"
-import { ExperienceTimeline } from "@/components/experience-timeline"
-import { Github, Mail } from "lucide-react"
-import { ProjectsSection } from "@/components/projects-section"
 import dynamic from 'next/dynamic';
+import { Github, Mail } from "lucide-react"
 
 const ContactForm = dynamic(() => import('@/components/contact-form'), {
   loading: () => <div>Loading...</div>,
@@ -11,6 +8,18 @@ const ContactForm = dynamic(() => import('@/components/contact-form'), {
 });
 
 const BlogSection = dynamic(() => import('@/components/blog-section'), {
+  loading: () => <div>Loading...</div>
+});
+
+const ProjectsSection = dynamic(() => import('@/components/projects-section'), {
+  loading: () => <div>Loading...</div>
+});
+
+const SkillsGrid = dynamic(() => import('@/components/skills-grid'), {
+  loading: () => <div>Loading...</div>
+});
+
+const ExperienceTimeline = dynamic(() => import('@/components/experience-timeline'), {
   loading: () => <div>Loading...</div>
 });
 
