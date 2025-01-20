@@ -10,7 +10,16 @@ const nextConfig = {
     ],
   },
   experimental: {
-    esmExternals: 'loose'
+    esmExternals: 'loose',
+    // Disable build traces collection
+    outputFileTracingRoot: undefined,
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/**/*',
+        '**/*.json',
+        '**/*.d.ts'
+      ]
+    }
   },
   output: 'standalone',
   typescript: {
