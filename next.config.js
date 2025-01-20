@@ -16,6 +16,14 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // Increase the stack size limit
     config.optimization.nodeEnv = false;
+    
+    // Fix module resolution
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      module: false,
+    };
+    
     return config;
   },
 }
