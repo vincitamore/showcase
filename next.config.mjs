@@ -6,22 +6,26 @@ import fs from 'fs';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Debug helper
-const debugModule = (modulePath) => {
+// Enhanced debug helper
+const debugModule = (modulePath, context = '') => {
   try {
     const exists = fs.existsSync(modulePath);
     const stats = exists ? fs.statSync(modulePath) : null;
     const isDirectory = stats ? stats.isDirectory() : false;
-    console.log(`[DEBUG] Module path check: ${modulePath}`);
-    console.log(`[DEBUG] - Exists: ${exists}`);
-    console.log(`[DEBUG] - Is Directory: ${isDirectory}`);
-    if (exists) {
+    console.log(`[DEBUG ${context}] Module path check: ${modulePath}`);
+    console.log(`[DEBUG ${context}] - Exists: ${exists}`);
+    console.log(`[DEBUG ${context}] - Is Directory: ${isDirectory}`);
+    if (exists && !isDirectory) {
+      const content = fs.readFileSync(modulePath, 'utf8');
+      console.log(`[DEBUG ${context}] - File size: ${content.length} bytes`);
+    }
+    if (exists && isDirectory) {
       const files = fs.readdirSync(modulePath);
-      console.log(`[DEBUG] - Contents: ${files.join(', ')}`);
+      console.log(`[DEBUG ${context}] - Contents: ${files.join(', ')}`);
     }
   } catch (error) {
-    console.log(`[DEBUG] Error checking module: ${modulePath}`);
-    console.log(`[DEBUG] Error details:`, error);
+    console.log(`[DEBUG ${context}] Error checking module: ${modulePath}`);
+    console.log(`[DEBUG ${context}] Error details:`, error);
   }
 };
 
@@ -37,16 +41,9 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Disable features that might cause trace collection issues
     serverActions: {
       bodySizeLimit: '2mb'
     },
-    // Configure turbotrace properly
-    turbotrace: {
-      memoryLimit: 4096,
-      logLevel: 'error'
-    },
-    // Optimize module resolution
     optimizePackageImports: ['twitter-api-v2']
   },
   output: 'standalone',
@@ -72,15 +69,69 @@ const nextConfig = {
     }
   },
   webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      Object.assign(config.resolve.alias, {
-        'next/error': 'next/dist/pages/_error',
-      });
-    }
+    console.log(`[DEBUG] Webpack config building for ${isServer ? 'server' : 'client'} in ${dev ? 'development' : 'production'}`);
+    
+    // Debug current config state
+    console.log('[DEBUG] Initial config state:');
+    console.log('- Resolve:', !!config.resolve);
+    console.log('- Module rules:', config.module?.rules?.length || 0);
+    console.log('- Externals:', typeof config.externals);
+
+    // Ensure we have a resolve object with aliases
+    config.resolve = {
+      ...config.resolve,
+      alias: {
+        ...config.resolve?.alias,
+        'styled-jsx': require.resolve('styled-jsx'),
+        'styled-jsx/style': require.resolve('styled-jsx/style')
+      }
+    };
+
+    // Handle externals for server-side
     if (isServer) {
-      // Simplify externals handling
-      config.externals = ['styled-jsx', ...config.externals];
+      const originalExternals = config.externals;
+      config.externals = (context, request, callback) => {
+        // First check if it's a styled-jsx module
+        if (request.startsWith('styled-jsx')) {
+          return callback(null, `commonjs ${request}`);
+        }
+        // If it's not styled-jsx, use the original externals
+        if (typeof originalExternals === 'function') {
+          return originalExternals(context, request, callback);
+        } else if (Array.isArray(originalExternals)) {
+          // Handle array of externals
+          for (const external of originalExternals) {
+            if (typeof external === 'function') {
+              return external(context, request, callback);
+            }
+          }
+        }
+        // If no externals matched, continue with default behavior
+        callback();
+      };
     }
+
+    // Add rule for handling styled-jsx
+    console.log('[DEBUG] Adding styled-jsx rule');
+    config.module.rules.push({
+      test: /styled-jsx\/style\.js$/,
+      use: [
+        {
+          loader: 'babel-loader',
+          options: {
+            presets: ['next/babel'],
+            plugins: ['styled-jsx/babel']
+          }
+        }
+      ]
+    });
+
+    // Log final config state
+    console.log('[DEBUG] Final config state:');
+    console.log('- Rules:', config.module.rules.length);
+    console.log('- Externals type:', typeof config.externals);
+    console.log('- Aliases:', Object.keys(config.resolve.alias || {}));
+
     return config;
   }
 }
