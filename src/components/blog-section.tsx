@@ -34,7 +34,7 @@ const BlogSection = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/tweets', {
+      const response = await fetch('/api/twitter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: '' }), // Empty test post to check auth
@@ -47,7 +47,7 @@ const BlogSection = () => {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('/api/auth/x')
+      const response = await fetch('/api/twitter/auth')
       const { url } = await response.json()
       if (url) window.location.href = url
     } catch (error) {
@@ -61,7 +61,10 @@ const BlogSection = () => {
 
   const fetchTweets = async () => {
     try {
-      const response = await fetch('/api/tweets')
+      const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME
+      const response = await fetch(
+        `/api/twitter?action=fetch_tweets&username=${username}`
+      )
       if (!response.ok) throw new Error('Failed to fetch tweets')
       
       const data = await response.json()
@@ -83,7 +86,7 @@ const BlogSection = () => {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/tweets', {
+      const response = await fetch('/api/twitter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: message }),
@@ -103,7 +106,7 @@ const BlogSection = () => {
 
       toast({
         title: "Success!",
-        description: "Your message has been posted to X.com and the blog.",
+        description: "Your message has been posted.",
       })
 
       setMessage('')
