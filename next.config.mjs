@@ -38,7 +38,7 @@ const nextConfig = {
   },
   experimental: {
     // Ensure proper module resolution
-    esmExternals: 'loose',
+    esmExternals: true,
     // Bundle styled-jsx with the server code
     serverActions: {
       bodySizeLimit: '2mb'
@@ -109,37 +109,33 @@ const nextConfig = {
           }
         });
 
-        // Add a rule to handle styled-jsx files
+        // Ensure styled-jsx is bundled with the server code
+        const originalExternals = config.externals;
+        config.externals = [
+          (context, request, callback) => {
+            if (request === 'styled-jsx' || request.startsWith('styled-jsx/')) {
+              return callback(null, false);
+            }
+            if (typeof originalExternals === 'function') {
+              return originalExternals(context, request, callback);
+            }
+            callback(null, true);
+          }
+        ];
+
+        // Add specific rule for styled-jsx
         config.module.rules.push({
           test: /styled-jsx[/\\].*\.js$/,
           include: /node_modules/,
-          type: 'javascript/auto',
-          resolve: {
-            fullySpecified: false
-          }
-        });
-
-        // Force styled-jsx to be included in the server bundle
-        config.externals = ['next', ...config.externals].filter(external => {
-          if (typeof external === 'string') {
-            return !external.includes('styled-jsx');
-          }
-          return true;
-        });
-
-        // Add a specific rule for styled-jsx
-        config.module.rules.push({
-          test: /styled-jsx\/.*\.js$/,
-          include: /node_modules/,
-          use: [
-            {
-              loader: 'babel-loader',
-              options: {
-                presets: ['@babel/preset-env'],
-                plugins: ['@babel/plugin-transform-modules-commonjs']
+          use: {
+            loader: 'next-swc-loader',
+            options: {
+              isServer: true,
+              jsc: {
+                target: 'es2017'
               }
             }
-          ]
+          }
         });
       } catch (error) {
         console.log('[DEBUG] Error in webpack config:', error);
