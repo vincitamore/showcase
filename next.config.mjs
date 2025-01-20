@@ -12,7 +12,18 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    // Disable build traces collection which is causing the stack overflow
+    outputFileTracingIncludes: {},
+    outputFileTracingExcludes: {
+      '**': [
+        'node_modules/**/*',
+        '.git/**/*',
+        '.next/**/*',
+        'build/**/*',
+        'dist/**/*',
+      ],
+    },
   },
 }
 
-module.exports = nextConfig 
+export default nextConfig 
