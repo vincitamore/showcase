@@ -39,9 +39,18 @@ const nextConfig = {
   distDir: '.next',
   transpilePackages: ['styled-jsx'],
   webpack: (config, { isServer }) => {
-    // Ensure styled-jsx is properly bundled
     if (isServer) {
-      config.externals = ['styled-jsx', ...config.externals];
+      // Remove styled-jsx from externals to bundle it
+      const externals = [...config.externals];
+      config.externals = externals.map((external) => {
+        if (typeof external !== 'function') return external;
+        return (ctx, req, cb) => {
+          if (req.startsWith('styled-jsx')) {
+            return cb();
+          }
+          return external(ctx, req, cb);
+        };
+      });
     }
     return config;
   }
