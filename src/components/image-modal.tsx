@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
+import Image from "next/legacy/image"
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
@@ -24,12 +24,15 @@ export function ImageModal({ src, alt, className }: ImageModalProps) {
         )}
       >
         <div className="absolute inset-0 z-10 bg-black/0 transition-colors group-hover/image:bg-black/10" />
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          className="object-cover transition-transform duration-500 group-hover/image:scale-105"
-        />
+        <div className="relative aspect-video">
+          <Image
+            src={src}
+            alt={alt}
+            layout="fill"
+            objectFit="cover"
+            className="transition-transform duration-500 group-hover/image:scale-105"
+          />
+        </div>
       </button>
 
       <Dialog modal open={isOpen} onOpenChange={setIsOpen}>
@@ -39,8 +42,8 @@ export function ImageModal({ src, alt, className }: ImageModalProps) {
             <Image
               src={src}
               alt={alt}
-              fill
-              className="object-contain"
+              layout="fill"
+              objectFit="contain"
               priority
             />
           </div>

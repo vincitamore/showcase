@@ -2,8 +2,9 @@ import { Card3D } from "@/components/ui/card"
 import { SkillsGrid } from "@/components/skills-grid"
 import { ExperienceTimeline } from "@/components/experience-timeline"
 import { ContactForm } from "@/components/contact-form"
-import { Github, Mail, Twitter } from "lucide-react"
+import { Github, Mail } from "lucide-react"
 import { ProjectsSection } from "@/components/projects-section"
+import { BlogSection } from "@/components/blog-section"
 
 export default function Home() {
   return (
@@ -83,6 +84,8 @@ export default function Home() {
         </div>
       </section>
 
+      <BlogSection />
+
       {/* Contact Section */}
       <section id="contact" className="container relative mx-auto px-4 py-16 scroll-mt-16">
         <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
@@ -99,7 +102,7 @@ export default function Home() {
             <span className="sr-only">GitHub</span>
           </a>
           <a
-            href="https://x.com/vincit_amore"
+            href={`https://x.com/${process.env.NEXT_PUBLIC_TWITTER_USERNAME}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-muted-foreground transition-colors hover:text-foreground"
@@ -111,7 +114,7 @@ export default function Home() {
             href="mailto:vincit_amore@amore.build"
             className="text-muted-foreground transition-colors hover:text-foreground"
           >
-            <Mail className="h-6 w-6" />
+            <Mail className="h-6 w-4" />
             <span className="sr-only">Email</span>
           </a>
         </div>

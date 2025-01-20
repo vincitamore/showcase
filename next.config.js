@@ -6,9 +6,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'amore.build',
+        hostname: '**',
       },
     ],
+  },
+  experimental: {
+    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
   },
 }
 
