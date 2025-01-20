@@ -11,9 +11,6 @@ const nextConfig = {
   },
   experimental: {
     esmExternals: 'loose',
-    // Enable server actions and components
-    serverActions: true,
-    serverComponents: true,
     // Ensure styled-jsx is properly handled
     externalDir: true,
     // Disable build traces collection
@@ -43,10 +40,12 @@ const nextConfig = {
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
   // Ensure Next.js includes styled-jsx in the server bundle
-  webpack: (config, { isServer }) => {
+  webpack: async (config, { isServer }) => {
     if (isServer) {
-      config.resolve.alias['styled-jsx'] = require.resolve('styled-jsx');
-      config.resolve.alias['styled-jsx/package.json'] = require.resolve('styled-jsx/package.json');
+      const path = await import('path');
+      const styledJsxPath = path.dirname(await import.meta.resolve('styled-jsx'));
+      config.resolve.alias['styled-jsx'] = styledJsxPath;
+      config.resolve.alias['styled-jsx/package.json'] = path.join(styledJsxPath, 'package.json');
     }
     return config;
   }
