@@ -26,8 +26,15 @@ const nextConfig = {
         tls: false,
       };
     }
+    // Optimize bundle size
+    config.optimization = {
+      ...config.optimization,
+      minimize: true,
+    };
     return config;
   },
+  // Reduce the impact of source maps
+  productionBrowserSourceMaps: false,
 }
 
 export default nextConfig 
