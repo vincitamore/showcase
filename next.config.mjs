@@ -10,19 +10,8 @@ const nextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    turbotrace: false,
-    serverComponentsExternalPackages: ['twitter-api-v2'],
-  },
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': './src',
-    };
-    return config;
-  },
-  typescript: {
-    ignoreBuildErrors: false,
+    // Disable all experimental features
+    esmExternals: false,
   },
 }
 
