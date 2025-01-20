@@ -13,11 +13,19 @@ const nextConfig = {
     // Disable all experimental features
     esmExternals: false,
   },
-  webpack: (config) => {
+  transpilePackages: ['twitter-api-v2'],
+  webpack: (config, { isServer }) => {
     config.watchOptions = {
       aggregateTimeout: 5,
       ignored: ['**/.git/**', '**/node_modules/**'],
     };
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        tls: false,
+      };
+    }
     return config;
   },
 }
