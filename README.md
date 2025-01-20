@@ -54,12 +54,21 @@ bun install
 
 3. Set up environment variables:
 ```bash
-# Create a .env.local file with:
+# Copy the example environment file
+cp .env.local.example .env.local
+
+# Edit .env.local with your SMTP credentials:
 SMTP_HOST=your-smtp-host
 SMTP_PORT=your-smtp-port
 SMTP_USER=your-smtp-username
 SMTP_PASS=your-smtp-password
 ```
+
+   For serverless deployment (e.g., Vercel):
+   - Go to your project settings in the deployment platform
+   - Add the environment variables in the Environment Variables section
+   - Include all variables from `.env.local`
+   - Deploy your project to apply the changes
 
 4. Run the development server:
 ```bash
