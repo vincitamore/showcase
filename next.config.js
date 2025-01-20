@@ -13,17 +13,6 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
   },
-  webpack: (config, { isServer }) => {
-    config.resolve = {
-      ...config.resolve,
-      fallback: {
-        ...config.resolve.fallback,
-        fs: false,
-        module: false,
-      },
-    };
-    return config;
-  },
 }
 
 module.exports = nextConfig 
