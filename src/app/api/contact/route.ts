@@ -1,9 +1,28 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   try {
     const { name, email, message } = await req.json()
+
+    // Validate input
+    if (!name?.trim() || !email?.trim() || !message?.trim()) {
+      return NextResponse.json(
+        { error: "All fields are required" },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      )
+    }
 
     if (!process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.error("Missing SMTP configuration")
@@ -24,9 +43,7 @@ export async function POST(req: Request) {
       tls: {
         ciphers: 'SSLv3',
         rejectUnauthorized: false
-      },
-      debug: true, // Enable debug logging
-      logger: true  // Enable built-in logger
+      }
     })
 
     // Verify SMTP connection configuration
