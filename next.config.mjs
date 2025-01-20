@@ -10,10 +10,11 @@ const nextConfig = {
     ],
   },
   experimental: {
-    // Disable all experimental features
+    // Completely disable all experimental features and tracing
     esmExternals: false,
-    // Modify build trace options
-    turbotrace: false
+    turbotrace: false,
+    serverActions: false,
+    serverComponentsExternalPackages: ['twitter-api-v2']
   },
   transpilePackages: ['twitter-api-v2'],
   output: 'standalone',
@@ -23,31 +24,15 @@ const nextConfig = {
     // your project has type errors.
     ignoreBuildErrors: true,
   },
-  webpack: (config, { isServer }) => {
-    config.watchOptions = {
-      aggregateTimeout: 5,
-      ignored: [
-        '**/.git/**',
-        '**/node_modules/**',
-        '**/.next/**',
-      ],
-    };
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        net: false,
-        tls: false,
-      };
+  // Disable source maps in production
+  productionBrowserSourceMaps: false,
+  // Simplify the build process
+  swcMinify: true,
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{member}}'
     }
-    // Add module resolution aliases
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': '/vercel/path0/src'
-    };
-    return config;
-  },
-  // Reduce the impact of source maps
-  productionBrowserSourceMaps: false
+  }
 }
 
 export default nextConfig 
