@@ -5,7 +5,7 @@ import { Card3D } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Send } from "lucide-react"
 
-export function ContactForm() {
+const ContactForm = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [submitStatus, setSubmitStatus] = React.useState<"idle" | "success" | "error">("idle")
   const formRef = React.useRef<HTMLFormElement>(null)
@@ -111,4 +111,6 @@ export function ContactForm() {
       </form>
     </Card3D>
   )
-} 
+}
+
+export default ContactForm 

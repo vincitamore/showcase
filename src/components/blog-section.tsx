@@ -20,7 +20,7 @@ interface Tweet {
   public_metrics?: TweetMetrics
 }
 
-export function BlogSection() {
+const BlogSection = () => {
   const [tweets, setTweets] = useState<Tweet[]>([])
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -192,4 +192,6 @@ export function BlogSection() {
       </div>
     </section>
   )
-} 
+}
+
+export default BlogSection 

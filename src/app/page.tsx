@@ -1,10 +1,18 @@
 import { Card3D } from "@/components/ui/card"
 import { SkillsGrid } from "@/components/skills-grid"
 import { ExperienceTimeline } from "@/components/experience-timeline"
-import { ContactForm } from "@/components/contact-form"
 import { Github, Mail } from "lucide-react"
 import { ProjectsSection } from "@/components/projects-section"
-import { BlogSection } from "@/components/blog-section"
+import dynamic from 'next/dynamic';
+
+const ContactForm = dynamic(() => import('@/components/contact-form'), {
+  loading: () => <div>Loading...</div>,
+  ssr: false
+});
+
+const BlogSection = dynamic(() => import('@/components/blog-section'), {
+  loading: () => <div>Loading...</div>
+});
 
 export default function Home() {
   return (
