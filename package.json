@@ -7,10 +7,9 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "npm run build"
+    "lint": "next lint"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",
