@@ -1,7 +1,7 @@
 import { TwitterApi } from 'twitter-api-v2';
 
 // Initialize the read-only client for public tweet fetching
-export const getReadOnlyClient = () => {
+export async function getReadOnlyClient() {
   if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
     throw new Error('Missing Twitter API credentials in environment variables');
   }
@@ -10,10 +10,10 @@ export const getReadOnlyClient = () => {
     appKey: process.env.TWITTER_API_KEY,
     appSecret: process.env.TWITTER_API_SECRET,
   });
-};
+}
 
 // Get the OAuth2 URL for login
-export const getOAuthUrl = async () => {
+export async function getOAuthUrl() {
   if (!process.env.TWITTER_CLIENT_ID) {
     throw new Error('Missing Twitter Client ID in environment variables');
   }
@@ -25,12 +25,12 @@ export const getOAuthUrl = async () => {
   
   // Generate OAuth 2.0 URL
   const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
-    process.env.NEXT_PUBLIC_APP_URL + '/api/auth/x/callback',
+    process.env.NEXT_PUBLIC_URL + '/api/auth/x/callback',
     { scope: ['tweet.read', 'tweet.write', 'users.read'] }
   );
 
   return { url, state, codeVerifier };
-};
+}
 
 // Fetch tech-related tweets (public read-only)
 export const fetchTechTweets = async (username: string) => {
@@ -41,7 +41,7 @@ export const fetchTechTweets = async (username: string) => {
   // Remove @ symbol if present
   const cleanUsername = username.replace('@', '');
   
-  const client = getReadOnlyClient();
+  const client = await getReadOnlyClient();
   const user = await client.v2.userByUsername(cleanUsername);
   
   if (!user.data) {
@@ -72,4 +72,8 @@ export const postTweet = async (text: string, accessToken: string) => {
   const client = new TwitterApi(accessToken);
   const tweet = await client.v2.tweet(text);
   return tweet.data;
-}; 
+};
+
+export async function getAuthenticatedClient(accessToken: string) {
+  return new TwitterApi(accessToken);
+} 

@@ -11,23 +11,15 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-    turbotrace: {
-      logLevel: 'error',
-      contextDirectory: '.',
-      processCwd: '.',
-      memoryLimit: 4096,
-    },
-    outputFileTracingRoot: '.',
-    outputFileTracingIncludes: {
-      '/**': ['./node_modules/twitter-api-v2/**/*'],
-    },
-    outputFileTracingExcludes: {
-      '/**': [
-        '**/node_modules/!(twitter-api-v2)/**/*',
-        '**/.git/**',
-        '**/.next/**',
-      ],
-    },
+    turbotrace: false,
+    serverComponentsExternalPackages: ['twitter-api-v2'],
+  },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': './src',
+    };
+    return config;
   },
   typescript: {
     ignoreBuildErrors: false,
