@@ -3,8 +3,6 @@ import { cookies } from 'next/headers'
 import { fetchTechTweets, postTweet } from '@/lib/x-api'
 import { TwitterApi } from 'twitter-api-v2'
 
-export const runtime = 'edge'
-
 export async function GET() {
   try {
     if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
