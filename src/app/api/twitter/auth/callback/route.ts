@@ -4,6 +4,7 @@ import { TwitterApi } from 'twitter-api-v2';
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 export async function GET(request: Request) {
   try {
@@ -12,22 +13,23 @@ export async function GET(request: Request) {
     const code = searchParams.get('code');
     
     // Get stored state and code verifier from cookies
-    const storedState = cookies().get('x_oauth_state')?.value;
-    const codeVerifier = cookies().get('x_oauth_code_verifier')?.value;
+    const cookieStore = cookies();
+    const storedState = cookieStore.get('x_oauth_state')?.value;
+    const codeVerifier = cookieStore.get('x_oauth_code_verifier')?.value;
     
     if (!state || !code || !storedState || !codeVerifier) {
       console.error('Missing OAuth parameters:', { state, code, storedState, codeVerifier });
-      return NextResponse.redirect('/error?message=Invalid+authentication+state');
+      return NextResponse.redirect(new URL('/error?message=Invalid+authentication+state', request.url));
     }
     
     if (state !== storedState) {
       console.error('State mismatch:', { state, storedState });
-      return NextResponse.redirect('/error?message=Invalid+authentication+state');
+      return NextResponse.redirect(new URL('/error?message=Invalid+authentication+state', request.url));
     }
     
     // Clear OAuth cookies
-    cookies().delete('x_oauth_state');
-    cookies().delete('x_oauth_code_verifier');
+    cookieStore.delete('x_oauth_state');
+    cookieStore.delete('x_oauth_code_verifier');
     
     const client = new TwitterApi({
       clientId: process.env.TWITTER_CLIENT_ID!,
@@ -48,7 +50,7 @@ export async function GET(request: Request) {
     });
     
     // Store access token in cookie
-    cookies().set('x_access_token', accessToken, {
+    cookieStore.set('x_access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
     });
     
     if (refreshToken) {
-      cookies().set('x_refresh_token', refreshToken, {
+      cookieStore.set('x_refresh_token', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -65,9 +67,9 @@ export async function GET(request: Request) {
     }
     
     // Redirect back to blog section
-    return NextResponse.redirect(`${baseUrl}/blog`);
+    return NextResponse.redirect(new URL('/blog', request.url));
   } catch (error) {
     console.error('OAuth callback error:', error);
-    return NextResponse.redirect('/error?message=Authentication+failed');
+    return NextResponse.redirect(new URL('/error?message=Authentication+failed', request.url));
   }
 } 
