@@ -13,6 +13,11 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
   },
+  webpack: (config, { isServer }) => {
+    // Increase the stack size limit
+    config.optimization.nodeEnv = false;
+    return config;
+  },
 }
 
 module.exports = nextConfig 
