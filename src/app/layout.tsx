@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { NavBar } from "@/components/nav-bar"
 import { Analytics } from "@vercel/analytics/react"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -24,9 +23,7 @@ export const metadata: Metadata = {
       { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
     ],
-    apple: [
-      { url: "/apple-touch-icon.png" },
-    ],
+    apple: [{ url: "/apple-touch-icon.png" }],
   },
   manifest: "/site.webmanifest",
   appleWebApp: {
@@ -64,11 +61,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
       <body className={inter.className}>
-        <ThemeProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="showcase-theme"
+        >
           <div className="relative flex min-h-screen flex-col">
-            <NavBar />
             {children}
           </div>
           <Toaster />

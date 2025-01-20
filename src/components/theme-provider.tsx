@@ -11,28 +11,19 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
     setMounted(true)
   }, [])
 
-  // During SSR and static generation, render with a default theme
-  if (!mounted) {
-    return (
-      <NextThemesProvider
-        attribute="class"
-        defaultTheme="light"
-        forcedTheme="light"
-        enableSystem={false}
-        disableTransitionOnChange
-      >
-        {children}
-      </NextThemesProvider>
-    )
-  }
-
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme="system"
       enableSystem
+      value={{
+        light: "light",
+        dark: "dark",
+        dim: "dim",
+        system: "system"
+      }}
       themes={["light", "dark", "dim", "system"]}
-      disableTransitionOnChange
+      forcedTheme={!mounted ? "system" : undefined}
       {...props}
     >
       {children}
