@@ -3,9 +3,30 @@
 import { OGImage } from "@/components/og-image"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
+import React from "react"
 
 export default function OGPreviewPage() {
+  const [mounted, setMounted] = React.useState(false)
   const { theme, setTheme } = useTheme()
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-4">
+        <div className="flex gap-4">
+          <Button variant="outline">Light</Button>
+          <Button variant="outline">Dim</Button>
+          <Button variant="outline">Dark</Button>
+        </div>
+        <div className="scale-[0.35] origin-top sm:scale-[0.45] lg:scale-[0.55]">
+          <OGImage />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-4">

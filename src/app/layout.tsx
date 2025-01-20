@@ -72,6 +72,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
           storageKey="theme-preference"
+          forcedTheme={process.env.NODE_ENV === 'production' ? 'light' : undefined}
         >
           <div className="relative flex min-h-screen flex-col">
             <NavBar />
