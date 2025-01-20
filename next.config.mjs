@@ -52,8 +52,9 @@ const nextConfig = {
     if (isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
-        'next/dist/compiled/ws': require.resolve('ws'),
-        'next/dist/compiled/jsonwebtoken': require.resolve('jsonwebtoken'),
+        // Use paths directly instead of require.resolve
+        'next/dist/compiled/ws': 'ws',
+        'next/dist/compiled/jsonwebtoken': 'jsonwebtoken',
       };
     }
 
