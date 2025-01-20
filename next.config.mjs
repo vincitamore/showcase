@@ -68,16 +68,8 @@ const nextConfig = {
       transform: 'twitter-api-v2/dist/{{member}}'
     }
   },
-  webpack: (config, { dev, isServer }) => {
-    console.log(`[DEBUG] Webpack config building for ${isServer ? 'server' : 'client'} in ${dev ? 'development' : 'production'}`);
-    
-    // Debug current config state
-    console.log('[DEBUG] Initial config state:');
-    console.log('- Resolve:', !!config.resolve);
-    console.log('- Module rules:', config.module?.rules?.length || 0);
-    console.log('- Externals:', typeof config.externals);
-
-    // Ensure we have a resolve object with aliases
+  webpack: (config, { isServer }) => {
+    // Add styled-jsx to the resolve aliases
     config.resolve = {
       ...config.resolve,
       alias: {
@@ -87,62 +79,22 @@ const nextConfig = {
       }
     };
 
-    // Handle externals for server-side
+    // Only handle externals for server-side
     if (isServer) {
       const originalExternals = config.externals;
-      config.externals = (context, request, callback) => {
-        // Skip externals for app directory pages and internal Next.js requests
-        if (context?.issuer?.includes('/app/') || request.startsWith('next/')) {
-          return callback();
-        }
-
+      config.externals = (ctx, callback) => {
         // Handle styled-jsx modules
-        if (request.startsWith('styled-jsx')) {
-          return callback(null, `commonjs ${request}`);
+        if (ctx.request?.startsWith('styled-jsx')) {
+          return callback(null, `commonjs ${ctx.request}`);
         }
-
-        // Handle original externals
+        // Use original externals
         if (typeof originalExternals === 'function') {
-          return originalExternals(context, request, callback);
+          return originalExternals(ctx, callback);
         }
-        
-        if (Array.isArray(originalExternals)) {
-          for (const external of originalExternals) {
-            if (typeof external === 'function') {
-              try {
-                return external(context, request, callback);
-              } catch (err) {
-                console.warn(`[DEBUG] External handler error:`, err);
-              }
-            }
-          }
-        }
-
         // Default behavior
         callback();
       };
     }
-
-    // Add rule for handling styled-jsx
-    console.log('[DEBUG] Adding styled-jsx rule');
-    config.module.rules.push({
-      test: /styled-jsx\/style\.js$/,
-      use: [
-        {
-          loader: 'babel-loader',
-          options: {
-            presets: ['next/babel'],
-            plugins: ['styled-jsx/babel']
-          }
-        }
-      ]
-    });
-
-    // Log final config state
-    console.log('[DEBUG] Final config state:');
-    console.log('- Rules:', config.module.rules.length);
-    console.log('- Externals type:', typeof config.externals);
-    console.log('- Aliases:', Object.keys(config.resolve.alias || {}));
 
     return config;
   }
