@@ -44,7 +44,11 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb'
     },
-    optimizePackageImports: ['twitter-api-v2']
+    optimizePackageImports: ['twitter-api-v2'],
+    logging: {
+      level: 'verbose',
+      fullUrl: true,
+    },
   },
   output: 'standalone',
   typescript: {
@@ -73,8 +77,20 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
   // Disable server features in production
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
-  }
+    removeConsole: {
+      exclude: ['error', 'warn'],
+    }
+  },
+  // Enable detailed logging
+  onError: function (err) {
+    console.error('Next.js Build Error:', err);
+    return err;
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
 }
 
 export default nextConfig 

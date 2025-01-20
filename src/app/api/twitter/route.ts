@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { getReadOnlyClient, postTweet } from '@/lib/x-api';
 
 export async function GET(request: Request) {
+  const searchParams = new URL(request.url).searchParams;
   try {
-    const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const username = searchParams.get('username')?.replace('@', '');
 
@@ -55,14 +55,26 @@ export async function GET(request: Request) {
       message: error instanceof Error ? error.message : 'Unknown error',
       name: error instanceof Error ? error.name : 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
-      raw: error // Log the raw error object
+      raw: error, // Log the raw error object
+      url: request.url, // Add request URL
+      params: { 
+        action: searchParams.get('action'),
+        username: searchParams.get('username')
+      }, // Add request parameters
+      env: {
+        hasApiKey: !!process.env.TWITTER_API_KEY,
+        hasApiSecret: !!process.env.TWITTER_API_SECRET,
+        nodeEnv: process.env.NODE_ENV,
+        vercelEnv: process.env.VERCEL_ENV
+      }
     });
 
     // Return a more detailed error response
     return NextResponse.json({
       error: 'Failed to process Twitter request',
       details: error instanceof Error ? error.message : 'Unknown error',
-      type: error instanceof Error ? error.name : 'Unknown'
+      type: error instanceof Error ? error.name : 'Unknown',
+      env: process.env.VERCEL_ENV || process.env.NODE_ENV
     }, { status: 500 });
   }
 }
