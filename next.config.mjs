@@ -15,16 +15,17 @@ const nextConfig = {
       logLevel: 'error',
       contextDirectory: '.',
       processCwd: '.',
+      memoryLimit: 4096,
     },
     outputFileTracingRoot: '.',
+    outputFileTracingIncludes: {
+      '/**': ['./node_modules/twitter-api-v2/**/*'],
+    },
     outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@swc/core-linux-x64-gnu',
-        'node_modules/@swc/core-linux-x64-musl',
-        'node_modules/@esbuild/linux-x64',
-        '.git/**/*',
-        '**/*.{pem,pdf,txt,log,md}',
-        '**/cache/**',
+      '/**': [
+        '**/node_modules/!(twitter-api-v2)/**/*',
+        '**/.git/**',
+        '**/.next/**',
       ],
     },
   },
