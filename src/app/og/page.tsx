@@ -13,7 +13,7 @@ export default function OGPreviewPage() {
     setMounted(true)
   }, [])
 
-  // During SSR and initial mount, render a static version
+  // During SSR and static generation, render a light theme version
   if (!mounted) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-4">
@@ -25,7 +25,6 @@ export default function OGPreviewPage() {
         <div className="scale-[0.35] origin-top sm:scale-[0.45] lg:scale-[0.55]">
           <OGImage />
         </div>
-        <p className="text-center text-sm text-muted-foreground">Loading theme preferences...</p>
       </div>
     )
   }
