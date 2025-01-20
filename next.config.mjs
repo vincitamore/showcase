@@ -20,6 +20,7 @@ const nextConfig = {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
     // Enable module resolution features
     esmExternals: 'loose',
+    serverComponentsExternalPackages: ['ws', 'bufferutil', 'utf-8-validate'],
     // Optimize build performance
     turbotrace: {
       logLevel: 'error',
@@ -48,15 +49,20 @@ const nextConfig = {
       tls: false,
     };
 
-    // Ensure these modules are bundled correctly
     if (isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // Use paths directly instead of require.resolve
-        'next/dist/compiled/ws': 'ws',
-        'next/dist/compiled/jsonwebtoken': 'jsonwebtoken',
-      };
+      // Handle Next.js compiled dependencies
+      config.externals = [
+        '@swc/helpers',
+        'next',
+        ...config.externals,
+      ];
     }
+
+    // Add module aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': '/vercel/path0/src',
+    };
 
     return config;
   },
