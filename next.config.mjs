@@ -13,6 +13,13 @@ const nextConfig = {
     // Disable all experimental features
     esmExternals: false,
   },
+  webpack: (config) => {
+    config.watchOptions = {
+      aggregateTimeout: 5,
+      ignored: ['**/.git/**', '**/node_modules/**'],
+    };
+    return config;
+  },
 }
 
 export default nextConfig 
