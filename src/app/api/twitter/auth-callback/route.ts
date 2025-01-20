@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { TwitterApi } from 'twitter-api-v2';
 
-// Mark this route as dynamic
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
@@ -11,7 +10,6 @@ export async function GET(request: Request) {
     const state = searchParams.get('state');
     const code = searchParams.get('code');
     
-    // Get stored state and code verifier from cookies
     const cookieStore = cookies();
     const storedState = cookieStore.get('x_oauth_state')?.value;
     const codeVerifier = cookieStore.get('x_oauth_code_verifier')?.value;
@@ -26,7 +24,6 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/error?message=Invalid+authentication+state', request.url));
     }
     
-    // Clear OAuth cookies
     cookieStore.delete('x_oauth_state');
     cookieStore.delete('x_oauth_code_verifier');
     
@@ -41,19 +38,17 @@ export async function GET(request: Request) {
         : 'http://localhost:3000'
     );
     
-    // Exchange code for access token
     const { accessToken, refreshToken } = await client.loginWithOAuth2({
       code,
       codeVerifier,
-      redirectUri: `${baseUrl}/api/twitter/auth/callback`,
+      redirectUri: `${baseUrl}/api/twitter/auth-callback`,
     });
     
-    // Store access token in cookie
     cookieStore.set('x_access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
+      maxAge: 60 * 60 * 24 * 7,
       path: '/'
     });
     
@@ -62,12 +57,11 @@ export async function GET(request: Request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: 60 * 60 * 24 * 30,
         path: '/'
       });
     }
     
-    // Redirect back to blog section
     const redirectUrl = new URL('/blog', request.url);
     return NextResponse.redirect(redirectUrl, {
       status: 302,
