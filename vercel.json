@@ -5,7 +5,7 @@
     }
   },
   "functions": {
-    "api/**/*": {
+    "src/app/api/**/*": {
       "memory": 3008
     }
   }
