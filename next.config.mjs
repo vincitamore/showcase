@@ -36,7 +36,15 @@ const nextConfig = {
   compress: true,
   generateEtags: false,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
-  distDir: '.next'
+  distDir: '.next',
+  transpilePackages: ['styled-jsx'],
+  webpack: (config, { isServer }) => {
+    // Ensure styled-jsx is properly bundled
+    if (isServer) {
+      config.externals = ['styled-jsx', ...config.externals];
+    }
+    return config;
+  }
 }
 
 export default nextConfig 
