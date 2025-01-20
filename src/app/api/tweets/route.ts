@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { fetchTechTweets, postTweet } from '@/lib/x-api'
 import { TwitterApi } from 'twitter-api-v2'
 
-export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
+    const apiKey = process.env.TWITTER_API_KEY
+    const apiSecret = process.env.TWITTER_API_SECRET
+    
+    if (!apiKey || !apiSecret) {
       return NextResponse.json(
         { error: 'Twitter API credentials not configured' },
         { status: 500 }
@@ -16,8 +17,8 @@ export async function GET() {
     }
 
     const client = new TwitterApi({
-      appKey: process.env.TWITTER_API_KEY,
-      appSecret: process.env.TWITTER_API_SECRET,
+      appKey: apiKey,
+      appSecret: apiSecret,
     })
 
     const user = await client.v2.userByUsername('NCUamoyer')
@@ -29,7 +30,7 @@ export async function GET() {
       )
     }
 
-    const tweets = await client.v2.userTimeline(user.data.id, {
+    const timeline = await client.v2.userTimeline(user.data.id, {
       exclude: ['replies', 'retweets'],
       expansions: ['author_id', 'attachments.media_keys'],
       'tweet.fields': ['created_at', 'text', 'public_metrics'],
@@ -37,7 +38,8 @@ export async function GET() {
       max_results: 10,
     })
 
-    return NextResponse.json(tweets.data)
+    const tweets = timeline.data.data || []
+    return NextResponse.json(tweets)
   } catch (error) {
     console.error('Error fetching tweets:', error)
     return NextResponse.json(
@@ -49,7 +51,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const accessToken = cookies().get('x_access_token')?.value;
+    const accessToken = cookies().get('x_access_token')?.value
     
     if (!accessToken) {
       return NextResponse.json(
@@ -67,7 +69,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const tweet = await postTweet(text, accessToken)
+    const client = new TwitterApi(accessToken)
+    const tweet = await client.v2.tweet(text)
     return NextResponse.json(tweet)
   } catch (error) {
     console.error('Error posting tweet:', error)
