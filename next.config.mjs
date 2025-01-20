@@ -14,10 +14,15 @@ const nextConfig = {
     esmExternals: false,
   },
   transpilePackages: ['twitter-api-v2'],
+  output: 'standalone',
   webpack: (config, { isServer }) => {
     config.watchOptions = {
       aggregateTimeout: 5,
-      ignored: ['**/.git/**', '**/node_modules/**'],
+      ignored: [
+        '**/.git/**',
+        '**/node_modules/**',
+        '**/.next/**',
+      ],
     };
     if (!isServer) {
       config.resolve.fallback = {
@@ -35,6 +40,14 @@ const nextConfig = {
   },
   // Reduce the impact of source maps
   productionBrowserSourceMaps: false,
+  // Modify build trace options
+  experimental: {
+    turbotrace: {
+      logLevel: 'error',
+      logDetail: true,
+      memoryLimit: 4096
+    }
+  }
 }
 
 export default nextConfig 

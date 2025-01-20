@@ -8,5 +8,8 @@
     "src/app/api/**/*": {
       "memory": 3008
     }
-  }
+  },
+  "buildCommand": "NEXT_TELEMETRY_DISABLED=1 npm run build",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
+  "installCommand": "npm ci"
 } 
