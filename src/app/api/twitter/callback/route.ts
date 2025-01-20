@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { TwitterApi } from 'twitter-api-v2';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
@@ -23,7 +24,6 @@ export async function GET(request: Request) {
       throw new Error('Invalid state parameter');
     }
     
-    // Clean up OAuth cookies
     cookieStore.delete('x_oauth_state', { path: '/' });
     cookieStore.delete('x_oauth_code_verifier', { path: '/' });
     
@@ -45,25 +45,23 @@ export async function GET(request: Request) {
     const { accessToken, refreshToken } = await client.loginWithOAuth2({
       code,
       codeVerifier,
-      redirectUri: `${baseUrl}/api/twitter/auth-callback`,
+      redirectUri: `${baseUrl}/api/twitter/callback`,
     });
     
-    // Set access token cookie
     cookieStore.set('x_access_token', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 1 week
+      maxAge: 60 * 60 * 24 * 7,
       path: '/'
     });
     
-    // Set refresh token if available
     if (refreshToken) {
       cookieStore.set('x_refresh_token', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: 60 * 60 * 24 * 30,
         path: '/'
       });
     }
@@ -77,7 +75,6 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Clean up any remaining OAuth cookies on error
     cookieStore.delete('x_oauth_state', { path: '/' });
     cookieStore.delete('x_oauth_code_verifier', { path: '/' });
     

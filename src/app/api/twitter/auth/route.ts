@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { TwitterApi } from 'twitter-api-v2';
 
-// Mark this route as dynamic
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
@@ -24,18 +24,16 @@ export async function GET(request: Request) {
       clientSecret: process.env.TWITTER_API_SECRET,
     });
 
-    // Generate OAuth 2.0 URL
     const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
-      `${baseUrl}/api/twitter/auth-callback`,
+      `${baseUrl}/api/twitter/callback`,
       { scope: ['tweet.read', 'tweet.write', 'users.read'] }
     );
     
-    // Store OAuth state and code verifier
     cookieStore.set('x_oauth_state', state, { 
       httpOnly: true, 
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 10, // 10 minutes
+      maxAge: 60 * 10,
       path: '/'
     });
     
@@ -43,7 +41,7 @@ export async function GET(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 10, // 10 minutes
+      maxAge: 60 * 10,
       path: '/'
     });
 
