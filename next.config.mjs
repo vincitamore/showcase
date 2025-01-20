@@ -50,23 +50,22 @@ const nextConfig = {
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   distDir: '.next',
   webpack: (config, { isServer }) => {
+    // Prevent styled-jsx from being externalized
     if (isServer) {
-      // Force styled-jsx to be included in the server bundle
-      config.externals = ['styled-jsx', ...(Array.isArray(config.externals) ? config.externals : [])];
-    }
-
-    // Add styled-jsx to the bundle
-    config.module.rules.push({
-      test: /styled-jsx\/.*\.js$/,
-      use: [
-        {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env'],
-          },
+      const originalExternals = [...config.externals];
+      config.externals = [
+        (ctx, req, cb) => {
+          if (req.startsWith('styled-jsx')) {
+            return cb(null, false);
+          }
+          if (typeof originalExternals[0] === 'function') {
+            return originalExternals[0](ctx, req, cb);
+          }
+          return cb(null, true);
         },
-      ],
-    });
+        ...(Array.isArray(originalExternals) ? originalExternals.slice(1) : [])
+      ];
+    }
 
     return config;
   }
