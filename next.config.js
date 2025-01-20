@@ -14,16 +14,14 @@ const nextConfig = {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
   },
   webpack: (config, { isServer }) => {
-    // Increase the stack size limit
-    config.optimization.nodeEnv = false;
-    
-    // Fix module resolution
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      module: false,
+    config.resolve = {
+      ...config.resolve,
+      fallback: {
+        ...config.resolve.fallback,
+        fs: false,
+        module: false,
+      },
     };
-    
     return config;
   },
 }
