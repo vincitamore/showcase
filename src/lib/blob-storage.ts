@@ -112,29 +112,46 @@ export async function getCachedTweets(): Promise<CachedTweets | null> {
       return null;
     }
     
-    // Sort by pathname to get the most recent blob (they have timestamps in the name)
-    const sortedBlobs = blobs.sort((a, b) => b.pathname.localeCompare(a.pathname));
-    console.log('Using most recent blob:', sortedBlobs[0].pathname);
+    // Fetch and parse all blobs
+    const allTweets = new Map<string, TweetV2>(); // Use Map to deduplicate by tweet ID
     
-    const response = await fetch(sortedBlobs[0].url);
-    console.log('Fetch response status:', response.status);
-    
-    if (!response.ok) {
-      console.error('Failed to fetch blob content:', response.statusText);
-      return null;
+    for (const blob of blobs) {
+      try {
+        console.log('Fetching blob:', blob.pathname);
+        const response = await fetch(blob.url);
+        
+        if (!response.ok) {
+          console.error('Failed to fetch blob content:', blob.pathname, response.statusText);
+          continue;
+        }
+        
+        const text = await response.text();
+        const parsed = JSON.parse(text);
+        
+        if (Array.isArray(parsed?.tweets)) {
+          parsed.tweets.forEach((tweet: TweetV2) => {
+            if (tweet.id && !allTweets.has(tweet.id)) {
+              allTweets.set(tweet.id, tweet);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error processing blob:', blob.pathname, error);
+        continue;
+      }
     }
     
-    const text = await response.text();
-    console.log('Received blob content:', text.substring(0, 100) + '...');
-    
-    const parsed = JSON.parse(text);
-    console.log('Parsed cached data:', {
-      hasTweets: Array.isArray(parsed?.tweets),
-      tweetCount: parsed?.tweets?.length ?? 0,
-      timestamp: new Date(parsed?.timestamp).toISOString()
+    const uniqueTweets = Array.from(allTweets.values());
+    console.log('Aggregated unique tweets:', {
+      totalBlobs: blobs.length,
+      uniqueTweets: uniqueTweets.length,
+      tweetIds: uniqueTweets.map(t => t.id)
     });
     
-    return parsed;
+    return {
+      tweets: uniqueTweets,
+      timestamp: Date.now()
+    };
   } catch (error) {
     console.error('Error getting cached tweets:', error);
     return null;
