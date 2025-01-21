@@ -49,6 +49,7 @@ const nextConfig = {
       level: 'verbose',
       fullUrl: true,
     },
+    middleware: true,
   },
   output: 'standalone',
   typescript: {
@@ -90,6 +91,29 @@ const nextConfig = {
     fetches: {
       fullUrl: true,
     },
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: process.env.NODE_ENV === 'production' 
+              ? 'https://amore.build' 
+              : 'http://localhost:3000'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, OPTIONS'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type'
+          }
+        ]
+      }
+    ]
   },
 }
 
