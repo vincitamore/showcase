@@ -28,7 +28,7 @@ const BlogSection = () => {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchTweets()
+    fetchCachedTweets()
     checkAuth()
   }, [])
 
@@ -59,26 +59,13 @@ const BlogSection = () => {
     }
   }
 
-  const fetchTweets = async () => {
+  const fetchCachedTweets = async () => {
     try {
-      const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME
-      if (!username) {
-        console.error('Twitter username not configured');
-        toast({
-          title: "Configuration Error",
-          description: "Twitter username is not configured.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const response = await fetch(
-        `/api/twitter?action=fetch_tweets&username=${username}`
-      )
+      const response = await fetch('/api/twitter/tweets')
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to fetch tweets:', {
+        console.error('Failed to fetch cached tweets:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData
@@ -93,11 +80,13 @@ const BlogSection = () => {
       }
       
       const data = await response.json()
-      // Ensure we have an array of tweets with required fields
-      const validTweets = Array.isArray(data) ? data : []
-      setTweets(validTweets)
+      // Ensure we have an array of tweets
+      const validTweets = Array.isArray(data) ? data : [];
+      // Randomly select 4 tweets
+      const randomTweets = validTweets.sort(() => Math.random() - 0.5).slice(0, 4);
+      setTweets(randomTweets)
     } catch (error) {
-      console.error('Error fetching tweets:', error);
+      console.error('Error fetching cached tweets:', error);
       toast({
         title: "Error",
         description: error instanceof Error 
@@ -137,7 +126,7 @@ const BlogSection = () => {
       })
 
       setMessage('')
-      fetchTweets() // Refresh the tweets list
+      fetchCachedTweets() // Refresh the tweets list
     } catch (error) {
       toast({
         title: "Error",

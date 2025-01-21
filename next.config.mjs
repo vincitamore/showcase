@@ -31,7 +31,6 @@ const debugModule = (modulePath, context = '') => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   images: {
     remotePatterns: [
       {
@@ -44,77 +43,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb'
     },
-    optimizePackageImports: ['twitter-api-v2'],
-    logging: {
-      level: 'verbose',
-      fullUrl: true,
-    },
-    middleware: true,
-  },
-  output: 'standalone',
-  typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    ignoreBuildErrors: false,
-  },
-  // Disable source maps in production
-  productionBrowserSourceMaps: false,
-  // Simplify the build process
-  swcMinify: true,
-  poweredByHeader: false,
-  compress: true,
-  generateEtags: false,
-  pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
-  distDir: '.next',
-  // Simplify module resolution
-  modularizeImports: {
-    'twitter-api-v2': {
-      transform: 'twitter-api-v2/dist/{{member}}'
-    }
-  },
-  // Static export configuration
-  trailingSlash: true,
-  skipTrailingSlashRedirect: true,
-  // Disable server features in production
-  compiler: {
-    removeConsole: {
-      exclude: ['error', 'warn'],
-    }
-  },
-  // Enable detailed logging
-  onError: function (err) {
-    console.error('Next.js Build Error:', err);
-    return err;
-  },
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
-  },
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'production' 
-              ? 'https://amore.build' 
-              : 'http://localhost:3000'
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, OPTIONS'
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type'
-          }
-        ]
-      }
-    ]
-  },
+  }
 }
 
-export default nextConfig 
+export default nextConfig; 

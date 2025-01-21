@@ -1,5 +1,53 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient, postTweet } from '@/lib/x-api';
+import {
+  getCachedTweets,
+  cacheTweets,
+  getRateLimitTimestamp,
+  updateRateLimitTimestamp,
+  canMakeRequest 
+} from '@/lib/blob-storage';
+
+async function searchRecentTweets(client: any) {
+  try {
+    // Search for tweets containing ".build"
+    const searchResults = await client.v2.search('.build', {
+      'tweet.fields': ['created_at', 'text', 'public_metrics'],
+      'user.fields': ['profile_image_url', 'username'],
+      max_results: 10,
+    });
+
+    if (searchResults.data && searchResults.data.length > 0) {
+      return searchResults.data[0]; // Return the most recent matching tweet
+    }
+    return null;
+  } catch (error) {
+    console.error('Error searching tweets:', error);
+    return null;
+  }
+}
+
+async function getRandomTweet(client: any, username: string) {
+  const user = await client.v2.userByUsername(username);
+  if (!user.data) {
+    throw new Error('User not found');
+  }
+
+  const tweets = await client.v2.userTimeline(user.data.id, {
+    exclude: ['replies', 'retweets'],
+    'tweet.fields': ['created_at', 'text', 'public_metrics'],
+    'user.fields': ['profile_image_url', 'username'],
+    max_results: 10,
+  });
+
+  if (!tweets.data || tweets.data.length === 0) {
+    throw new Error('No tweets found');
+  }
+
+  // Get a random tweet from the results
+  const randomIndex = Math.floor(Math.random() * tweets.data.length);
+  return tweets.data[randomIndex];
+}
 
 export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
@@ -15,35 +63,42 @@ export async function GET(request: Request) {
 
     switch (action) {
       case 'fetch_tweets': {
-        if (!username) {
-          console.error('Missing username parameter');
-          return NextResponse.json({ error: 'Username is required' }, { status: 400 });
-        }
-
-        console.log(`Fetching tweets for username: ${username}`);
-        const client = await getReadOnlyClient();
-        const user = await client.v2.userByUsername(username);
+        // Check cache first
+        const cachedData = await getCachedTweets();
+        const cachedTweets = cachedData?.tweets ?? [];
         
-        if (!user.data) {
-          console.error('User not found:', username);
-          return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        if (cachedTweets.length > 0) {
+          console.log('Returning cached tweets, count:', cachedTweets.length);
+          return NextResponse.json({ tweets: cachedTweets });
         }
 
-        console.log(`Found user ID: ${user.data.id}, fetching timeline...`);
-        const tweets = await client.v2.userTimeline(user.data.id, {
-          exclude: ['replies', 'retweets'],
-          expansions: ['author_id', 'attachments.media_keys'],
-          'tweet.fields': ['created_at', 'text', 'public_metrics'],
-          'user.fields': ['profile_image_url', 'username'],
-          max_results: 10,
-        });
+        // Check rate limit
+        const lastRequestTime = await getRateLimitTimestamp();
+        if (!canMakeRequest(lastRequestTime)) {
+          console.log('Rate limit in effect, waiting for timeout');
+          return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+        }
 
-        console.log('Tweets fetched successfully:', {
-          count: tweets.data.meta?.result_count,
-          userId: user.data.id
-        });
+        // Make new request
+        console.log('Fetching fresh tweets');
+        const client = await getReadOnlyClient();
 
-        return NextResponse.json(tweets.data);
+        // First try to find tweets with ".build"
+        const buildTweet = await searchRecentTweets(client);
+        
+        // If no ".build" tweets found, get a random tweet from the user's timeline
+        const tweet = buildTweet || (username ? await getRandomTweet(client, username) : null);
+
+        if (!tweet) {
+          return NextResponse.json({ error: 'No tweets found' }, { status: 404 });
+        }
+
+        // Cache the tweets and update rate limit timestamp
+        await cacheTweets([tweet]);
+        await updateRateLimitTimestamp();
+
+        console.log('Tweet fetched and cached successfully');
+        return NextResponse.json(tweet);
       }
 
       default:
@@ -55,12 +110,12 @@ export async function GET(request: Request) {
       message: error instanceof Error ? error.message : 'Unknown error',
       name: error instanceof Error ? error.name : 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
-      raw: error, // Log the raw error object
-      url: request.url, // Add request URL
+      raw: error,
+      url: request.url,
       params: { 
         action: searchParams.get('action'),
         username: searchParams.get('username')
-      }, // Add request parameters
+      },
       env: {
         hasApiKey: !!process.env.TWITTER_API_KEY,
         hasApiSecret: !!process.env.TWITTER_API_SECRET,
@@ -69,7 +124,11 @@ export async function GET(request: Request) {
       }
     });
 
-    // Return a more detailed error response
+    // Update rate limit timestamp if we hit a rate limit error
+    if (error instanceof Error && error.message.includes('Rate limit')) {
+      await updateRateLimitTimestamp();
+    }
+
     return NextResponse.json({
       error: 'Failed to process Twitter request',
       details: error instanceof Error ? error.message : 'Unknown error',

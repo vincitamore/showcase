@@ -4,5 +4,9 @@
       "memory": 3008,
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [{
+    "path": "/api/cron/fetch-tweets",
+    "schedule": "*/15 * * * *"
+  }]
 } 
