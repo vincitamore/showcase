@@ -16,25 +16,27 @@ export async function GET() {
     console.log('Fetching cached tweets...')
     const cachedData = await getCachedTweets()
     
-    if (!cachedData?.tweets) {
+    if (!cachedData?.tweets || cachedData.tweets.length === 0) {
       console.log('No cached tweets found')
       return NextResponse.json({ tweets: [] })
     }
     
-    // Get up to 4 random tweets from cache
-    const randomTweets = [...cachedData.tweets]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 4)
+    // Always return exactly 4 tweets (or all if less than 4 available)
+    const tweetsToReturn = getRandomItems(cachedData.tweets, Math.min(4, cachedData.tweets.length))
     
-    console.log('Returning cached tweets:', {
-      available: cachedData.tweets.length,
-      returning: randomTweets.length
+    console.log('Returning tweets:', {
+      availableInCache: cachedData.tweets.length,
+      returning: tweetsToReturn.length,
+      tweets: tweetsToReturn.map(t => ({ id: t.id, text: t.text.substring(0, 50) + '...' }))
     })
     
-    return NextResponse.json({ tweets: randomTweets })
+    return NextResponse.json({ tweets: tweetsToReturn })
   } catch (error) {
     console.error('Error fetching cached tweets:', error)
-    return NextResponse.json({ tweets: [] })
+    return NextResponse.json({ 
+      error: 'Failed to fetch tweets',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
 

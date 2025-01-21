@@ -79,7 +79,11 @@ const BlogSection = () => {
       }
       
       const data = await response.json();
-      console.log('Received tweets response:', data);
+      console.log('Received tweets response:', {
+        hasTweets: Array.isArray(data?.tweets),
+        tweetCount: data?.tweets?.length ?? 0,
+        tweets: data?.tweets?.map((t: any) => ({ id: t.id, text: t.text.substring(0, 50) + '...' }))
+      });
       
       if (!data.tweets || !Array.isArray(data.tweets)) {
         console.error('Invalid tweets data received:', data);
@@ -90,11 +94,6 @@ const BlogSection = () => {
         });
         return;
       }
-      
-      console.log('Setting tweets:', {
-        count: data.tweets.length,
-        tweets: data.tweets
-      });
       
       setTweets(data.tweets);
     } catch (error) {
