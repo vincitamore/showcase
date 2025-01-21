@@ -6,11 +6,19 @@ interface CachedTweets {
   timestamp: number;
 }
 
-// Constants for blob storage
-const CACHE_KEY_PREFIX = 'cached-tweets';
-const RATE_LIMIT_PREFIX = 'rate-limit-timestamp';
-const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
-const MAX_TWEETS = 100;
+// Cache keys
+export const CACHE_KEY_PREFIX = 'cached-tweets';
+export const RATE_LIMIT_PREFIX = 'rate-limit-timestamp';
+export const SELECTED_TWEETS_KEY = 'selected-tweets.json';
+
+// Constants
+export const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
+export const MAX_TWEETS = 100;
+
+export interface SelectedTweets {
+  tweets: TweetV2[];
+  timestamp: number;
+}
 
 export async function getCachedTweets(): Promise<CachedTweets | null> {
   try {
@@ -156,4 +164,57 @@ export function canMakeRequest(lastTimestamp: number | null): boolean {
     canMake
   });
   return canMake;
+}
+
+export async function getSelectedTweets(): Promise<SelectedTweets | null> {
+  try {
+    console.log('Getting selected tweets...');
+    const blobs = await list({ prefix: SELECTED_TWEETS_KEY });
+    
+    if (blobs.blobs.length === 0) {
+      console.log('No selected tweets found');
+      return null;
+    }
+    
+    const mostRecent = blobs.blobs[0];
+    const response = await fetch(mostRecent.url);
+    if (!response.ok) {
+      console.error('Failed to fetch selected tweets blob:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Retrieved selected tweets:', {
+      count: data.tweets?.length ?? 0,
+      timestamp: new Date(data.timestamp).toISOString()
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Error getting selected tweets:', error);
+    return null;
+  }
+}
+
+export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
+  try {
+    console.log('Updating selected tweets...');
+    const data: SelectedTweets = {
+      tweets,
+      timestamp: Date.now()
+    };
+    
+    await put(SELECTED_TWEETS_KEY, JSON.stringify(data), {
+      access: 'public',
+      addRandomSuffix: true
+    });
+    
+    console.log('Selected tweets updated:', {
+      count: tweets.length,
+      timestamp: new Date(data.timestamp).toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating selected tweets:', error);
+    throw error;
+  }
 } 

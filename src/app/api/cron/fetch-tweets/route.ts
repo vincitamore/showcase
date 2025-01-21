@@ -4,7 +4,9 @@ import {
   cacheTweets,
   getRateLimitTimestamp,
   updateRateLimitTimestamp,
-  getCachedTweets
+  getCachedTweets,
+  canMakeRequest,
+  updateSelectedTweets
 } from '@/lib/blob-storage';
 import { TwitterApi, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
 
@@ -38,7 +40,7 @@ function logStatus(message: string, data?: any) {
   console.log(`[CRON ${timestamp}] ${message}`, data ? JSON.stringify(data, null, 2) : '');
 }
 
-async function canMakeRequest() {
+async function checkRateLimit() {
   try {
     const lastTimestamp = await getRateLimitTimestamp();
     if (!lastTimestamp) {
@@ -135,6 +137,12 @@ async function getRandomUserTweet(client: TwitterApi, username: string, cachedTw
   }
 }
 
+// Helper function to get random items from an array
+function getRandomItems<T>(array: T[], count: number): T[] {
+  const shuffled = [...array].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 export async function GET(request: Request) {
   const startTime = Date.now();
   logStatus('Cron job started');
@@ -148,14 +156,23 @@ export async function GET(request: Request) {
     }
 
     // Check if we can make a request
-    const canRequest = await canMakeRequest();
+    const canRequest = await checkRateLimit();
     if (!canRequest) {
       const lastTimestamp = await getRateLimitTimestamp();
       const nextRequest = lastTimestamp ? lastTimestamp + FIFTEEN_MINUTES : Date.now() + FIFTEEN_MINUTES;
       
-      logStatus('Rate limit in effect, skipping fetch', {
-        nextRequestAt: new Date(nextRequest).toISOString()
-      });
+      logStatus('Rate limit in effect, skipping fetch');
+      
+      // Even if rate limited, we can still select new random tweets from cache
+      const cachedData = await getCachedTweets();
+      if (cachedData?.tweets?.length) {
+        const selectedTweets = getRandomItems(cachedData.tweets, 4);
+        await updateSelectedTweets(selectedTweets);
+        logStatus('Updated selected tweets from cache', {
+          available: cachedData.tweets.length,
+          selected: selectedTweets.length
+        });
+      }
       
       return NextResponse.json({ 
         error: 'Rate limit in effect',
@@ -193,6 +210,16 @@ export async function GET(request: Request) {
     const updatedTweets = [...tweetsToCache, ...currentTweets].slice(0, 100);
     await cacheTweets(updatedTweets);
     await updateRateLimitTimestamp();
+
+    // After successfully fetching and caching tweets, select random ones
+    if (cachedData?.tweets?.length) {
+      const selectedTweets = getRandomItems(cachedData.tweets, 4);
+      await updateSelectedTweets(selectedTweets);
+      logStatus('Updated selected tweets', {
+        available: cachedData.tweets.length,
+        selected: selectedTweets.length
+      });
+    }
 
     const duration = Date.now() - startTime;
     logStatus('Cron job completed successfully', {

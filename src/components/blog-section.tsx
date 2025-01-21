@@ -188,29 +188,43 @@ const BlogSection = () => {
       {/* Tweets Display */}
       <div className="grid gap-6 mx-auto max-w-2xl">
         {tweets.map((tweet) => (
-          <Card3D key={tweet.id} className="p-6">
-            <p className="mb-4 text-foreground/90">{tweet.text}</p>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Heart className="h-4 w-4" />
-                <span>{tweet.public_metrics?.like_count ?? 0}</span>
+          <a 
+            key={tweet.id}
+            href={`https://x.com/i/web/status/${tweet.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative transition-all duration-200 hover:scale-[1.02]"
+          >
+            <Card3D className="p-6 transition-colors group-hover:bg-muted/50">
+              <div className="absolute right-4 top-4 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground shadow-sm">
+                  <Share2 className="h-4 w-4" />
+                  <span>View on X</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" />
-                <span>{tweet.public_metrics?.reply_count ?? 0}</span>
+              <p className="mb-4 text-foreground/90">{tweet.text}</p>
+              <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Heart className="h-4 w-4" />
+                  <span>{tweet.public_metrics?.like_count ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>{tweet.public_metrics?.reply_count ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Share2 className="h-4 w-4" />
+                  <span>{tweet.public_metrics?.retweet_count ?? 0}</span>
+                </div>
+                <span className="ml-auto">
+                  {tweet.created_at 
+                    ? new Date(tweet.created_at).toLocaleDateString()
+                    : 'Just now'
+                  }
+                </span>
               </div>
-              <div className="flex items-center gap-1">
-                <Share2 className="h-4 w-4" />
-                <span>{tweet.public_metrics?.retweet_count ?? 0}</span>
-              </div>
-              <span className="ml-auto">
-                {tweet.created_at 
-                  ? new Date(tweet.created_at).toLocaleDateString()
-                  : 'Just now'
-                }
-              </span>
-            </div>
-          </Card3D>
+            </Card3D>
+          </a>
         ))}
         {tweets.length === 0 && (
           <div className="text-center text-muted-foreground">

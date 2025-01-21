@@ -1,30 +1,35 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { TwitterApi } from 'twitter-api-v2'
-import { getCachedTweets } from '@/lib/blob-storage'
+import { getCachedTweets, getSelectedTweets } from '@/lib/blob-storage'
 
 export const dynamic = 'force-dynamic'
 
+// Helper function to get random items from array
+function getRandomItems<T>(array: T[], count: number): T[] {
+  const shuffled = [...array].sort(() => 0.5 - Math.random())
+  return shuffled.slice(0, count)
+}
+
 export async function GET() {
   try {
-    console.log('Fetching cached tweets...')
-    const cachedData = await getCachedTweets()
+    console.log('Fetching selected tweets...')
+    const selectedData = await getSelectedTweets()
     
-    console.log('Cached data:', {
-      hasCachedData: !!cachedData,
-      tweetCount: cachedData?.tweets?.length ?? 0
+    if (!selectedData) {
+      console.log('No selected tweets found')
+      return NextResponse.json({ tweets: [] })
+    }
+    
+    console.log('Returning selected tweets:', {
+      count: selectedData.tweets.length,
+      timestamp: new Date(selectedData.timestamp).toISOString()
     })
     
-    if (!cachedData?.tweets) {
-      // Return empty array instead of 404
-      return NextResponse.json([])
-    }
-
-    return NextResponse.json(cachedData.tweets)
+    return NextResponse.json({ tweets: selectedData.tweets })
   } catch (error) {
-    console.error('Error fetching cached tweets:', error)
-    // Return empty array on error instead of 500
-    return NextResponse.json([])
+    console.error('Error fetching selected tweets:', error)
+    return NextResponse.json({ tweets: [] })
   }
 }
 
