@@ -8,26 +8,31 @@ const allowedDomains = [
 ]
 
 export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || ''
-  
-  // Log the hostname for debugging
-  console.log('Request hostname:', hostname)
-  
-  // Check if the hostname is in our allowed list
-  const isAllowed = allowedDomains.some(domain => hostname.includes(domain))
-  
-  if (!isAllowed) {
-    console.warn(`Blocked request from unauthorized domain: ${hostname}`)
-    return new NextResponse(null, {
-      status: 403,
-      statusText: 'Forbidden',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-  }
-
   try {
+    // Check if this is a cron request
+    const isCronRequest = request.nextUrl.pathname === '/api/cron/fetch-tweets'
+    if (isCronRequest) {
+      const authHeader = request.headers.get('authorization')
+      const isValidCron = authHeader === `Bearer ${process.env.CRON_SECRET}`
+      
+      if (isValidCron) {
+        console.log('[Middleware] Allowing authorized cron request')
+        return NextResponse.next()
+      }
+      
+      console.log('[Middleware] Blocked unauthorized cron request')
+      return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
+    }
+
+    // For non-cron requests, check domain
+    const hostname = request.headers.get('host') || ''
+    const domain = hostname.split(':')[0] // Remove port if present
+    
+    if (!allowedDomains.includes(domain)) {
+      console.log(`[Middleware] Blocked request from unauthorized domain: ${domain}`)
+      return NextResponse.json({ error: 'Unauthorized domain' }, { status: 403 })
+    }
+
     const response = NextResponse.next()
 
     // Add headers to help with CORS and caching
@@ -43,11 +48,8 @@ export async function middleware(request: NextRequest) {
 
     return response
   } catch (error) {
-    console.error('Middleware error:', error)
-    return new NextResponse(
-      JSON.stringify({ success: false, message: 'Internal Server Error' }),
-      { status: 500, headers: { 'content-type': 'application/json' } }
-    )
+    console.error('[Middleware] Error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
