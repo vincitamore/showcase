@@ -24,6 +24,7 @@ const navigation = [
   { name: "Projects", href: "#projects" },
   { name: "Skills", href: "#skills" },
   { name: "Experience", href: "#experience" },
+  { name: "Blog", href: "#blog" },
   { name: "Contact", href: "#contact" },
 ]
 

@@ -189,7 +189,7 @@ const BlogSection = () => {
       </Card3D>
 
       {/* Tweets Display */}
-      <div className="grid gap-6 mx-auto max-w-2xl">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
         {tweets.map((tweet) => (
           <a 
             key={tweet.id}
@@ -198,15 +198,15 @@ const BlogSection = () => {
             rel="noopener noreferrer"
             className="group relative transition-all duration-200 hover:scale-[1.02]"
           >
-            <Card3D className="p-6 transition-colors group-hover:bg-muted/50">
-              <div className="absolute right-4 top-4 opacity-0 transition-opacity group-hover:opacity-100">
+            <Card3D className="p-6 transition-colors group-hover:bg-muted/50 h-full">
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 bg-black/5 dark:bg-white/5 backdrop-blur-sm rounded-xl">
                 <div className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground shadow-sm">
                   <Share2 className="h-4 w-4" />
                   <span>View on X</span>
                 </div>
               </div>
               <p className="mb-4 text-foreground/90">{tweet.text}</p>
-              <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-6 text-sm text-muted-foreground mt-auto">
                 <div className="flex items-center gap-1">
                   <Heart className="h-4 w-4" />
                   <span>{tweet.public_metrics?.like_count ?? 0}</span>
@@ -230,7 +230,7 @@ const BlogSection = () => {
           </a>
         ))}
         {tweets.length === 0 && (
-          <div className="text-center text-muted-foreground">
+          <div className="text-center text-muted-foreground col-span-full">
             No tweets to display yet.
           </div>
         )}
