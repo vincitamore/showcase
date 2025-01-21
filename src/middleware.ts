@@ -4,8 +4,11 @@ import type { NextRequest } from 'next/server'
 // List of allowed domains
 const allowedDomains = [
   'amore.build',
-  'localhost:3000', // For local development
+  'localhost', // Base localhost without port
 ]
+
+// List of allowed ports for development
+const allowedPorts = ['3000', '3001', '3002']
 
 export async function middleware(request: NextRequest) {
   try {
@@ -26,10 +29,26 @@ export async function middleware(request: NextRequest) {
 
     // For non-cron requests, check domain
     const hostname = request.headers.get('host') || ''
-    const domain = hostname.split(':')[0] // Remove port if present
+    const [domain, port] = hostname.split(':')
     
-    if (!allowedDomains.includes(domain)) {
-      console.log(`[Middleware] Blocked request from unauthorized domain: ${domain}`)
+    // Allow if domain is in allowedDomains and (no port specified or port is allowed)
+    const isDomainAllowed = allowedDomains.includes(domain)
+    const isPortAllowed = !port || allowedPorts.includes(port)
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    
+    // In development, allow localhost regardless of port
+    if (isDevelopment && domain === 'localhost') {
+      const response = NextResponse.next()
+      response.headers.set('Access-Control-Allow-Origin', `http://${hostname}`)
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+      return response
+    }
+
+    // In production, be strict about domain and port
+    if (!isDevelopment && (!isDomainAllowed || !isPortAllowed)) {
+      console.log(`[Middleware] Blocked request from unauthorized domain: ${hostname}`)
       return NextResponse.json({ error: 'Unauthorized domain' }, { status: 403 })
     }
 
@@ -40,7 +59,7 @@ export async function middleware(request: NextRequest) {
       'Access-Control-Allow-Origin', 
       process.env.NODE_ENV === 'production' 
         ? 'https://amore.build' 
-        : 'http://localhost:3000'
+        : `http://${hostname}`
     )
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')

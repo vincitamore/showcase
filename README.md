@@ -11,9 +11,11 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - Smooth scroll navigation with section highlighting
 - Dynamic image modals for project showcases
 - Real-time form validation and submission
-- X (Twitter) Integration with OAuth authentication
+- X (Twitter) Integration with OAuth authentication and cron-based tweet fetching
 - Built with performance and accessibility in mind
 - Automated deployment via GitHub Actions and Vercel
+- Blob storage for tweet caching and management
+- Rate-limited API endpoints with fallback mechanisms
 
 ## Tech Stack
 
@@ -21,12 +23,15 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui
-- **Runtime**: Bun
+- **Runtime**: Node.js
 - **Animations**: CSS transforms & transitions
 - **Theme Management**: next-themes
 - **Email**: Nodemailer with SMTP
 - **Social**: X (Twitter) API v2
 - **Analytics**: Vercel Analytics
+- **Storage**: Vercel Blob Storage
+- **Cron Jobs**: Vercel Cron
+- **Rate Limiting**: Vercel Edge Config
 
 ## Project Structure
 
@@ -39,7 +44,8 @@ src/
 │   ├── ui/          # shadcn/ui components
 │   └── ...          # Custom components
 ├── hooks/           # Custom React hooks
-└── lib/             # Utility functions and API clients
+├── lib/             # Utility functions and API clients
+└── middleware.ts    # Edge middleware for auth and rate limiting
 ```
 
 ## Getting Started
@@ -60,6 +66,10 @@ bun install
 cp .env.local.example .env.local
 
 # Edit .env.local with your credentials:
+# Core Configuration
+NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
+CRON_SECRET=your-cron-secret              # For authenticating cron jobs
+
 # SMTP Configuration
 SMTP_HOST=your-smtp-host
 SMTP_PORT=your-smtp-port
@@ -71,9 +81,6 @@ TWITTER_API_KEY=your-api-key
 TWITTER_API_SECRET=your-api-secret
 TWITTER_USERNAME=your-username-without-@
 NEXT_PUBLIC_TWITTER_USERNAME=your-username-without-@
-
-# Application URL
-NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
 ```
 
 4. Configure X API Access:

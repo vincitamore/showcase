@@ -2,6 +2,17 @@ import { Card3D } from "@/components/ui/card"
 import dynamic from 'next/dynamic';
 import { Github, Mail } from "lucide-react"
 import { NavWrapper } from "@/components/nav-wrapper"
+import { motion } from 'framer-motion';
+
+const AnimatedChatInput = dynamic(() => import('@/components/animated-chat-input').then(mod => mod.AnimatedChatInput), {
+  loading: () => <div className="w-full max-w-3xl mx-auto opacity-0" />,
+  ssr: false
+});
+
+const GrokTagline = dynamic(() => import('@/components/grok-tagline').then(mod => mod.GrokTagline), {
+  loading: () => <div className="mt-2 opacity-0" />,
+  ssr: false
+});
 
 const ContactForm = dynamic(() => import('@/components/contact-form'), {
   loading: () => <div>Loading...</div>,
@@ -57,10 +68,17 @@ export default function Home() {
                 Crafting elegant solutions with passion and precision. 
                 From infrastructure to interface, building technology that empowers and endures.
               </p>
+              
+              {/* Chat Input */}
+              <div className="mt-16">
+                <AnimatedChatInput />
+                <GrokTagline />
+              </div>
             </div>
           </div>
         </section>
 
+        {/* Projects Section */}
         <ProjectsSection />
 
         {/* Skills Section */}

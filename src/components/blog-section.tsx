@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { MessageSquare, Share2, Heart } from "lucide-react"
+import { ChatInput } from "@/components/chat-input"
 
 interface TweetMetrics {
   like_count?: number
@@ -151,10 +152,14 @@ const BlogSection = () => {
 
   return (
     <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
-      <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
-        Tech Thoughts
-      </h2>
-      
+      <div className="mb-12 text-center">
+        <h2 className="text-3xl font-bold mb-4">Tech Thoughts</h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Sharing insights and experiences from my journey in software development,
+          network engineering, and cybersecurity.
+        </p>
+      </div>
+
       {/* Message Composer */}
       <Card3D className="mb-8 mx-auto max-w-2xl p-6">
         <div className="space-y-4">
@@ -186,6 +191,11 @@ const BlogSection = () => {
           )}
         </div>
       </Card3D>
+
+      {/* AI Chat Input */}
+      <div className="mb-12">
+        <ChatInput />
+      </div>
 
       {/* Tweets Display */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">

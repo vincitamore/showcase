@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  Message[]
+  ipAddress String?
+  userAgent String?
+}
+
+model Message {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  content       String
+  role          String      // 'user' | 'assistant'
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  chatSessionId String
+  tokens        Int         @default(0)
+  skillTags     String[]    // Array of skill tags referenced in the response
+
+  @@index([chatSessionId])
+}
+
+model SystemPrompt {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  content   String
+  version   String   @unique
+  isActive  Boolean  @default(false)
+  metadata  Json?    // Store any additional prompt configuration
+}
+
+model RateLimit {
+  id        String   @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hits      Int      @default(0)
+  resetAt   DateTime
+  ipAddress String   @unique
+
+  @@index([ipAddress])
+}

@@ -20,6 +20,7 @@
 .DS_Store
 *.pem
 DEVPLAN.md
+GOALS.md
 
 # debug
 npm-debug.log*
