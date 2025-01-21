@@ -59,6 +59,7 @@ const BlogSection = () => {
 
   const fetchCachedTweets = async () => {
     try {
+      console.log('Fetching cached tweets from API...')
       const response = await fetch('/api/twitter/tweets')
       
       if (!response.ok) {
@@ -78,10 +79,20 @@ const BlogSection = () => {
       }
       
       const data = await response.json()
+      console.log('Received tweets:', {
+        isArray: Array.isArray(data),
+        length: Array.isArray(data) ? data.length : 0,
+        data
+      })
+      
       // Ensure we have an array of tweets
       const validTweets = Array.isArray(data) ? data : [];
       // Randomly select 4 tweets
       const randomTweets = validTweets.sort(() => Math.random() - 0.5).slice(0, 4);
+      console.log('Selected random tweets:', {
+        validTweetsCount: validTweets.length,
+        randomTweetsCount: randomTweets.length
+      })
       setTweets(randomTweets)
     } catch (error) {
       console.error('Error fetching cached tweets:', error);

@@ -7,19 +7,24 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    console.log('Fetching cached tweets...')
     const cachedData = await getCachedTweets()
     
-    if (!cachedData || !cachedData.tweets || cachedData.tweets.length === 0) {
-      return NextResponse.json({ error: 'No tweets available' }, { status: 404 })
+    console.log('Cached data:', {
+      hasCachedData: !!cachedData,
+      tweetCount: cachedData?.tweets?.length ?? 0
+    })
+    
+    if (!cachedData?.tweets) {
+      // Return empty array instead of 404
+      return NextResponse.json([])
     }
 
     return NextResponse.json(cachedData.tweets)
   } catch (error) {
     console.error('Error fetching cached tweets:', error)
-    return NextResponse.json({ 
-      error: 'Failed to fetch cached tweets',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    // Return empty array on error instead of 500
+    return NextResponse.json([])
   }
 }
 
