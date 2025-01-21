@@ -13,22 +13,27 @@ function getRandomItems<T>(array: T[], count: number): T[] {
 
 export async function GET() {
   try {
-    console.log('Fetching selected tweets...')
-    const selectedData = await getSelectedTweets()
+    console.log('Fetching cached tweets...')
+    const cachedData = await getCachedTweets()
     
-    if (!selectedData) {
-      console.log('No selected tweets found')
+    if (!cachedData?.tweets) {
+      console.log('No cached tweets found')
       return NextResponse.json({ tweets: [] })
     }
     
-    console.log('Returning selected tweets:', {
-      count: selectedData.tweets.length,
-      timestamp: new Date(selectedData.timestamp).toISOString()
+    // Get up to 4 random tweets from cache
+    const randomTweets = [...cachedData.tweets]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 4)
+    
+    console.log('Returning cached tweets:', {
+      available: cachedData.tweets.length,
+      returning: randomTweets.length
     })
     
-    return NextResponse.json({ tweets: selectedData.tweets })
+    return NextResponse.json({ tweets: randomTweets })
   } catch (error) {
-    console.error('Error fetching selected tweets:', error)
+    console.error('Error fetching cached tweets:', error)
     return NextResponse.json({ tweets: [] })
   }
 }
