@@ -34,13 +34,11 @@ const BlogSection = () => {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/twitter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: '' }), // Empty test post to check auth
-      })
-      setIsAuthenticated(response.status !== 401)
+      const response = await fetch('/api/twitter/auth/status')
+      const { isAuthenticated: authStatus } = await response.json()
+      setIsAuthenticated(authStatus)
     } catch (error) {
+      console.error('Auth check failed:', error)
       setIsAuthenticated(false)
     }
   }
