@@ -12,10 +12,12 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - Dynamic image modals for project showcases
 - Real-time form validation and submission
 - X (Twitter) Integration with OAuth authentication and cron-based tweet fetching
+- xAI Grok-2 powered chat interface with streaming responses
 - Built with performance and accessibility in mind
 - Automated deployment via GitHub Actions and Vercel
 - Blob storage for tweet caching and management
 - Rate-limited API endpoints with fallback mechanisms
+- PostgreSQL database for chat history and system prompts
 
 ## Tech Stack
 
@@ -23,22 +25,24 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **UI Components**: shadcn/ui
+- **Database**: PostgreSQL with Prisma ORM
+- **AI Integration**: xAI SDK with Grok-2
 - **Runtime**: Node.js
-- **Animations**: CSS transforms & transitions
+- **Animations**: Framer Motion & CSS transforms
 - **Theme Management**: next-themes
 - **Email**: Nodemailer with SMTP
 - **Social**: X (Twitter) API v2
 - **Analytics**: Vercel Analytics
 - **Storage**: Vercel Blob Storage
 - **Cron Jobs**: Vercel Cron
-- **Rate Limiting**: Vercel Edge Config
+- **Rate Limiting**: Database-backed with Prisma
 
 ## Project Structure
 
 ```
 src/
 ├── app/              # Next.js app directory
-│   ├── api/         # API routes for form handling and X auth
+│   ├── api/         # API routes for chat, form handling, and X auth
 │   └── og/          # OpenGraph image generation
 ├── components/       # React components
 │   ├── ui/          # shadcn/ui components
@@ -46,6 +50,7 @@ src/
 ├── hooks/           # Custom React hooks
 ├── lib/             # Utility functions and API clients
 └── middleware.ts    # Edge middleware for auth and rate limiting
+prisma/              # Database schema and migrations
 ```
 
 ## Getting Started
@@ -57,7 +62,7 @@ git clone https://github.com/vincitamore/showcase.git
 
 2. Install dependencies:
 ```bash
-bun install
+npm install
 ```
 
 3. Set up environment variables:
@@ -67,8 +72,15 @@ cp .env.local.example .env.local
 
 # Edit .env.local with your credentials:
 # Core Configuration
-NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
-CRON_SECRET=your-cron-secret              # For authenticating cron jobs
+NEXT_PUBLIC_URL=http://localhost:3000 # Change in production
+CRON_SECRET=your-cron-secret          # For authenticating cron jobs
+
+# Database Configuration
+DATABASE_URL=your-postgresql-url      # Main connection string
+DIRECT_URL=your-direct-db-url        # For Prisma migrations
+
+# xAI Configuration
+XAI_API_KEY=your-xai-api-key         # For Grok-2 chat functionality
 
 # SMTP Configuration
 SMTP_HOST=your-smtp-host
@@ -83,21 +95,15 @@ TWITTER_USERNAME=your-username-without-@
 NEXT_PUBLIC_TWITTER_USERNAME=your-username-without-@
 ```
 
-4. Configure X API Access:
-   - Visit the [X Developer Portal](https://developer.twitter.com/en/portal/dashboard)
-   - Create a new project and app
-   - Enable OAuth 2.0 and set up authentication
-   - Add your callback URL: `{NEXT_PUBLIC_APP_URL}/api/auth/x/callback`
-   - Get your API key and secret
-   - Configure User authentication settings:
-     - Enable OAuth 2.0
-     - Set App permissions to Read and Write
-     - Add the callback URL
-     - Request email from users (optional)
+4. Initialize the database:
+```bash
+npx prisma generate
+npx prisma db push
+```
 
 5. Run the development server:
 ```bash
-bun run dev
+npm run dev
 ```
 
 6. Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -219,11 +225,16 @@ To generate your preview image:
 - Analytics integration
 - X integration with OAuth authentication
 - Blog section with post composer
+- xAI Grok-2 chat integration
+- PostgreSQL database setup
+- Chat streaming implementation
+- Animated chat UI with glow effects
 
 ### In Progress
-- Project filtering and sorting
+- System prompt refinement
+- Error boundary implementation
 - Performance optimization
-- SEO enhancements
+- Rate limiting feedback
 
 ### Upcoming
 - Case studies for major projects
@@ -250,3 +261,33 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - [Vercel](https://vercel.com) for hosting and analytics
 - [Cursor](https://cursor.com/) for the AI-powered development environment
 - GitHub Actions for automated cross-repository workflow management
+
+## Chat System Features
+
+The site includes an AI-powered chat system using xAI's Grok-2 model:
+
+1. **Interactive Interface**
+   - Animated chat input with typewriter effect
+   - Real-time streaming responses
+   - Markdown rendering for formatted output
+   - Skill tag highlighting
+   - Chat history with dialog view
+
+2. **Backend Features**
+   - PostgreSQL database for chat storage
+   - Rate limiting with database tracking
+   - System prompt versioning
+   - Skill and context awareness
+   - Error handling and retry logic
+
+3. **Performance**
+   - Streaming responses for fast interaction
+   - Optimized database queries
+   - Proper error boundaries
+   - Fallback mechanisms
+
+4. **Security**
+   - Rate limiting per IP
+   - Input validation
+   - Secure environment variable handling
+   - Production-ready middleware
