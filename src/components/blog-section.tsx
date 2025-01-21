@@ -59,8 +59,8 @@ const BlogSection = () => {
 
   const fetchCachedTweets = async () => {
     try {
-      console.log('Fetching cached tweets from API...')
-      const response = await fetch('/api/twitter/tweets')
+      console.log('Fetching cached tweets from API...');
+      const response = await fetch('/api/twitter/tweets');
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -78,16 +78,25 @@ const BlogSection = () => {
         return;
       }
       
-      const { tweets: fetchedTweets } = await response.json()
-      console.log('Received tweets:', {
-        isArray: Array.isArray(fetchedTweets),
-        length: Array.isArray(fetchedTweets) ? fetchedTweets.length : 0,
-        data: fetchedTweets
-      })
+      const data = await response.json();
+      console.log('Received tweets response:', data);
       
-      // Ensure we have an array of tweets
-      const validTweets = Array.isArray(fetchedTweets) ? fetchedTweets : [];
-      setTweets(validTweets)
+      if (!data.tweets || !Array.isArray(data.tweets)) {
+        console.error('Invalid tweets data received:', data);
+        toast({
+          title: "Error",
+          description: "Received invalid tweet data. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('Setting tweets:', {
+        count: data.tweets.length,
+        tweets: data.tweets
+      });
+      
+      setTweets(data.tweets);
     } catch (error) {
       console.error('Error fetching cached tweets:', error);
       toast({
@@ -96,7 +105,7 @@ const BlogSection = () => {
           ? `Failed to load tweets: ${error.message}`
           : "Failed to load tweets. Please try again later.",
         variant: "destructive",
-      })
+      });
     }
   }
 

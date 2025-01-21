@@ -9,15 +9,96 @@ interface CachedTweets {
 // Cache keys
 export const CACHE_KEY_PREFIX = 'cached-tweets';
 export const RATE_LIMIT_PREFIX = 'rate-limit-timestamp';
-export const SELECTED_TWEETS_KEY = 'selected-tweets.json';
+export const RATE_LIMIT_FILE = 'rate-limit-timestamp.txt';
+export const SELECTED_TWEETS_FILE = 'selected-tweets.json';
 
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
 export const MAX_TWEETS = 100;
+export const STORAGE_LIMIT_MB = 450; // Cleanup when approaching 500MB
+export const BYTES_PER_MB = 1024 * 1024;
 
 export interface SelectedTweets {
   tweets: TweetV2[];
   timestamp: number;
+}
+
+interface BlobInfo {
+  pathname: string;
+  url: string;
+  size: number;
+  uploadedAt: Date;
+}
+
+async function checkStorageUsage(): Promise<number> {
+  try {
+    const { blobs } = await list({ prefix: CACHE_KEY_PREFIX });
+    const totalBytes = blobs.reduce((acc, blob) => acc + (blob.size || 0), 0);
+    const totalMB = totalBytes / BYTES_PER_MB;
+    
+    console.log('Current blob storage usage:', {
+      totalMB: Math.round(totalMB * 100) / 100,
+      totalFiles: blobs.length
+    });
+    
+    return totalMB;
+  } catch (error) {
+    console.error('Error checking storage usage:', error);
+    return 0;
+  }
+}
+
+async function cleanupOldCachedTweets(): Promise<void> {
+  try {
+    const currentUsageMB = await checkStorageUsage();
+    
+    if (currentUsageMB < STORAGE_LIMIT_MB) {
+      console.log('Storage usage below limit, no cleanup needed');
+      return;
+    }
+    
+    console.log('Storage usage exceeds limit, starting cleanup...');
+    const { blobs } = await list({ prefix: CACHE_KEY_PREFIX });
+    
+    // Sort blobs by date, keeping most recent
+    const sortedBlobs = blobs
+      .map(blob => ({
+        pathname: blob.pathname,
+        url: blob.url,
+        size: blob.size || 0,
+        uploadedAt: new Date(blob.uploadedAt || Date.now())
+      }))
+      .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+    
+    let currentSize = 0;
+    const blobsToKeep: BlobInfo[] = [];
+    const blobsToDelete: BlobInfo[] = [];
+    
+    // Keep adding blobs until we hit 80% of our limit
+    for (const blob of sortedBlobs) {
+      const newSize = currentSize + (blob.size / BYTES_PER_MB);
+      if (newSize < STORAGE_LIMIT_MB * 0.8) {
+        blobsToKeep.push(blob);
+        currentSize = newSize;
+      } else {
+        blobsToDelete.push(blob);
+      }
+    }
+    
+    // Delete old blobs
+    for (const blob of blobsToDelete) {
+      console.log('Deleting old cached tweets file:', blob.pathname);
+      await del(blob.url);
+    }
+    
+    console.log('Cleanup completed:', {
+      filesKept: blobsToKeep.length,
+      filesDeleted: blobsToDelete.length,
+      newSizeMB: Math.round(currentSize * 100) / 100
+    });
+  } catch (error) {
+    console.error('Error during storage cleanup:', error);
+  }
 }
 
 export async function getCachedTweets(): Promise<CachedTweets | null> {
@@ -82,6 +163,9 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
       count: tweetsToCache.length,
       timestamp: new Date().toISOString()
     });
+    
+    // Check storage usage and cleanup if needed
+    await cleanupOldCachedTweets();
   } catch (error) {
     console.error('Error caching tweets:', error);
   }
@@ -89,20 +173,15 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
 
 export async function getRateLimitTimestamp(): Promise<number | null> {
   try {
-    console.log('Listing blobs with prefix:', RATE_LIMIT_PREFIX);
-    const { blobs } = await list({ prefix: RATE_LIMIT_PREFIX });
-    console.log('Found rate limit blobs:', blobs.map(b => ({ url: b.url, pathname: b.pathname })));
+    console.log('Getting rate limit timestamp...');
+    const { blobs } = await list({ prefix: RATE_LIMIT_FILE });
     
     if (blobs.length === 0) {
       console.log('No rate limit timestamp found');
       return null;
     }
     
-    // Sort by pathname to get the most recent timestamp
-    const sortedBlobs = blobs.sort((a, b) => b.pathname.localeCompare(a.pathname));
-    console.log('Using most recent timestamp blob:', sortedBlobs[0].pathname);
-    
-    const response = await fetch(sortedBlobs[0].url);
+    const response = await fetch(blobs[0].url);
     console.log('Rate limit fetch response status:', response.status);
     
     if (!response.ok) {
@@ -135,17 +214,17 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
 export async function updateRateLimitTimestamp(): Promise<void> {
   try {
     const timestamp = Date.now();
-    const filename = `${RATE_LIMIT_PREFIX}-${timestamp}.txt`;
     
     console.log('Updating rate limit timestamp:', {
-      filename,
+      filename: RATE_LIMIT_FILE,
       timestamp,
       date: new Date(timestamp).toISOString()
     });
     
-    await put(filename, timestamp.toString(), {
+    await put(RATE_LIMIT_FILE, timestamp.toString(), {
       contentType: 'text/plain',
       access: 'public',
+      addRandomSuffix: false
     });
     
     console.log('Successfully updated rate limit timestamp');
@@ -169,15 +248,14 @@ export function canMakeRequest(lastTimestamp: number | null): boolean {
 export async function getSelectedTweets(): Promise<SelectedTweets | null> {
   try {
     console.log('Getting selected tweets...');
-    const blobs = await list({ prefix: SELECTED_TWEETS_KEY });
+    const { blobs } = await list({ prefix: SELECTED_TWEETS_FILE });
     
-    if (blobs.blobs.length === 0) {
+    if (blobs.length === 0) {
       console.log('No selected tweets found');
       return null;
     }
     
-    const mostRecent = blobs.blobs[0];
-    const response = await fetch(mostRecent.url);
+    const response = await fetch(blobs[0].url);
     if (!response.ok) {
       console.error('Failed to fetch selected tweets blob:', response.status);
       return null;
@@ -204,14 +282,16 @@ export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
       timestamp: Date.now()
     };
     
-    await put(SELECTED_TWEETS_KEY, JSON.stringify(data), {
+    await put(SELECTED_TWEETS_FILE, JSON.stringify(data), {
       access: 'public',
-      addRandomSuffix: true
+      addRandomSuffix: false,
+      contentType: 'application/json'
     });
     
     console.log('Selected tweets updated:', {
       count: tweets.length,
-      timestamp: new Date(data.timestamp).toISOString()
+      timestamp: new Date(data.timestamp).toISOString(),
+      filename: SELECTED_TWEETS_FILE
     });
   } catch (error) {
     console.error('Error updating selected tweets:', error);
