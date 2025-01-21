@@ -1,60 +1,47 @@
 import { TwitterApi } from 'twitter-api-v2';
 
 interface RateLimitCache {
-  reset: number;
-  remaining: number;
-  backoffAttempt: number;
-}
-
-interface TwitterError extends Error {
-  code?: number;
-  rateLimit?: {
+  search: {
+    reset: number;
+    remaining: number;
+  };
+  timeline: {
     reset: number;
     remaining: number;
   };
 }
 
-// Cache for rate limit info
-let rateLimitCache: RateLimitCache = {
-  reset: 0,
-  remaining: 1,
-  backoffAttempt: 0
+// Cache for rate limit info per endpoint
+const rateLimitCache: RateLimitCache = {
+  search: {
+    reset: 0,
+    remaining: 1
+  },
+  timeline: {
+    reset: 0,
+    remaining: 1
+  }
 };
 
-// Helper to check if we're rate limited
-function isRateLimited(): boolean {
-  return rateLimitCache.remaining <= 0 && Date.now() < rateLimitCache.reset * 1000;
+// Helper to check if we're rate limited for a specific endpoint
+function isRateLimited(endpoint: keyof RateLimitCache): boolean {
+  const now = Date.now();
+  const limit = rateLimitCache[endpoint];
+  return limit.remaining <= 0 && now < limit.reset;
 }
 
 // Helper to update rate limit info from response headers
-function updateRateLimitInfo(headers: Record<string, string | string[]>) {
+function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<string, string | string[]>) {
   if (headers['x-rate-limit-reset']) {
-    rateLimitCache.reset = parseInt(String(headers['x-rate-limit-reset']));
+    rateLimitCache[endpoint].reset = parseInt(String(headers['x-rate-limit-reset'])) * 1000; // Convert to milliseconds
   }
   if (headers['x-rate-limit-remaining']) {
-    rateLimitCache.remaining = parseInt(String(headers['x-rate-limit-remaining']));
+    rateLimitCache[endpoint].remaining = parseInt(String(headers['x-rate-limit-remaining']));
   }
-}
-
-// Helper for exponential backoff
-async function waitForRateLimit(): Promise<void> {
-  const now = Date.now();
-  const resetTime = rateLimitCache.reset * 1000;
-  
-  if (now < resetTime) {
-    // Calculate backoff time (exponential with max of 2 minutes)
-    const backoffMs = Math.min(
-      Math.pow(2, rateLimitCache.backoffAttempt) * 1000,
-      120000
-    );
-    console.warn(`Rate limited, waiting ${backoffMs/1000} seconds before retry`);
-    await new Promise(resolve => setTimeout(resolve, backoffMs));
-    rateLimitCache.backoffAttempt++;
-  } else {
-    // Reset backoff if we're past the reset time
-    rateLimitCache.backoffAttempt = 0;
-    rateLimitCache.remaining = 1;
-  }
+  console.log(`[Twitter API] Rate limit status for ${endpoint}:`, {
+    reset: new Date(rateLimitCache[endpoint].reset).toISOString(),
+    remaining: rateLimitCache[endpoint].remaining
+  });
 }
 
 // Initialize the read-only client for public tweet fetching
@@ -79,31 +66,34 @@ export async function getReadOnlyClient() {
       if (typeof value === 'function') {
         return async (...args: unknown[]) => {
           try {
-            if (isRateLimited()) {
-              await waitForRateLimit();
+            // Determine which endpoint we're calling
+            const endpoint = prop === 'search' ? 'search' : 'timeline';
+            
+            // Check if we're rate limited
+            if (isRateLimited(endpoint)) {
+              const waitTime = rateLimitCache[endpoint].reset - Date.now();
+              console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
+              throw new Error(`Rate limit exceeded for ${endpoint}`);
             }
+
             const result = await (value as Function).apply(target, args);
+            
             // Update rate limit info from successful response
             if (result?.rateLimit) {
-              updateRateLimitInfo({
+              updateRateLimitInfo(endpoint, {
                 'x-rate-limit-reset': String(result.rateLimit.reset),
                 'x-rate-limit-remaining': String(result.rateLimit.remaining)
               });
             }
+            
             return result;
           } catch (error) {
-            const twitterError = error as TwitterError;
-            if (twitterError.code === 429) {
-              // Update rate limit info from error response
-              if (twitterError.rateLimit) {
-                updateRateLimitInfo({
-                  'x-rate-limit-reset': String(twitterError.rateLimit.reset),
-                  'x-rate-limit-remaining': String(twitterError.rateLimit.remaining)
-                });
-              }
-              await waitForRateLimit();
-              // Retry the request
-              return (value as Function).apply(target, args);
+            if (error instanceof Error && error.message.includes('429')) {
+              // Update rate limit info and throw custom error
+              const endpoint = prop === 'search' ? 'search' : 'timeline';
+              rateLimitCache[endpoint].remaining = 0;
+              rateLimitCache[endpoint].reset = Date.now() + (15 * 60 * 1000); // 15 minutes from now
+              console.log(`[Twitter API] Rate limit hit for ${endpoint}, reset at:`, new Date(rateLimitCache[endpoint].reset).toISOString());
             }
             throw error;
           }

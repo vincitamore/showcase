@@ -78,22 +78,16 @@ const BlogSection = () => {
         return;
       }
       
-      const data = await response.json()
+      const { tweets: fetchedTweets } = await response.json()
       console.log('Received tweets:', {
-        isArray: Array.isArray(data),
-        length: Array.isArray(data) ? data.length : 0,
-        data
+        isArray: Array.isArray(fetchedTweets),
+        length: Array.isArray(fetchedTweets) ? fetchedTweets.length : 0,
+        data: fetchedTweets
       })
       
       // Ensure we have an array of tweets
-      const validTweets = Array.isArray(data) ? data : [];
-      // Randomly select 4 tweets
-      const randomTweets = validTweets.sort(() => Math.random() - 0.5).slice(0, 4);
-      console.log('Selected random tweets:', {
-        validTweetsCount: validTweets.length,
-        randomTweetsCount: randomTweets.length
-      })
-      setTweets(randomTweets)
+      const validTweets = Array.isArray(fetchedTweets) ? fetchedTweets : [];
+      setTweets(validTweets)
     } catch (error) {
       console.error('Error fetching cached tweets:', error);
       toast({

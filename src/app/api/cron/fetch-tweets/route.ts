@@ -92,6 +92,11 @@ async function searchNewBuildTweets(client: TwitterApi, cachedTweets: StoredTwee
     
     return newTweets.length > 0 ? newTweets : null;
   } catch (error) {
+    // If rate limited, log and return null
+    if (error instanceof Error && error.message.includes('Rate limit exceeded for search')) {
+      logStatus('Search rate limit exceeded, skipping search');
+      return null;
+    }
     logStatus('Error searching tweets', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
@@ -132,6 +137,11 @@ async function getRandomUserTweet(client: TwitterApi, username: string, cachedTw
     const randomIndex = Math.floor(Math.random() * availableTweets.length);
     return [availableTweets[randomIndex]];
   } catch (error) {
+    // If rate limited, log and return null
+    if (error instanceof Error && error.message.includes('Rate limit exceeded for timeline')) {
+      logStatus('Timeline rate limit exceeded, skipping user tweets');
+      return null;
+    }
     logStatus('Error fetching random user tweet', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
@@ -155,31 +165,39 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get currently cached tweets first
+    const cachedData = await getCachedTweets();
+    const currentTweets = (cachedData?.tweets || []) as StoredTweet[];
+    logStatus('Current cache status', { cachedTweetCount: currentTweets.length });
+
     // Check if we can make a request
     const canRequest = await checkRateLimit();
     if (!canRequest) {
-      const lastTimestamp = await getRateLimitTimestamp();
-      const nextRequest = lastTimestamp ? lastTimestamp + FIFTEEN_MINUTES : Date.now() + FIFTEEN_MINUTES;
+      logStatus('Rate limit in effect, using cached tweets');
       
-      logStatus('Rate limit in effect, skipping fetch');
-      
-      // Even if rate limited, we can still select new random tweets from cache
-      const cachedData = await getCachedTweets();
-      if (cachedData?.tweets?.length) {
-        const selectedTweets = getRandomItems(cachedData.tweets, 4);
+      // Even when rate limited, we should still update selected tweets from cache
+      if (currentTweets.length > 0) {
+        const selectedTweets = getRandomItems(currentTweets, 4);
         await updateSelectedTweets(selectedTweets);
         logStatus('Updated selected tweets from cache', {
-          available: cachedData.tweets.length,
+          available: currentTweets.length,
           selected: selectedTweets.length
+        });
+        
+        return NextResponse.json({ 
+          message: 'Rate limited but updated selected tweets from cache',
+          selectedCount: selectedTweets.length,
+          nextRequest: await getRateLimitTimestamp()
         });
       }
       
       return NextResponse.json({ 
-        error: 'Rate limit in effect',
-        nextRequest
+        error: 'Rate limit in effect and no cached tweets available',
+        nextRequest: await getRateLimitTimestamp()
       }, { status: 429 });
     }
 
+    // Initialize Twitter client
     logStatus('Initializing Twitter client');
     const client = await getReadOnlyClient();
     const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
@@ -187,51 +205,43 @@ export async function GET(request: Request) {
       throw new Error('Twitter username not configured');
     }
 
-    // Get currently cached tweets
-    const cachedData = await getCachedTweets();
-    const currentTweets = (cachedData?.tweets || []) as StoredTweet[];
-    logStatus('Current cache status', { cachedTweetCount: currentTweets.length });
-
-    // First try to find new tweets with ".build"
+    // Try to fetch new tweets
     const newBuildTweets = await searchNewBuildTweets(client, currentTweets);
-    
-    // If no new .build tweets, get a random user tweet
     const tweetsToCache = newBuildTweets || await getRandomUserTweet(client, username, currentTweets);
 
-    if (!tweetsToCache) {
-      logStatus('No new tweets found to cache');
-      return NextResponse.json({ 
-        message: 'No new tweets to cache',
-        currentCacheSize: currentTweets.length
+    // Update cache if we got new tweets
+    let updatedTweets = currentTweets;
+    if (tweetsToCache) {
+      updatedTweets = [...tweetsToCache, ...currentTweets].slice(0, 100);
+      await cacheTweets(updatedTweets);
+      await updateRateLimitTimestamp();
+      logStatus('Cache updated with new tweets', {
+        newTweetsAdded: tweetsToCache.length,
+        totalTweets: updatedTweets.length
       });
     }
 
-    // Cache new tweets and update rate limit timestamp
-    const updatedTweets = [...tweetsToCache, ...currentTweets].slice(0, 100);
-    await cacheTweets(updatedTweets);
-    await updateRateLimitTimestamp();
-
-    // After successfully fetching and caching tweets, select random ones
-    if (cachedData?.tweets?.length) {
-      const selectedTweets = getRandomItems(cachedData.tweets, 4);
-      await updateSelectedTweets(selectedTweets);
-      logStatus('Updated selected tweets', {
-        available: cachedData.tweets.length,
-        selected: selectedTweets.length
-      });
-    }
+    // Always select and update random tweets for display, whether we got new ones or not
+    const selectedTweets = getRandomItems(updatedTweets, 4);
+    await updateSelectedTweets(selectedTweets);
+    logStatus('Updated selected tweets', {
+      available: updatedTweets.length,
+      selected: selectedTweets.length
+    });
 
     const duration = Date.now() - startTime;
     logStatus('Cron job completed successfully', {
-      newTweetsAdded: tweetsToCache.length,
+      newTweetsAdded: tweetsToCache?.length ?? 0,
       totalTweetsInCache: updatedTweets.length,
+      selectedTweetsCount: selectedTweets.length,
       executionTimeMs: duration
     });
 
     return NextResponse.json({ 
       success: true, 
-      newTweetsCount: tweetsToCache.length,
+      newTweetsCount: tweetsToCache?.length ?? 0,
       totalTweetsCount: updatedTweets.length,
+      selectedTweetsCount: selectedTweets.length,
       executionTimeMs: duration,
       timestamp: new Date().toISOString()
     });

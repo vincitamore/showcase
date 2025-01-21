@@ -8,5 +8,6 @@
   "crons": [{
     "path": "/api/cron/fetch-tweets",
     "schedule": "*/5 * * * *"
-  }]
+  }],
+  "buildCommand": "curl -X GET -H \"Authorization: Bearer $CRON_SECRET\" $NEXT_PUBLIC_URL/api/init/fetch-tweets && next build"
 } 
