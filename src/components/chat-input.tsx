@@ -62,7 +62,7 @@ export function ChatInput() {
       <Card3D className="mx-auto max-w-2xl p-6">
         <form onSubmit={handleFormSubmit} className="space-y-4">
           <Textarea
-            placeholder="Ask me anything about my skills, experience, or projects..."
+            placeholder="What does my motto mean?"
             value={input}
             onChange={handleInputChange}
             className="min-h-[100px] resize-none"
