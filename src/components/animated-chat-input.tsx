@@ -40,9 +40,19 @@ export function AnimatedChatInput() {
   })
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsDialogOpen(true)
-    handleSubmit(e)
+    e.preventDefault();
+    const inputElement = e.currentTarget.querySelector('input[type="text"]') as HTMLInputElement;
+    let actualInput = input.trim() ? input : inputElement.placeholder;
+
+    // TypeScript doesn't allow direct modification of event objects, so we'll simulate it with an object
+    handleSubmit({
+      ...e,
+      currentTarget: { 
+        ...e.currentTarget, 
+        querySelector: () => ({ value: actualInput } as HTMLInputElement)
+      }
+    } as React.FormEvent<HTMLFormElement>);
+    setIsDialogOpen(true);
   }
 
   const markdownComponents: Components = {
