@@ -110,7 +110,7 @@ export function AnimatedChatInput() {
                 type="text"
                 value={input}
                 onChange={handleInputChange}
-                placeholder="Ask me anything about my skills, experience, or projects..."
+                placeholder="What does your motto mean?"
                 className="w-full rounded-lg border-0 bg-transparent px-4 py-3 pr-24 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
                 disabled={isLoading}
               />
