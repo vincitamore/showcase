@@ -192,11 +192,6 @@ const BlogSection = () => {
         </div>
       </Card3D>
 
-      {/* AI Chat Input */}
-      <div className="mb-12">
-        <ChatInput />
-      </div>
-
       {/* Tweets Display */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
         {tweets.map((tweet) => (
