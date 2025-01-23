@@ -8,7 +8,7 @@ import {
   canMakeRequest,
   updateSelectedTweets
 } from '@/lib/blob-storage';
-import { TwitterApi, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
+import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
 
 // Helper function to check if a tweet has entities with URLs
 function hasTweetEntities(tweet: TweetV2): boolean {
@@ -82,10 +82,10 @@ async function checkRateLimit() {
   }
 }
 
-async function searchNewBuildTweets(client: TwitterApi, cachedTweets: TweetV2[]) {
+async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[]) {
   try {
     logStatus('Searching for .build tweets');
-    const searchResults = await client.v2.search('.build', {
+    const searchResults = await client.search('.build', {
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,
     });
@@ -117,16 +117,16 @@ async function searchNewBuildTweets(client: TwitterApi, cachedTweets: TweetV2[])
   }
 }
 
-async function getRandomUserTweet(client: TwitterApi, username: string, cachedTweets: TweetV2[]) {
+async function getRandomUserTweet(client: TwitterApiv2, username: string, cachedTweets: TweetV2[]) {
   try {
     logStatus('Fetching user tweets', { username });
-    const user = await client.v2.userByUsername(username);
+    const user = await client.userByUsername(username);
     if (!user?.data) {
       logStatus('User not found', { username });
       throw new Error('User not found');
     }
 
-    const timeline = await client.v2.userTimeline(user.data.id, {
+    const timeline = await client.userTimeline(user.data.id, {
       exclude: ['replies', 'retweets'],
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,

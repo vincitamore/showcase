@@ -2,10 +2,13 @@ import { NextResponse } from 'next/server';
 import { getReadOnlyClient } from '@/lib/x-api';
 import { 
   cacheTweets,
+  getRateLimitTimestamp,
   updateRateLimitTimestamp,
+  getCachedTweets,
+  canMakeRequest,
   updateSelectedTweets
 } from '@/lib/blob-storage';
-import { TweetV2, TweetPublicMetricsV2, TwitterApi } from 'twitter-api-v2';
+import { TwitterApiv2, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
 
 // Interface to match TweetV2 structure but only include what we need
 interface StoredTweet {
@@ -26,44 +29,47 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
   };
 }
 
-async function searchBuildTweets(client: TwitterApi): Promise<StoredTweet[]> {
+// Helper function to get random items from array
+function getRandomItems<T>(array: T[], count: number): T[] {
+  return [...array].sort(() => Math.random() - 0.5).slice(0, count);
+}
+
+async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
   console.log('[Init] Searching for .build tweets...');
-  const searchResults = await client.v2.search('.build', {
+  const paginator = await client.search('.build', {
     'tweet.fields': ['created_at', 'public_metrics'],
     max_results: 10,
   });
 
-  if (!searchResults?.data) {
+  const page = await paginator.fetchNext();
+  if (!page || !Array.isArray(page.data)) {
     return [];
   }
 
-  const tweets = (Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data])
-    .map(tweet => convertToStoredTweet(tweet as TweetV2));
-  console.log('[Init] Found .build tweets:', tweets.length);
-  return tweets;
+  console.log('[Init] Found .build tweets:', page.data.length);
+  return page.data.map((tweet: TweetV2) => convertToStoredTweet(tweet));
 }
 
-async function getUserTweets(client: TwitterApi, username: string): Promise<StoredTweet[]> {
+async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
   console.log('[Init] Fetching user tweets...');
-  const user = await client.v2.userByUsername(username);
+  const user = await client.userByUsername(username);
   if (!user?.data) {
     throw new Error('User not found');
   }
 
-  const timeline = await client.v2.userTimeline(user.data.id, {
+  const paginator = await client.userTimeline(user.data.id, {
     exclude: ['replies', 'retweets'],
     'tweet.fields': ['created_at', 'public_metrics'],
     max_results: 10,
   });
 
-  if (!timeline?.data?.data) {
+  const page = await paginator.fetchNext();
+  if (!page || !Array.isArray(page.data)) {
     return [];
   }
 
-  const tweets = (Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data])
-    .map(tweet => convertToStoredTweet(tweet as TweetV2));
-  console.log('[Init] Found user tweets:', tweets.length);
-  return tweets;
+  console.log('[Init] Found user tweets:', page.data.length);
+  return page.data.map((tweet: TweetV2) => convertToStoredTweet(tweet));
 }
 
 // This route is called during build/deployment to initialize tweets
@@ -86,11 +92,11 @@ export async function GET(request: Request) {
     }
 
     // Search for .build tweets first
-    let tweets = await searchBuildTweets(client);
+    let tweets = await searchBuildTweets(client as TwitterApiv2);
 
     // If no .build tweets, get tweets from configured user
     if (tweets.length === 0) {
-      tweets = await getUserTweets(client, username);
+      tweets = await getUserTweets(client as TwitterApiv2, username);
     }
 
     if (tweets.length === 0) {
@@ -105,9 +111,7 @@ export async function GET(request: Request) {
     await updateRateLimitTimestamp();
 
     // Select random tweets for display
-    const selectedTweets = tweets
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 4);
+    const selectedTweets = getRandomItems(tweets, 4);
     await updateSelectedTweets(selectedTweets);
 
     console.log('[Init] Successfully cached and selected tweets');
