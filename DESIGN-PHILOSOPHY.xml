@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<design-philosophy>
+    <animation-guidelines>
+        <guideline>Use Framer Motion for complex animations with AnimatePresence for mount/unmount</guideline>
+        <guideline>Implement smooth blooming effects with custom cubic-bezier curves: [0.22, 1, 0.36, 1]</guideline>
+        <guideline>Use spring animations for natural movement (damping: 20, stiffness: 100)</guideline>
+        <guideline>Implement staggered animations with slight delays (0.1-0.3s) for child elements</guideline>
+        <guideline>Use react-simple-typewriter for engaging text animations</guideline>
+    </animation-guidelines>
+
+    <styling-system>
+        <colors>
+            <theme>Use HSL color system with CSS variables for dynamic theming</theme>
+            <palette>
+                Implement semantic color naming:
+                - background/foreground
+                - primary/secondary
+                - muted/accent
+                - destructive
+                - card/popover
+            </palette>
+        </colors>
+        <typography>
+            <scale>Use relative sizing with text-sm through text-2xl</scale>
+            <prose>Implement dark mode compatible prose classes for markdown content</prose>
+        </typography>
+        <spacing>
+            <container>Center-aligned with 2rem padding and 1400px max-width</container>
+            <components>Use consistent gap-2 and space-y-4 patterns</components>
+        </spacing>
+    </styling-system>
+
+    <component-patterns>
+        <pattern>Implement "use client" only for interactive components</pattern>
+        <pattern>Use motion.div for animated containers</pattern>
+        <pattern>Implement skeleton states for initial loading</pattern>
+        <pattern>Use cn() utility for conditional class merging</pattern>
+        <pattern>Implement responsive designs using Tailwind breakpoints</pattern>
+    </component-patterns>
+
+    <reusable-files>
+        <config-files>
+            <file path="tailwind.config.ts">Base Tailwind configuration with animation plugins</file>
+            <file path="components.json">Shadcn UI component configuration</file>
+            <file path="src/lib/utils.ts">Utility functions including cn() for class merging</file>
+        </config-files>
+        <components>
+            <file path="src/components/ui/*">All Shadcn UI base components</file>
+            <file path="src/components/animated-chat-input.tsx">Reference for complex animations</file>
+        </components>
+        <styles>
+            <file path="src/app/globals.css">Base styles and CSS variables</file>
+        </styles>
+    </reusable-files>
+
+    <animation-recipes>
+        <recipe name="bloom-in">
+            <initial>opacity: 0, scale: 0.95</initial>
+            <animate>opacity: 1, scale: 1</animate>
+            <transition>duration: 0.4, ease: [0.22, 1, 0.36, 1]</transition>
+        </recipe>
+        <recipe name="fade-up">
+            <initial>opacity: 0, y: 10</initial>
+            <animate>opacity: 1, y: 0</animate>
+            <transition>delay: 0.1-0.3, duration: 0.3</transition>
+        </recipe>
+    </animation-recipes>
+
+    <dependencies>
+        <ui>
+            <package>@radix-ui/react-*</package>
+            <package>@shadcn/ui</package>
+            <package>class-variance-authority</package>
+            <package>clsx</package>
+            <package>tailwind-merge</package>
+        </ui>
+        <animation>
+            <package>framer-motion</package>
+            <package>react-simple-typewriter</package>
+            <package>tailwindcss-animate</package>
+        </animation>
+    </dependencies>
+</design-philosophy> 

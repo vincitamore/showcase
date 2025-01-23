@@ -43,6 +43,18 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb'
     },
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      // Disable client-side debug mode in development
+      config.devtool = 'eval-source-map';
+    }
+    return config;
   }
 }
 

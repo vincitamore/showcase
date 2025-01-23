@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation>
+    <overview>
+        The chat system operates independently with its own database schema and skill tracking,
+        while integrating with the broader application's auth system only where necessary.
+    </overview>
+
+    <key-components>
+        <database-schema>
+            <models>
+                <model name="ChatSession">
+                    <fields>
+                        <field>id: String @id @default(cuid())</field>
+                        <field>createdAt: DateTime @default(now())</field>
+                        <field>updatedAt: DateTime @updatedAt</field>
+                        <field>messages: Message[]</field>
+                        <field>ipAddress: String?</field>
+                        <field>userAgent: String?</field>
+                    </fields>
+                </model>
+                <model name="Message">
+                    <fields>
+                        <field>id: String @id @default(cuid())</field>
+                        <field>createdAt: DateTime @default(now()</field>
+                        <field>content: String</field>
+                        <field>role: String</field>
+                        <field>chatSession: ChatSession</field>
+                        <field>chatSessionId: String</field>
+                        <field>tokens: Int @default(0)</field>
+                        <field>skillTags: String[]</field>
+                    </fields>
+                    <indexes>
+                        <index>@@index([chatSessionId])</index>
+                    </indexes>
+                </model>
+                <model name="SystemPrompt">
+                    <fields>
+                        <field>id: String @id @default(cuid())</field>
+                        <field>content: String</field>
+                        <field>isActive: Boolean</field>
+                        <field>updatedAt: DateTime @updatedAt</field>
+                    </fields>
+                </model>
+            </models>
+        </database-schema>
+
+        <chat-config>
+            <settings>
+                <setting name="temperature">0.7</setting>
+                <setting name="maxTokens">1000</setting>
+                <setting name="model">grok-2-1212</setting>
+                <setting name="streamingFunctionCall">false</setting>
+            </settings>
+            <system-prompt>
+                <management>
+                    <active-prompt>
+                        <query>
+                            <where>isActive: true</where>
+                            <orderBy>updatedAt: desc</orderBy>
+                        </query>
+                        <fallback>Detailed expertise prompt</fallback>
+                    </active-prompt>
+                </management>
+            </system-prompt>
+            <skill-tracking>
+                <keywords>TypeScript, JavaScript, React, Next.js, etc.</keywords>
+                <extraction>Case-insensitive matching</extraction>
+            </skill-tracking>
+        </chat-config>
+
+        <middleware>
+            <matcher>
+                <!-- Only protect specific API routes -->
+                <routes>
+                    <route>/api/twitter/:path*</route>
+                    <route>/api/protected/:path*</route>
+                </routes>
+            </matcher>
+            <auth-check>
+                <rules>
+                    <rule>Skip auth for /api/chat</rule>
+                    <rule>Skip auth for /api/public/*</rule>
+                    <rule>Require auth for /api/twitter/*</rule>
+                    <rule>Require auth for /api/protected/*</rule>
+                </rules>
+            </auth-check>
+        </middleware>
+
+        <rate-limiting>
+            <configuration>
+                <window>60 * 60 * 1000 // 1 hour</window>
+                <limits>
+                    <production>20 requests</production>
+                    <development>1000 requests</development>
+                </limits>
+            </configuration>
+            <storage>
+                <model name="RateLimit">
+                    <fields>
+                        <field>ipAddress: String</field>
+                        <field>hits: Int</field>
+                        <field>resetAt: DateTime</field>
+                    </fields>
+                </model>
+            </storage>
+        </rate-limiting>
+
+        <chat-component>
+            <configuration>
+                <useChat>
+                    <api>/api/chat</api>
+                    <body>
+                        <model>grok-2-1212</model>
+                    </body>
+                </useChat>
+            </configuration>
+            <form-submission>
+                <handleSubmit>
+                    <event>undefined</event>
+                    <data>
+                        <content>message</content>
+                    </data>
+                </handleSubmit>
+            </form-submission>
+        </chat-component>
+
+        <api-route>
+            <chat-endpoint>
+                <steps>
+                    <step>Check rate limit</step>
+                    <step>Parse request body</step>
+                    <step>Get system prompt</step>
+                    <step>Create chat session</step>
+                    <step>Store user message with skill tags</step>
+                    <step>Stream AI response</step>
+                    <step>Store AI response with extracted skills</step>
+                </steps>
+            </chat-endpoint>
+        </api-route>
+    </key-components>
+
+    <auth-integration>
+        <strategy>
+            <rules>
+                <rule>Chat system operates independently</rule>
+                <rule>Twitter auth only for Twitter features</rule>
+                <rule>Rate limiting applies to all routes</rule>
+                <rule>Use middleware for route protection</rule>
+            </rules>
+        </strategy>
+    </auth-integration>
+
+    <error-handling>
+        <strategies>
+            <strategy>
+                <scope>Rate Limiting</scope>
+                <action>Return 429 with reset time</action>
+            </strategy>
+            <strategy>
+                <scope>Auth Errors</scope>
+                <action>Return 401 for protected routes</action>
+            </strategy>
+            <strategy>
+                <scope>Chat Errors</scope>
+                <action>Return 500 with error details</action>
+            </strategy>
+            <strategy>
+                <scope>System Prompt</scope>
+                <action>Use fallback prompt on error</action>
+            </strategy>
+        </strategies>
+    </error-handling>
+
+    <debugging>
+        <logging>
+            <component>Chat API</component>
+            <levels>
+                <level>Request received</level>
+                <level>Rate limit checks</level>
+                <level>Message processing</level>
+                <level>Stream creation</level>
+                <level>Response handling</level>
+                <level>Skill extraction</level>
+            </levels>
+        </logging>
+    </debugging>
+</implementation> 
