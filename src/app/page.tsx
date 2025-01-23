@@ -31,7 +31,7 @@ const SkillsGrid = dynamic(() => import('@/components/skills-grid'), {
   loading: () => <div>Loading...</div>
 });
 
-const ExperienceTimeline = dynamic(() => import('@/components/experience-timeline'), {
+const ProfessionalJourney = dynamic(() => import('@/components/professional-journey').then(mod => mod.ProfessionalJourney), {
   loading: () => <div>Loading...</div>
 });
 
@@ -97,17 +97,7 @@ export default function Home() {
 
         {/* Experience Section */}
         <section id="experience" className="container relative mx-auto px-4 py-16 scroll-mt-16">
-          <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
-            Professional Journey
-          </h2>
-          <div className="mb-16 mx-auto max-w-2xl text-center">
-            <p className="text-lg text-muted-foreground">
-              My diverse background spans technology, industrial operations, and agriculture. This unique combination 
-              brings a practical, solution-oriented approach to technical challenges, grounded in real-world experience 
-              and a deep understanding of various industries.
-            </p>
-          </div>
-          <ExperienceTimeline />
+          <ProfessionalJourney />
           
           <div className="mt-16 mx-auto max-w-3xl text-center">
             <h3 className="mb-4 text-xl font-semibold">Why This Matters</h3>
@@ -122,7 +112,13 @@ export default function Home() {
           </div>
         </section>
 
-        <BlogSection />
+        {/* Blog Section */}
+        <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
+          <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
+            Latest Thoughts
+          </h2>
+          <BlogSection />
+        </section>
 
         {/* Contact Section */}
         <section id="contact" className="container relative mx-auto px-4 py-16 scroll-mt-16">

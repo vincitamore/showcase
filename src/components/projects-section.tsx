@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card3D } from "@/components/ui/card"
 import { ImageModal } from "@/components/image-modal"
 import { ProjectDetailsModal } from "@/components/project-details-modal"
+import { Carousel } from "@/components/ui/carousel"
 
 const projects = [
   {
@@ -64,19 +65,28 @@ const ProjectsSection = () => {
       <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
         Featured Projects
       </h2>
-      <div className="grid gap-8 md:grid-cols-2 lg:gap-12">
+      <Carousel 
+        className="w-full max-w-[100rem] mx-auto" 
+        opts={{ 
+          loop: true, 
+          align: "center",
+          containScroll: "trimSnaps",
+          dragFree: true,
+          skipSnaps: true
+        }}
+      >
         {projects.map((project, index) => (
           <Card3D
             key={index}
-            className="group cursor-pointer p-8"
-            containerClassName="min-h-[400px]"
+            className="group cursor-pointer p-8 mx-6 w-[44rem] backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+            containerClassName="min-h-[30rem] rounded-3xl"
           >
             <div className="flex h-full flex-col justify-between">
               <div>
                 <h3 className="mb-3 text-2xl font-semibold tracking-tight">{project.title}</h3>
                 <p className="mb-4 text-muted-foreground">{project.description}</p>
                 {project.highlights && (
-                  <ul className="mb-6 space-y-2">
+                  <ul className="mb-8 space-y-2">
                     {project.highlights.map((highlight, highlightIndex) => (
                       <li 
                         key={highlightIndex}
@@ -89,24 +99,24 @@ const ProjectsSection = () => {
                 )}
               </div>
               <div>
-                <div className="mb-4 flex flex-wrap gap-2">
+                <div className="mb-8 flex flex-wrap gap-2">
                   {project.tags.map((tag, tagIndex) => (
                     <span
                       key={tagIndex}
-                      className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground transition-colors"
+                      className="rounded-full bg-primary/5 px-3 py-1 text-sm font-medium text-primary ring-1 ring-inset ring-primary/10 transition-colors group-hover:bg-primary/10"
                     >
                       {tag}
                     </span>
                   ))}
                 </div>
                 {project.images && (
-                  <div className="mb-4 grid gap-4 md:grid-cols-2">
+                  <div className="mb-8 grid gap-4 md:grid-cols-2">
                     {project.images.map((image, imageIndex) => (
                       <ImageModal
                         key={imageIndex}
                         src={image}
                         alt={`${project.title} screenshot ${imageIndex + 1}`}
-                        className="aspect-video"
+                        className="aspect-video rounded-xl ring-1 ring-foreground/5 transition-all duration-300 group-hover:ring-foreground/10"
                       />
                     ))}
                   </div>
@@ -121,7 +131,7 @@ const ProjectsSection = () => {
             </div>
           </Card3D>
         ))}
-      </div>
+      </Carousel>
 
       {selectedProject && (
         <ProjectDetailsModal
