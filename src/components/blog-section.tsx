@@ -218,19 +218,18 @@ const BlogSection = () => {
         
         // Add the link
         segments.push(
-          <a
+          <Button
             key={`link-${index}`}
-            href={entity.expanded_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
+            variant="link"
+            className="h-auto p-0 text-primary hover:text-primary/80 font-normal"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
             }}
           >
             {entity.display_url}
-          </a>
+          </Button>
         );
         
         lastIndex = end;
@@ -238,47 +237,51 @@ const BlogSection = () => {
         // Generate preview card if it's not a Twitter URL
         if (!entity.expanded_url.includes('twitter.com') && !entity.expanded_url.includes('x.com')) {
           const preview = (
-            <div 
+            <Button
               key={entity.url}
-              className="mt-2 mb-4 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors"
+              variant="ghost"
+              className="w-full p-0 h-auto hover:bg-accent/5"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
               }}
             >
-              <div className="relative w-full h-[200px] bg-accent/5">
-                <Image
-                  src={`https://www.google.com/s2/favicons?domain=${new URL(entity.expanded_url).hostname}&sz=64`}
-                  alt={entity.display_url}
-                  width={32}
-                  height={32}
-                  className="absolute top-4 left-4 rounded-sm"
-                  unoptimized
-                />
-                {entity.images?.[0] && (
+              <div className="w-full rounded-lg border border-border/50 overflow-hidden">
+                <div className="relative w-full h-[200px] bg-accent/5">
                   <Image
-                    src={entity.images[0].url}
-                    alt={entity.title || entity.display_url}
-                    fill
-                    className="object-cover"
+                    src={`https://www.google.com/s2/favicons?domain=${new URL(entity.expanded_url).hostname}&sz=64`}
+                    alt={entity.display_url}
+                    width={32}
+                    height={32}
+                    className="absolute top-4 left-4 rounded-sm"
                     unoptimized
                   />
-                )}
-              </div>
-              <div className="p-4">
-                <h4 className="font-medium text-sm mb-1">
-                  {entity.title || new URL(entity.expanded_url).hostname}
-                </h4>
-                {entity.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {entity.description}
+                  {entity.images?.[0] && (
+                    <Image
+                      src={entity.images[0].url}
+                      alt={entity.title || entity.display_url}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  )}
+                </div>
+                <div className="p-4 text-left">
+                  <h4 className="font-medium text-sm mb-1">
+                    {entity.title || new URL(entity.expanded_url).hostname}
+                  </h4>
+                  {entity.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {entity.description}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground/70 mt-2">
+                    {new URL(entity.expanded_url).hostname}
                   </p>
-                )}
-                <p className="text-xs text-muted-foreground/70 mt-2">
-                  {new URL(entity.expanded_url).hostname}
-                </p>
+                </div>
               </div>
-            </div>
+            </Button>
           );
           urlPreviews.push(preview);
         }
