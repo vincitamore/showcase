@@ -192,8 +192,23 @@ const BlogSection = () => {
   const renderTweetText = (tweet: Tweet) => {
     if (!tweet.text) return null;
     
+    console.log('Tweet data:', {
+      text: tweet.text,
+      entities: tweet.entities,
+      urls: tweet.entities?.urls
+    });
+    
+    // If no entities or urls, just return the text
+    if (!tweet.entities?.urls?.length) {
+      return (
+        <div className="text-sm text-muted-foreground/90 leading-relaxed mb-2">
+          {tweet.text}
+        </div>
+      );
+    }
+    
     let text = tweet.text;
-    const entities = tweet.entities?.urls || [];
+    const entities = tweet.entities.urls;
     const urlPreviews: JSX.Element[] = [];
     
     // Create an array of text segments and links
@@ -205,23 +220,35 @@ const BlogSection = () => {
       (a.indices[0] || 0) - (b.indices[0] || 0)
     );
 
+    console.log('Sorted entities:', sortedEntities);
+
     // Build segments array with text and link elements
     sortedEntities.forEach((entity, index) => {
+      console.log('Processing entity:', {
+        entity,
+        start: entity.indices[0],
+        end: entity.indices[1],
+        currentLastIndex: lastIndex
+      });
+
       const start = entity.indices[0];
       const end = entity.indices[1];
       
       if (typeof start === 'number' && typeof end === 'number') {
         // Add text before the link
         if (start > lastIndex) {
-          segments.push(text.slice(lastIndex, start));
+          const beforeText = text.slice(lastIndex, start);
+          console.log('Adding text before link:', beforeText);
+          segments.push(beforeText);
         }
         
         // Add the link
+        console.log('Adding link:', entity.display_url);
         segments.push(
-          <Button
+          <button
             key={`link-${index}`}
-            variant="link"
-            className="h-auto p-0 text-primary hover:text-primary/80 font-normal"
+            type="button"
+            className="text-primary hover:text-primary/80 hover:underline px-1 font-normal"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -229,69 +256,21 @@ const BlogSection = () => {
             }}
           >
             {entity.display_url}
-          </Button>
+          </button>
         );
         
         lastIndex = end;
-        
-        // Generate preview card if it's not a Twitter URL
-        if (!entity.expanded_url.includes('twitter.com') && !entity.expanded_url.includes('x.com')) {
-          const preview = (
-            <Button
-              key={entity.url}
-              variant="ghost"
-              className="w-full p-0 h-auto hover:bg-accent/5"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              <div className="w-full rounded-lg border border-border/50 overflow-hidden">
-                <div className="relative w-full h-[200px] bg-accent/5">
-                  <Image
-                    src={`https://www.google.com/s2/favicons?domain=${new URL(entity.expanded_url).hostname}&sz=64`}
-                    alt={entity.display_url}
-                    width={32}
-                    height={32}
-                    className="absolute top-4 left-4 rounded-sm"
-                    unoptimized
-                  />
-                  {entity.images?.[0] && (
-                    <Image
-                      src={entity.images[0].url}
-                      alt={entity.title || entity.display_url}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  )}
-                </div>
-                <div className="p-4 text-left">
-                  <h4 className="font-medium text-sm mb-1">
-                    {entity.title || new URL(entity.expanded_url).hostname}
-                  </h4>
-                  {entity.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {entity.description}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground/70 mt-2">
-                    {new URL(entity.expanded_url).hostname}
-                  </p>
-                </div>
-              </div>
-            </Button>
-          );
-          urlPreviews.push(preview);
-        }
       }
     });
     
     // Add any remaining text
     if (lastIndex < text.length) {
-      segments.push(text.slice(lastIndex));
+      const remainingText = text.slice(lastIndex);
+      console.log('Adding remaining text:', remainingText);
+      segments.push(remainingText);
     }
+
+    console.log('Final segments:', segments);
 
     return (
       <>
