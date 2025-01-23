@@ -9,8 +9,8 @@ export async function GET(request: Request) {
   const cookieStore = cookies();
   
   try {
-    if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
-      throw new Error('Missing Twitter credentials');
+    if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_CLIENT_SECRET) {
+      throw new Error('Missing Twitter OAuth credentials');
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
     const client = new TwitterApi({
       clientId: process.env.TWITTER_CLIENT_ID,
-      clientSecret: process.env.TWITTER_API_SECRET,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET,
     });
 
     const { url, state, codeVerifier } = client.generateOAuth2AuthLink(

@@ -1,13 +1,13 @@
 import { TwitterApi } from 'twitter-api-v2';
 
 export function createTwitterClient() {
-  if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_API_SECRET) {
-    throw new Error('Missing Twitter credentials');
+  if (!process.env.TWITTER_CLIENT_ID || !process.env.TWITTER_CLIENT_SECRET) {
+    throw new Error('Missing Twitter OAuth credentials');
   }
 
   return new TwitterApi({
     clientId: process.env.TWITTER_CLIENT_ID,
-    clientSecret: process.env.TWITTER_API_SECRET,
+    clientSecret: process.env.TWITTER_CLIENT_SECRET,
   });
 }
 
