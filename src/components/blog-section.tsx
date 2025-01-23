@@ -161,6 +161,10 @@ const BlogSection = () => {
     }
   }
 
+  const handleCardClick = (tweetId: string) => {
+    window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
       <div className="mb-12 text-center">
@@ -219,6 +223,7 @@ const BlogSection = () => {
             {tweets.map((tweet, index) => (
               <Card3D
                 key={tweet.id}
+                onClick={() => handleCardClick(tweet.id)}
                 className={cn(
                   "group cursor-pointer",
                   "p-4 sm:p-6",
@@ -245,14 +250,15 @@ const BlogSection = () => {
                         <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
                       </div>
                     </div>
-                    <a 
-                      href={`https://twitter.com/${profileConfig.username}/status/${tweet.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <span 
                       className="text-primary hover:text-primary/80 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCardClick(tweet.id)
+                      }}
                     >
                       <Twitter className="h-5 w-5" />
-                    </a>
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground/90 leading-relaxed mb-4">{tweet.text}</p>
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
