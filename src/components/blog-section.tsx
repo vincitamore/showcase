@@ -5,12 +5,13 @@ import { Card3D } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { MessageSquare, Share2, Heart, Twitter, MessageCircle, Repeat2 } from "lucide-react"
+import { MessageSquare, Share2, Heart, MessageCircle, Repeat2 } from "lucide-react"
 import { ChatInput } from "@/components/chat-input"
 import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
+import { TwitterTweetEmbed } from 'react-twitter-embed'
 
 interface TweetMetrics {
   like_count?: number
@@ -31,6 +32,82 @@ interface Tweet {
 }
 
 const DEFAULT_PROFILE_IMAGE = "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png"
+
+const URL_REGEX = /(https?:\/\/[^\s]+)/g
+const TWEET_URL_REGEX = /https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/g
+
+function parseLinks(text: string) {
+  const parts = []
+  let lastIndex = 0
+  
+  // First find all tweet URLs and replace them with embeds
+  const tweetMatches = Array.from(text.matchAll(TWEET_URL_REGEX))
+  if (tweetMatches.length > 0) {
+    tweetMatches.forEach((match) => {
+      const [fullMatch, tweetId] = match
+      const offset = match.index!
+      
+      // Add text before the tweet
+      if (offset > lastIndex) {
+        parts.push(text.slice(lastIndex, offset))
+      }
+      
+      // Add the tweet embed
+      parts.push(
+        <div 
+          key={`tweet-${tweetId}`} 
+          className="my-4" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <TwitterTweetEmbed
+            tweetId={tweetId}
+            options={{ theme: 'dark', width: '100%' }}
+          />
+        </div>
+      )
+      
+      lastIndex = offset + fullMatch.length
+    })
+  }
+  
+  // Then handle remaining regular URLs
+  const remainingText = text.slice(lastIndex)
+  remainingText.replace(URL_REGEX, (match, offset) => {
+    // Skip if this URL was already handled as a tweet
+    if (tweetMatches.some(([tweetUrl]) => tweetUrl === match)) {
+      return match
+    }
+    
+    // Add text before the link
+    if (offset > 0) {
+      parts.push(remainingText.slice(0, offset))
+    }
+    
+    // Add the link
+    parts.push(
+      <a
+        key={`link-${offset}`}
+        href={match}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:text-primary/80 underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {match}
+      </a>
+    )
+    
+    lastIndex = offset + match.length
+    return match
+  })
+  
+  // Add any remaining text
+  if (remainingText.length > lastIndex) {
+    parts.push(remainingText.slice(lastIndex))
+  }
+  
+  return parts
+}
 
 const BlogSection = () => {
   const [tweets, setTweets] = useState<Tweet[]>([])
@@ -250,17 +327,17 @@ const BlogSection = () => {
                       </div>
                     </div>
                     <span 
-                      className="text-primary hover:text-primary/80 transition-colors"
+                      className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleCardClick(tweet.id)
                       }}
                     >
-                      <Twitter className="h-5 w-5" />
+                      𝕏
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground/90 leading-relaxed mb-6">
-                    {tweet.text}
+                    {parseLinks(tweet.text)}
                   </p>
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
