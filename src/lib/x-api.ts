@@ -1,4 +1,4 @@
-import { TwitterApi, TwitterApiv2 } from 'twitter-api-v2';
+import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
 
 interface RateLimitCache {
   search: {
@@ -9,6 +9,15 @@ interface RateLimitCache {
     reset: number;
     remaining: number;
   };
+}
+
+// Interface to match TweetV2 structure but only include what we need
+interface StoredTweet {
+  id: string;
+  text: string;
+  edit_history_tweet_ids: string[];
+  created_at?: string;
+  public_metrics?: TweetPublicMetricsV2;
 }
 
 // Cache for rate limit info per endpoint
@@ -22,6 +31,16 @@ const rateLimitCache: RateLimitCache = {
     remaining: 1
   }
 };
+
+function convertToStoredTweet(tweet: TweetV2): StoredTweet {
+  return {
+    id: tweet.id,
+    text: tweet.text,
+    edit_history_tweet_ids: tweet.edit_history_tweet_ids,
+    created_at: tweet.created_at,
+    public_metrics: tweet.public_metrics
+  };
+}
 
 // Helper to check if we're rate limited for a specific endpoint
 function isRateLimited(endpoint: keyof RateLimitCache): boolean {
@@ -42,6 +61,48 @@ function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<str
     reset: new Date(rateLimitCache[endpoint].reset).toISOString(),
     remaining: rateLimitCache[endpoint].remaining
   });
+}
+
+async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
+  console.log('[Init] Searching for .build tweets...');
+  const paginator = await client.search('".build" lang:en -is:retweet', {
+    'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+    'max_results': 10
+  });
+
+  const page = await paginator.fetchNext();
+  if (!page?.data) {
+    console.log('[Init] No .build tweets found');
+    return [];
+  }
+
+  const tweets = Array.isArray(page.data) ? page.data : [page.data];
+  console.log('[Init] Found .build tweets:', tweets.length);
+  return tweets.map(tweet => convertToStoredTweet(tweet));
+}
+
+async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
+  console.log('[Init] Fetching user tweets...');
+  const user = await client.userByUsername(username);
+  if (!user?.data) {
+    throw new Error('User not found');
+  }
+
+  const paginator = await client.userTimeline(user.data.id, {
+    'exclude': ['replies', 'retweets'],
+    'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+    'max_results': 10
+  });
+
+  const page = await paginator.fetchNext();
+  if (!page?.data) {
+    console.log('[Init] No user tweets found');
+    return [];
+  }
+
+  const tweets = Array.isArray(page.data) ? page.data : [page.data];
+  console.log('[Init] Found user tweets:', tweets.length);
+  return tweets.map(tweet => convertToStoredTweet(tweet));
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
