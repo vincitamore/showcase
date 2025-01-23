@@ -10,6 +10,7 @@ import { ChatInput } from "@/components/chat-input"
 import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
+import { profileConfig } from "@/lib/profile-config"
 
 interface TweetMetrics {
   like_count?: number
@@ -22,10 +23,10 @@ interface Tweet {
   text: string
   created_at?: string
   public_metrics?: TweetMetrics
-  author: {
-    profile_image_url: string
-    username: string
-    name: string
+  author?: {
+    profile_image_url?: string
+    username?: string
+    name?: string
   }
 }
 
@@ -232,20 +233,20 @@ const BlogSection = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Image
-                        src={tweet.author?.profile_image_url || DEFAULT_PROFILE_IMAGE}
-                        alt={tweet.author?.username || 'Profile'}
+                        src={profileConfig.profileImage}
+                        alt={profileConfig.username}
                         width={40}
                         height={40}
                         className="rounded-full"
                         unoptimized
                       />
                       <div>
-                        <p className="font-medium text-sm">{tweet.author?.name || 'Anonymous'}</p>
-                        <p className="text-xs text-muted-foreground">@{tweet.author?.username || 'user'}</p>
+                        <p className="font-medium text-sm">{profileConfig.displayName}</p>
+                        <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
                       </div>
                     </div>
                     <a 
-                      href={tweet.author?.username ? `https://twitter.com/${tweet.author.username}/status/${tweet.id}` : '#'}
+                      href={`https://twitter.com/${profileConfig.username}/status/${tweet.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:text-primary/80 transition-colors"
