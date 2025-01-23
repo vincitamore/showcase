@@ -2,19 +2,27 @@ import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2 } from 'twitter
 import { 
   canMakeRequest,
   getRateLimitTimestamp,
-  updateRateLimitTimestamp
+  updateRateLimitTimestamp,
+  getCachedTweets
 } from '@/lib/blob-storage';
 
-interface RateLimitCache {
-  search: {
-    reset: number;
-    remaining: number;
-  };
-  timeline: {
-    reset: number;
-    remaining: number;
-  };
+// Rate limit configuration
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+interface RateLimitInfo {
+  reset: number;
+  remaining: number;
+  lastUpdated: number;
 }
+
+interface RateLimitCache {
+  [key: string]: RateLimitInfo;
+}
+
+// Cache for rate limit info per endpoint
+const rateLimitCache: RateLimitCache = {};
 
 // Interface to match TweetV2 structure but only include what we need
 interface StoredTweet {
@@ -25,18 +33,6 @@ interface StoredTweet {
   public_metrics?: TweetPublicMetricsV2;
   entities?: any;
 }
-
-// Cache for rate limit info per endpoint
-const rateLimitCache: RateLimitCache = {
-  search: {
-    reset: 0,
-    remaining: 1
-  },
-  timeline: {
-    reset: 0,
-    remaining: 1
-  }
-};
 
 function convertToStoredTweet(tweet: TweetV2): StoredTweet {
   // Ensure created_at is a valid ISO string if it exists
@@ -65,30 +61,133 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
 }
 
 // Helper to check if we're rate limited for a specific endpoint
-function isRateLimited(endpoint: keyof RateLimitCache): boolean {
+function isRateLimited(endpoint: string): boolean {
   const now = Date.now();
   const limit = rateLimitCache[endpoint];
+  
+  if (!limit) return false;
+  
+  // If the rate limit info is stale (older than 15 minutes), consider it expired
+  if (now - limit.lastUpdated > RATE_LIMIT_WINDOW) {
+    delete rateLimitCache[endpoint];
+    return false;
+  }
+  
   return limit.remaining <= 0 && now < limit.reset;
 }
 
 // Helper to update rate limit info from response headers
-function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<string, string | string[]>) {
+function updateRateLimitInfo(endpoint: string, headers: Record<string, string | string[]>) {
+  const now = Date.now();
+  
+  if (!rateLimitCache[endpoint]) {
+    rateLimitCache[endpoint] = {
+      reset: now + RATE_LIMIT_WINDOW,
+      remaining: 1,
+      lastUpdated: now
+    };
+  }
+  
   if (headers['x-rate-limit-reset']) {
-    rateLimitCache[endpoint].reset = parseInt(String(headers['x-rate-limit-reset'])) * 1000; // Convert to milliseconds
+    rateLimitCache[endpoint].reset = parseInt(String(headers['x-rate-limit-reset'])) * 1000;
   }
   if (headers['x-rate-limit-remaining']) {
     rateLimitCache[endpoint].remaining = parseInt(String(headers['x-rate-limit-remaining']));
   }
+  rateLimitCache[endpoint].lastUpdated = now;
+  
   console.log(`[Twitter API] Rate limit status for ${endpoint}:`, {
     reset: new Date(rateLimitCache[endpoint].reset).toISOString(),
-    remaining: rateLimitCache[endpoint].remaining
+    remaining: rateLimitCache[endpoint].remaining,
+    timeUntilReset: Math.round((rateLimitCache[endpoint].reset - now) / 1000) + 's'
   });
 }
 
-async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
-  console.log('[Init] Searching for .build tweets...');
+// Helper to safely execute rate-limited API calls with retries
+async function executeWithRateLimit<T>(
+  endpoint: string,
+  operation: () => Promise<T>,
+  retryCount = 0
+): Promise<T> {
   try {
-    // Use proper query syntax for Twitter API v2
+    if (isRateLimited(endpoint)) {
+      const waitTime = rateLimitCache[endpoint].reset - Date.now();
+      console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
+      
+      // If we have cached data, use it
+      if (endpoint.includes('search') || endpoint.includes('timeline')) {
+        const cachedData = await getCachedTweets();
+        if (cachedData?.tweets?.length) {
+          console.log(`[Twitter API] Using cached data for ${endpoint}`);
+          return cachedData as any;
+        }
+      }
+      
+      throw new Error(`Rate limit exceeded for ${endpoint}`);
+    }
+
+    const result = await operation();
+    return result;
+  } catch (error: any) {
+    if (error?.data?.status === 429 && retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAY * Math.pow(2, retryCount);
+      console.log(`[Twitter API] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return executeWithRateLimit(endpoint, operation, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
+// Helper to validate and clean tweet data
+function validateTweet(tweet: any): TweetV2 | null {
+  try {
+    // Ensure required fields exist
+    if (!tweet.id || !tweet.text || !Array.isArray(tweet.edit_history_tweet_ids)) {
+      console.warn('[Twitter] Invalid tweet structure:', tweet);
+      return null;
+    }
+
+    // Create a clean copy of the tweet
+    const cleanTweet = {
+      id: tweet.id,
+      text: tweet.text,
+      edit_history_tweet_ids: tweet.edit_history_tweet_ids,
+      entities: tweet.entities,
+      public_metrics: tweet.public_metrics
+    } as TweetV2;
+
+    // Handle created_at separately
+    if (tweet.created_at) {
+      try {
+        const date = new Date(tweet.created_at);
+        if (!isNaN(date.getTime())) {
+          cleanTweet.created_at = date.toISOString();
+        } else {
+          console.warn('[Twitter] Invalid date found in tweet:', tweet.id);
+        }
+      } catch (error) {
+        console.warn('[Twitter] Error parsing date for tweet:', tweet.id, error);
+      }
+    }
+
+    return cleanTweet;
+  } catch (error) {
+    console.warn('[Twitter] Error validating tweet:', error);
+    return null;
+  }
+}
+
+// Helper to safely process tweets
+function processTweets(tweets: any[]): TweetV2[] {
+  return tweets
+    .map(tweet => validateTweet(tweet))
+    .filter((tweet): tweet is TweetV2 => tweet !== null);
+}
+
+async function searchBuildTweets(client: TwitterApiv2): Promise<TweetV2[]> {
+  return executeWithRateLimit('search', async () => {
+    console.log('[Init] Searching for .build tweets...');
     const query = '(.build) lang:en -is:retweet -is:reply';
     console.log('[Init] Using search query:', query);
     
@@ -106,43 +205,20 @@ async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
     const tweets = Array.isArray(page.data) ? page.data : [page.data];
     console.log('[Init] Found .build tweets:', tweets.length);
     
-    // Filter out tweets with invalid dates before converting
-    const validTweets = tweets.filter(tweet => {
-      if (!tweet.created_at) return true; // Keep tweets without dates
-      try {
-        const date = new Date(tweet.created_at);
-        const isValid = !isNaN(date.getTime());
-        if (!isValid) {
-          console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
-        }
-        return isValid;
-      } catch (error) {
-        console.warn('[Twitter API] Error validating tweet date:', tweet.id, error);
-        return false;
-      }
-    });
-
-    return validTweets.map(tweet => convertToStoredTweet(tweet));
-  } catch (error: any) {
-    console.error('[Twitter API] Search request failed:', {
-      error: error.message,
-      details: error.data,
-      stack: error.stack
-    });
-    throw error;
-  }
+    return processTweets(tweets);
+  });
 }
 
-async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
-  console.log('[Init] Fetching user tweets...');
-  try {
+async function getUserTweets(client: TwitterApiv2, username: string): Promise<TweetV2[]> {
+  return executeWithRateLimit('timeline', async () => {
+    console.log('[Init] Fetching user tweets...');
     const user = await client.userByUsername(username);
     if (!user?.data) {
       throw new Error('User not found');
     }
 
     const paginator = await client.userTimeline(user.data.id, {
-      'exclude': ['retweets'],  // Only exclude retweets, allow replies
+      'exclude': ['retweets'],
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       'max_results': 10
     });
@@ -156,32 +232,8 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<St
     const tweets = Array.isArray(page.data) ? page.data : [page.data];
     console.log('[Init] Found user tweets:', tweets.length);
     
-    // Filter out tweets with invalid dates before converting
-    const validTweets = tweets.filter(tweet => {
-      if (!tweet.created_at) return true; // Keep tweets without dates
-      try {
-        const date = new Date(tweet.created_at);
-        const isValid = !isNaN(date.getTime());
-        if (!isValid) {
-          console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
-        }
-        return isValid;
-      } catch (error) {
-        console.warn('[Twitter API] Error validating tweet date:', tweet.id, error);
-        return false;
-      }
-    });
-
-    return validTweets.map(tweet => convertToStoredTweet(tweet));
-  } catch (error: any) {
-    console.error('[Twitter API] User timeline request failed:', {
-      username,
-      error: error.message,
-      details: error.data,
-      stack: error.stack
-    });
-    throw error;
-  }
+    return processTweets(tweets);
+  });
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
@@ -228,9 +280,11 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
     }
 
     try {
-      await client.v2.userByUsername(testUser);
-      console.log('[Twitter API] Credentials verified successfully');
-      await updateRateLimitTimestamp();
+      await executeWithRateLimit('verify', async () => {
+        await client.v2.userByUsername(testUser);
+        console.log('[Twitter API] Credentials verified successfully');
+        await updateRateLimitTimestamp();
+      });
       return client.v2;
     } catch (verifyError: any) {
       console.error('[Twitter API] Credential verification failed:', {
