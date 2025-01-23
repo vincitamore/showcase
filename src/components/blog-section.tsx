@@ -189,45 +189,6 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
-  const renderUrlPreview = (urlEntity: UrlEntity) => {
-    if (!urlEntity.images?.[0] && !urlEntity.title) return null;
-    
-    return (
-      <div 
-        className="mt-2 mb-4 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors"
-        onClick={(e) => {
-          e.stopPropagation();
-          window.open(urlEntity.expanded_url, '_blank', 'noopener,noreferrer');
-        }}
-      >
-        {urlEntity.images?.[0] && (
-          <div className="relative w-full h-[200px]">
-            <Image
-              src={urlEntity.images[0].url}
-              alt={urlEntity.title || 'Link preview'}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-        )}
-        <div className="p-4">
-          {urlEntity.title && (
-            <h4 className="font-medium text-sm mb-1">{urlEntity.title}</h4>
-          )}
-          {urlEntity.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">
-              {urlEntity.description}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground/70 mt-2">
-            {new URL(urlEntity.unwound_url || urlEntity.expanded_url).hostname}
-          </p>
-        </div>
-      </div>
-    );
-  };
-
   const renderTweetText = (tweet: Tweet) => {
     if (!tweet.text) return null;
     
@@ -240,7 +201,7 @@ const BlogSection = () => {
       (b.indices[0] || 0) - (a.indices[0] || 0)
     );
 
-    // Replace each URL with a clickable link
+    // Replace each URL with a clickable link and generate preview
     sortedEntities.forEach(entity => {
       const start = entity.indices[0];
       const end = entity.indices[1];
@@ -249,25 +210,64 @@ const BlogSection = () => {
         const before = text.slice(0, start);
         const after = text.slice(end);
         
-        // Don't show the link in text if it's going to be shown as a preview card
-        const shouldShowPreview = entity.images?.[0] || entity.title;
-        const link = shouldShowPreview ? '' : (
-          `<a 
-            href="${entity.expanded_url}"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            ${entity.display_url}
-          </a>`
-        );
+        // Always show the link in text, regardless of preview
+        const link = `<a 
+          href="${entity.expanded_url}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          ${entity.display_url}
+        </a>`;
         
         text = before + link + after;
         
-        // Add preview if available
-        const preview = renderUrlPreview(entity);
-        if (preview) {
+        // Generate preview card if it's not a Twitter URL
+        if (!entity.expanded_url.includes('twitter.com') && !entity.expanded_url.includes('x.com')) {
+          const preview = (
+            <div 
+              key={entity.url}
+              className="mt-2 mb-4 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              <div className="relative w-full h-[200px] bg-accent/5">
+                <Image
+                  src={`https://www.google.com/s2/favicons?domain=${new URL(entity.expanded_url).hostname}&sz=64`}
+                  alt={entity.display_url}
+                  width={32}
+                  height={32}
+                  className="absolute top-4 left-4 rounded-sm"
+                  unoptimized
+                />
+                {entity.images?.[0] && (
+                  <Image
+                    src={entity.images[0].url}
+                    alt={entity.title || entity.display_url}
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                )}
+              </div>
+              <div className="p-4">
+                <h4 className="font-medium text-sm mb-1">
+                  {entity.title || new URL(entity.expanded_url).hostname}
+                </h4>
+                {entity.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {entity.description}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground/70 mt-2">
+                  {new URL(entity.expanded_url).hostname}
+                </p>
+              </div>
+            </div>
+          );
           urlPreviews.push(preview);
         }
       }
@@ -276,10 +276,14 @@ const BlogSection = () => {
     return (
       <>
         <div 
-          className="text-sm text-muted-foreground/90 leading-relaxed"
+          className="text-sm text-muted-foreground/90 leading-relaxed mb-2"
           dangerouslySetInnerHTML={{ __html: text.trim() }}
         />
-        {urlPreviews}
+        {urlPreviews.length > 0 && (
+          <div className="space-y-2">
+            {urlPreviews}
+          </div>
+        )}
       </>
     );
   };
