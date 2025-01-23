@@ -142,9 +142,9 @@ async function executeWithRateLimit<T>(
 // Helper to validate and clean tweet data
 function validateTweet(tweet: any): TweetV2 | null {
   try {
-    // Ensure required fields exist
-    if (!tweet.id || !tweet.text || !Array.isArray(tweet.edit_history_tweet_ids)) {
-      console.warn('[Twitter] Invalid tweet structure:', tweet);
+    // Handle null/undefined
+    if (!tweet) {
+      console.warn('[Twitter] Null or undefined tweet');
       return null;
     }
 
@@ -157,17 +157,35 @@ function validateTweet(tweet: any): TweetV2 | null {
       public_metrics: tweet.public_metrics
     } as TweetV2;
 
+    // Ensure required fields exist
+    if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
+      console.warn('[Twitter] Invalid tweet structure:', {
+        id: tweet.id,
+        hasText: !!tweet.text,
+        hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids)
+      });
+      return null;
+    }
+
     // Handle created_at separately
     if (tweet.created_at) {
       try {
+        // Handle both ISO string and timestamp formats
         const date = new Date(tweet.created_at);
         if (!isNaN(date.getTime())) {
           cleanTweet.created_at = date.toISOString();
         } else {
-          console.warn('[Twitter] Invalid date found in tweet:', tweet.id);
+          console.warn('[Twitter] Invalid date found in tweet:', {
+            id: tweet.id,
+            date: tweet.created_at
+          });
         }
       } catch (error) {
-        console.warn('[Twitter] Error parsing date for tweet:', tweet.id, error);
+        console.warn('[Twitter] Error parsing date for tweet:', {
+          id: tweet.id,
+          date: tweet.created_at,
+          error
+        });
       }
     }
 
@@ -180,9 +198,22 @@ function validateTweet(tweet: any): TweetV2 | null {
 
 // Helper to safely process tweets
 function processTweets(tweets: any[]): TweetV2[] {
-  return tweets
+  if (!Array.isArray(tweets)) {
+    console.warn('[Twitter] Invalid tweets array:', typeof tweets);
+    return [];
+  }
+
+  const validTweets = tweets
     .map(tweet => validateTweet(tweet))
     .filter((tweet): tweet is TweetV2 => tweet !== null);
+
+  console.log('[Twitter] Processed tweets:', {
+    total: tweets.length,
+    valid: validTweets.length,
+    invalid: tweets.length - validTweets.length
+  });
+
+  return validTweets;
 }
 
 async function searchBuildTweets(client: TwitterApiv2): Promise<TweetV2[]> {
@@ -241,10 +272,26 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
   console.log('[Twitter API] Initializing read-only client...');
 
   // Check if we can make a request based on rate limit
-  const canRequest = await canMakeRequest(Date.now());
-  if (!canRequest) {
-    const lastUpdate = await getRateLimitTimestamp();
-    console.log('[Twitter API] Rate limited during initialization, last update:', lastUpdate);
+  const now = Date.now();
+  const canRequest = await canMakeRequest(now);
+  const lastUpdate = await getRateLimitTimestamp() ?? 0; // Default to 0 if null
+  
+  console.log('[Twitter API] Rate limit check:', {
+    canRequest,
+    lastUpdate,
+    lastUpdateDate: lastUpdate ? new Date(lastUpdate).toISOString() : 'never',
+    minutesSinceLastUpdate: lastUpdate ? Math.floor((now - lastUpdate) / (60 * 1000)) : Infinity,
+    now: new Date(now).toISOString()
+  });
+
+  // Only block if we can't make a request AND we're within the rate limit window
+  const withinRateLimit = lastUpdate && (now - lastUpdate) < RATE_LIMIT_WINDOW;
+  if (!canRequest && withinRateLimit) {
+    console.log('[Twitter API] Rate limited during initialization:', {
+      lastUpdate,
+      lastUpdateDate: new Date(lastUpdate).toISOString(),
+      timeUntilReset: Math.round((lastUpdate + RATE_LIMIT_WINDOW - now) / 1000) + 's'
+    });
     throw new Error('Rate limited during client initialization');
   }
 

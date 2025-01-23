@@ -92,16 +92,23 @@ export async function GET() {
     console.log('Fetching cached tweets...')
     const cachedData = await getCachedTweets()
     
-    if (!cachedData?.tweets || cachedData.tweets.length === 0) {
+    if (!cachedData?.tweets || !Array.isArray(cachedData.tweets) || cachedData.tweets.length === 0) {
       console.log('No cached tweets found')
       return NextResponse.json({ tweets: [] })
     }
+
+    console.log('Aggregated unique tweets:', {
+      totalBlobs: cachedData.tweets.length,
+      uniqueTweets: new Set(cachedData.tweets.map(t => t.id)).size,
+      withEntities: cachedData.tweets.filter(t => hasTweetEntities(t)).length,
+      tweetIds: cachedData.tweets.map(t => t.id)
+    })
     
     // Get selected tweets with full data including entities
     const selectedTweets = await getSelectedTweets()
-    console.log('Selected tweets response:', selectedTweets)
+    console.log('Getting selected tweets...')
     
-    if (selectedTweets && selectedTweets.tweets && selectedTweets.tweets.length > 0) {
+    if (selectedTweets?.tweets && Array.isArray(selectedTweets.tweets) && selectedTweets.tweets.length > 0) {
       // Validate and clean selected tweets
       const validSelectedTweets = selectedTweets.tweets
         .map(tweet => validateTweet(tweet))
