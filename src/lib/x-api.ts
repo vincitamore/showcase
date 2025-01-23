@@ -1,4 +1,4 @@
-import { TwitterApi } from 'twitter-api-v2';
+import { TwitterApi, TwitterApiv2 } from 'twitter-api-v2';
 
 interface RateLimitCache {
   search: {
@@ -75,14 +75,14 @@ export async function getReadOnlyClient() {
       appSecret: apiSecret,   // API Key Secret
       accessToken: accessToken,     // Access Token
       accessSecret: accessSecret,   // Access Token Secret
-    });
+    }).v2;
 
     console.log('[Twitter API] Client initialized with OAuth 1.0a User Context authentication');
     
     // Wrap the client to handle rate limits
     return new Proxy(client, {
-      get(target: TwitterApi, prop: string | symbol) {
-        const value = target[prop as keyof TwitterApi];
+      get(target: TwitterApiv2, prop: string | symbol) {
+        const value = target[prop as keyof TwitterApiv2];
         if (typeof value === 'function') {
           return async (...args: unknown[]) => {
             try {
@@ -173,13 +173,13 @@ export const fetchTechTweets = async (username: string) => {
   const cleanUsername = username.replace('@', '');
   
   const client = await getReadOnlyClient();
-  const user = await client.v2.userByUsername(cleanUsername);
+  const user = await client.userByUsername(cleanUsername);
   
   if (!user.data) {
     throw new Error('User not found');
   }
 
-  const tweets = await client.v2.userTimeline(user.data.id, {
+  const tweets = await client.userTimeline(user.data.id, {
     exclude: ['replies', 'retweets'],
     expansions: ['author_id', 'attachments.media_keys'],
     'tweet.fields': ['created_at', 'text', 'public_metrics'],
