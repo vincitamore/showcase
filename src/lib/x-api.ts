@@ -44,78 +44,114 @@ function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<str
   });
 }
 
-// Initialize the read-only client for public tweet fetching
+// Initialize the read-only client for public tweet fetching using API Key/Secret
 export async function getReadOnlyClient() {
-  if (!process.env.TWITTER_API_KEY || !process.env.TWITTER_API_SECRET) {
+  console.log('[Twitter API] Initializing read-only client...');
+  
+  // Check for required environment variables
+  const apiKey = process.env.TWITTER_API_KEY;
+  const apiSecret = process.env.TWITTER_API_SECRET;
+  
+  if (!apiKey || !apiSecret) {
+    console.error('[Twitter API] Missing API credentials:', {
+      hasApiKey: !!apiKey,
+      hasApiSecret: !!apiSecret,
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL_ENV: process.env.VERCEL_ENV
+      }
+    });
     throw new Error('Missing Twitter API credentials in environment variables');
   }
-
-  // Create client with app-only auth
-  const client = new TwitterApi({
-    appKey: process.env.TWITTER_API_KEY,
-    appSecret: process.env.TWITTER_API_SECRET,
-  });
-
-  // Get app-only client
-  const appClient = await client.appLogin();
   
-  // Wrap the client to handle rate limits
-  return new Proxy(appClient, {
-    get(target: TwitterApi, prop: string | symbol) {
-      const value = target[prop as keyof TwitterApi];
-      if (typeof value === 'function') {
-        return async (...args: unknown[]) => {
-          try {
-            // Determine which endpoint we're calling
-            const endpoint = prop === 'search' ? 'search' : 'timeline';
-            
-            // Check if we're rate limited
-            if (isRateLimited(endpoint)) {
-              const waitTime = rateLimitCache[endpoint].reset - Date.now();
-              console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
-              throw new Error(`Rate limit exceeded for ${endpoint}`);
-            }
+  try {
+    // Create client with API Key/Secret auth
+    const client = new TwitterApi({
+      appKey: apiKey,         // API Key
+      appSecret: apiSecret,   // API Key Secret
+    });
 
-            const result = await (value as Function).apply(target, args);
-            
-            // Update rate limit info from successful response
-            if (result?.rateLimit) {
-              updateRateLimitInfo(endpoint, {
-                'x-rate-limit-reset': String(result.rateLimit.reset),
-                'x-rate-limit-remaining': String(result.rateLimit.remaining)
-              });
-            }
-            
-            return result;
-          } catch (error) {
-            if (error instanceof Error && error.message.includes('429')) {
-              // Update rate limit info and throw custom error
+    // Get app-only bearer token
+    console.log('[Twitter API] Requesting app-only bearer token...');
+    const appClient = await client.appLogin();
+    console.log('[Twitter API] Successfully obtained bearer token');
+    
+    // Wrap the client to handle rate limits
+    return new Proxy(appClient, {
+      get(target: TwitterApi, prop: string | symbol) {
+        const value = target[prop as keyof TwitterApi];
+        if (typeof value === 'function') {
+          return async (...args: unknown[]) => {
+            try {
+              // Determine which endpoint we're calling
               const endpoint = prop === 'search' ? 'search' : 'timeline';
-              rateLimitCache[endpoint].remaining = 0;
-              rateLimitCache[endpoint].reset = Date.now() + (15 * 60 * 1000); // 15 minutes from now
-              console.log(`[Twitter API] Rate limit hit for ${endpoint}, reset at:`, new Date(rateLimitCache[endpoint].reset).toISOString());
+              
+              // Check if we're rate limited
+              if (isRateLimited(endpoint)) {
+                const waitTime = rateLimitCache[endpoint].reset - Date.now();
+                console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
+                throw new Error(`Rate limit exceeded for ${endpoint}`);
+              }
+
+              console.log(`[Twitter API] Making request to ${String(prop)}...`);
+              const result = await (value as Function).apply(target, args);
+              
+              // Update rate limit info from response headers if available
+              if (result?.rateLimit) {
+                updateRateLimitInfo(endpoint, result.rateLimit);
+              }
+              
+              return result;
+            } catch (error) {
+              // Log detailed error information
+              console.error('[Twitter API] Request failed:', {
+                endpoint: String(prop),
+                error: error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined,
+                env: {
+                  NODE_ENV: process.env.NODE_ENV,
+                  VERCEL_ENV: process.env.VERCEL_ENV
+                }
+              });
+              throw error;
             }
-            throw error;
-          }
-        };
+          };
+        }
+        return value;
       }
-      return value;
-    }
-  });
+    });
+  } catch (error) {
+    console.error('[Twitter API] Failed to initialize client:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL_ENV: process.env.VERCEL_ENV
+      }
+    });
+    throw error;
+  }
 }
 
-// Get the OAuth2 URL for login
+// Get the OAuth2 URL for user login (using CLIENT_ID/CLIENT_SECRET)
 export async function getOAuthUrl() {
-  if (!process.env.TWITTER_CLIENT_ID) {
-    throw new Error('Missing Twitter Client ID in environment variables');
+  const clientId = process.env.TWITTER_CLIENT_ID;
+  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error('[Twitter OAuth] Missing OAuth credentials:', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret
+    });
+    throw new Error('Missing Twitter OAuth credentials');
   }
 
   const client = new TwitterApi({
-    clientId: process.env.TWITTER_CLIENT_ID,
-    clientSecret: process.env.TWITTER_API_SECRET,
+    clientId: clientId,
+    clientSecret: clientSecret,
   });
   
-  // Generate OAuth 2.0 URL
+  // Generate OAuth 2.0 URL for user authentication
   const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
     process.env.NEXT_PUBLIC_URL + '/api/auth/x/callback',
     { scope: ['tweet.read', 'tweet.write', 'users.read'] }
@@ -124,7 +160,7 @@ export async function getOAuthUrl() {
   return { url, state, codeVerifier };
 }
 
-// Fetch tech-related tweets (public read-only)
+// Fetch tech-related tweets (public read-only using API Key/Secret)
 export const fetchTechTweets = async (username: string) => {
   if (!username) {
     throw new Error('Username is required to fetch tweets');
@@ -151,7 +187,7 @@ export const fetchTechTweets = async (username: string) => {
   return tweets.data;
 };
 
-// Post a new tweet (requires authentication)
+// Post a new tweet (requires OAuth 2.0 user authentication)
 export const postTweet = async (text: string, accessToken: string) => {
   if (!text?.trim()) {
     throw new Error('Tweet text is required');
@@ -166,6 +202,10 @@ export const postTweet = async (text: string, accessToken: string) => {
   return tweet.data;
 };
 
+// Get authenticated client for user actions (using OAuth 2.0)
 export async function getAuthenticatedClient(accessToken: string) {
+  if (!accessToken) {
+    throw new Error('Access token is required for authenticated client');
+  }
   return new TwitterApi(accessToken);
 } 

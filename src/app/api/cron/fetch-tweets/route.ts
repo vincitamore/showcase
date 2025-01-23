@@ -8,25 +8,40 @@ import {
   canMakeRequest,
   updateSelectedTweets
 } from '@/lib/blob-storage';
-import { TwitterApi, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
+import { TwitterApi, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
 
-// Update interface to match TweetV2 structure but only include what we need
-interface StoredTweet {
-  id: string;
-  text: string;
-  edit_history_tweet_ids: string[];
-  created_at?: string;
-  public_metrics?: TweetPublicMetricsV2;
+// Helper function to check if a tweet has entities with URLs
+function hasTweetEntities(tweet: TweetV2): boolean {
+  return !!tweet.entities?.urls && tweet.entities.urls.length > 0;
 }
 
-function convertToStoredTweet(tweet: TweetV2): StoredTweet {
-  return {
-    id: tweet.id,
-    text: tweet.text,
-    edit_history_tweet_ids: tweet.edit_history_tweet_ids,
-    created_at: tweet.created_at,
-    public_metrics: tweet.public_metrics
-  };
+// Helper function to get random items from array with priority for tweets with entities
+function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
+  // Separate tweets with and without entities
+  const tweetsWithEntities = array.filter(hasTweetEntities);
+  const tweetsWithoutEntities = array.filter(tweet => !hasTweetEntities(tweet));
+  
+  logStatus('Tweet selection stats', {
+    totalTweets: array.length,
+    withEntities: tweetsWithEntities.length,
+    withoutEntities: tweetsWithoutEntities.length
+  });
+  
+  // If we have enough tweets with entities, use those first
+  if (tweetsWithEntities.length >= count) {
+    const shuffled = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }
+  
+  // Otherwise, fill remaining slots with tweets without entities
+  const shuffledWithEntities = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
+  const shuffledWithoutEntities = [...tweetsWithoutEntities].sort(() => 0.5 - Math.random());
+  const remaining = count - shuffledWithEntities.length;
+  
+  return [
+    ...shuffledWithEntities,
+    ...shuffledWithoutEntities.slice(0, remaining)
+  ];
 }
 
 // Vercel Cron Job - runs every 5 minutes but respects 15-minute rate limit
@@ -67,11 +82,11 @@ async function checkRateLimit() {
   }
 }
 
-async function searchNewBuildTweets(client: TwitterApi, cachedTweets: StoredTweet[]) {
+async function searchNewBuildTweets(client: TwitterApi, cachedTweets: TweetV2[]) {
   try {
     logStatus('Searching for .build tweets');
     const searchResults = await client.v2.search('.build', {
-      'tweet.fields': ['created_at', 'public_metrics'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,
     });
 
@@ -82,12 +97,12 @@ async function searchNewBuildTweets(client: TwitterApi, cachedTweets: StoredTwee
 
     const cachedIds = new Set(cachedTweets.map(tweet => tweet.id));
     const newTweets = (Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data])
-      .filter(tweet => !cachedIds.has(tweet.id))
-      .map(convertToStoredTweet);
+      .filter(tweet => !cachedIds.has(tweet.id));
     
     logStatus('Search results', {
       totalFound: Array.isArray(searchResults.data) ? searchResults.data.length : 1,
-      newTweetsFound: newTweets.length
+      newTweetsFound: newTweets.length,
+      withEntities: newTweets.filter(hasTweetEntities).length
     });
     
     return newTweets.length > 0 ? newTweets : null;
@@ -102,7 +117,7 @@ async function searchNewBuildTweets(client: TwitterApi, cachedTweets: StoredTwee
   }
 }
 
-async function getRandomUserTweet(client: TwitterApi, username: string, cachedTweets: StoredTweet[]) {
+async function getRandomUserTweet(client: TwitterApi, username: string, cachedTweets: TweetV2[]) {
   try {
     logStatus('Fetching user tweets', { username });
     const user = await client.v2.userByUsername(username);
@@ -113,7 +128,7 @@ async function getRandomUserTweet(client: TwitterApi, username: string, cachedTw
 
     const timeline = await client.v2.userTimeline(user.data.id, {
       exclude: ['replies', 'retweets'],
-      'tweet.fields': ['created_at', 'public_metrics'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,
     });
 
@@ -124,16 +139,24 @@ async function getRandomUserTweet(client: TwitterApi, username: string, cachedTw
 
     const cachedIds = new Set(cachedTweets.map(tweet => tweet.id));
     const availableTweets = (Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data])
-      .filter(tweet => !cachedIds.has(tweet.id))
-      .map(convertToStoredTweet);
+      .filter(tweet => !cachedIds.has(tweet.id));
     
     logStatus('Timeline results', {
       totalFound: Array.isArray(timeline.data.data) ? timeline.data.data.length : 1,
-      newTweetsAvailable: availableTweets.length
+      newTweetsAvailable: availableTweets.length,
+      withEntities: availableTweets.filter(hasTweetEntities).length
     });
     
     if (availableTweets.length === 0) return null;
     
+    // Prioritize tweets with entities
+    const tweetsWithEntities = availableTweets.filter(hasTweetEntities);
+    if (tweetsWithEntities.length > 0) {
+      const randomIndex = Math.floor(Math.random() * tweetsWithEntities.length);
+      return [tweetsWithEntities[randomIndex]];
+    }
+    
+    // Fallback to any tweet if none have entities
     const randomIndex = Math.floor(Math.random() * availableTweets.length);
     return [availableTweets[randomIndex]];
   } catch (error) {
@@ -145,12 +168,6 @@ async function getRandomUserTweet(client: TwitterApi, username: string, cachedTw
     logStatus('Error fetching random user tweet', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
-}
-
-// Helper function to get random items from an array
-function getRandomItems<T>(array: T[], count: number): T[] {
-  const shuffled = [...array].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
 }
 
 export async function GET(request: Request) {
@@ -167,8 +184,11 @@ export async function GET(request: Request) {
 
     // Get currently cached tweets first
     const cachedData = await getCachedTweets();
-    const currentTweets = (cachedData?.tweets || []) as StoredTweet[];
-    logStatus('Current cache status', { cachedTweetCount: currentTweets.length });
+    const currentTweets = (cachedData?.tweets || []) as TweetV2[];
+    logStatus('Current cache status', { 
+      cachedTweetCount: currentTweets.length,
+      withEntities: currentTweets.filter(hasTweetEntities).length
+    });
 
     // Check if we can make a request
     const canRequest = await checkRateLimit();
@@ -181,7 +201,8 @@ export async function GET(request: Request) {
         await updateSelectedTweets(selectedTweets);
         logStatus('Updated selected tweets from cache', {
           available: currentTweets.length,
-          selected: selectedTweets.length
+          selected: selectedTweets.length,
+          withEntities: selectedTweets.filter(hasTweetEntities).length
         });
         
         return NextResponse.json({ 
@@ -217,7 +238,8 @@ export async function GET(request: Request) {
       await updateRateLimitTimestamp();
       logStatus('Cache updated with new tweets', {
         newTweetsAdded: tweetsToCache.length,
-        totalTweets: updatedTweets.length
+        totalTweets: updatedTweets.length,
+        withEntities: updatedTweets.filter(hasTweetEntities).length
       });
     }
 
@@ -226,7 +248,8 @@ export async function GET(request: Request) {
     await updateSelectedTweets(selectedTweets);
     logStatus('Updated selected tweets', {
       available: updatedTweets.length,
-      selected: selectedTweets.length
+      selected: selectedTweets.length,
+      withEntities: selectedTweets.filter(hasTweetEntities).length
     });
 
     const duration = Date.now() - startTime;
@@ -234,6 +257,7 @@ export async function GET(request: Request) {
       newTweetsAdded: tweetsToCache?.length ?? 0,
       totalTweetsInCache: updatedTweets.length,
       selectedTweetsCount: selectedTweets.length,
+      withEntities: selectedTweets.filter(hasTweetEntities).length,
       executionTimeMs: duration
     });
 

@@ -1,9 +1,9 @@
 import { list, put, del } from '@vercel/blob';
-import { TweetV2 } from 'twitter-api-v2';
+import { TwitterApi, TweetV2, Tweetv2TimelineResult } from 'twitter-api-v2';
 
 interface CachedTweets {
   tweets: TweetV2[];
-  timestamp: number;
+  timestamp: string;
 }
 
 // Cache keys
@@ -20,7 +20,7 @@ export const BYTES_PER_MB = 1024 * 1024;
 
 export interface SelectedTweets {
   tweets: TweetV2[];
-  timestamp: number;
+  timestamp: string;
 }
 
 interface BlobInfo {
@@ -28,6 +28,11 @@ interface BlobInfo {
   url: string;
   size: number;
   uploadedAt: Date;
+}
+
+// Helper function to check if a tweet has entities with URLs
+function hasTweetEntities(tweet: TweetV2): boolean {
+  return !!tweet.entities?.urls && tweet.entities.urls.length > 0;
 }
 
 async function checkStorageUsage(): Promise<number> {
@@ -145,12 +150,13 @@ export async function getCachedTweets(): Promise<CachedTweets | null> {
     console.log('Aggregated unique tweets:', {
       totalBlobs: blobs.length,
       uniqueTweets: uniqueTweets.length,
+      withEntities: uniqueTweets.filter(hasTweetEntities).length,
       tweetIds: uniqueTweets.map(t => t.id)
     });
     
     return {
       tweets: uniqueTweets,
-      timestamp: Date.now()
+      timestamp: Date.now().toString()
     };
   } catch (error) {
     console.error('Error getting cached tweets:', error);
@@ -165,11 +171,14 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
     
     const cachedData: CachedTweets = {
       tweets: tweetsToCache,
-      timestamp: Date.now()
+      timestamp: Date.now().toString()
     };
     
     const filename = `${CACHE_KEY_PREFIX}-${Date.now()}.json`;
-    console.log('Caching tweets to:', filename);
+    console.log('Caching tweets to:', filename, {
+      count: tweetsToCache.length,
+      withEntities: tweetsToCache.filter(hasTweetEntities).length
+    });
     
     await put(filename, JSON.stringify(cachedData), {
       contentType: 'application/json',
@@ -178,7 +187,8 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
     
     console.log('Successfully cached tweets:', {
       count: tweetsToCache.length,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      withEntities: tweetsToCache.filter(hasTweetEntities).length
     });
     
     // Check storage usage and cleanup if needed
@@ -230,36 +240,45 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
 
 export async function updateRateLimitTimestamp(): Promise<void> {
   try {
-    const timestamp = Date.now();
-    
-    console.log('Updating rate limit timestamp:', {
-      filename: RATE_LIMIT_FILE,
-      timestamp,
-      date: new Date(timestamp).toISOString()
-    });
-    
-    await put(RATE_LIMIT_FILE, timestamp.toString(), {
-      contentType: 'text/plain',
+    const timestamp = Date.now().toString();
+    await put(RATE_LIMIT_FILE, timestamp, {
       access: 'public',
-      addRandomSuffix: false
+      addRandomSuffix: false,
     });
-    
-    console.log('Successfully updated rate limit timestamp');
+    console.log('Updated rate limit timestamp:', new Date(parseInt(timestamp)).toISOString());
   } catch (error) {
     console.error('Error updating rate limit timestamp:', error);
   }
 }
 
-export function canMakeRequest(lastTimestamp: number | null): boolean {
-  if (!lastTimestamp) return true;
-  const timeSinceLastRequest = Date.now() - lastTimestamp;
-  const canMake = timeSinceLastRequest >= FIFTEEN_MINUTES;
-  console.log('Checking if can make request:', {
-    lastTimestamp: new Date(lastTimestamp).toISOString(),
-    timeSinceLastRequest: Math.round(timeSinceLastRequest / 1000) + 's',
-    canMake
-  });
-  return canMake;
+export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
+  try {
+    console.log('Updating selected tweets...', {
+      count: tweets.length,
+      withEntities: tweets.filter(hasTweetEntities).length
+    });
+    
+    const data: SelectedTweets = {
+      tweets,
+      timestamp: Date.now().toString()
+    };
+    
+    await put(SELECTED_TWEETS_FILE, JSON.stringify(data), {
+      access: 'public',
+      addRandomSuffix: false,
+      contentType: 'application/json'
+    });
+    
+    console.log('Selected tweets updated:', {
+      count: tweets.length,
+      timestamp: new Date(data.timestamp).toISOString(),
+      filename: SELECTED_TWEETS_FILE,
+      withEntities: tweets.filter(hasTweetEntities).length
+    });
+  } catch (error) {
+    console.error('Error updating selected tweets:', error);
+    throw error;
+  }
 }
 
 export async function getSelectedTweets(): Promise<SelectedTweets | null> {
@@ -274,14 +293,15 @@ export async function getSelectedTweets(): Promise<SelectedTweets | null> {
     
     const response = await fetch(blobs[0].url);
     if (!response.ok) {
-      console.error('Failed to fetch selected tweets blob:', response.status);
+      console.error('Failed to fetch selected tweets:', response.statusText);
       return null;
     }
     
-    const data = await response.json();
+    const data = await response.json() as SelectedTweets;
     console.log('Retrieved selected tweets:', {
-      count: data.tweets?.length ?? 0,
-      timestamp: new Date(data.timestamp).toISOString()
+      count: data.tweets.length,
+      timestamp: new Date(data.timestamp).toISOString(),
+      withEntities: data.tweets.filter(hasTweetEntities).length
     });
     
     return data;
@@ -291,27 +311,87 @@ export async function getSelectedTweets(): Promise<SelectedTweets | null> {
   }
 }
 
-export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
+export async function canMakeRequest(lastTimestamp: number | null): Promise<boolean> {
+  if (!lastTimestamp) return true;
+  return Date.now() - lastTimestamp >= FIFTEEN_MINUTES;
+}
+
+export async function searchBuildTweets(client: TwitterApi) {
+  console.log('Searching for build tweets...')
   try {
-    console.log('Updating selected tweets...');
+    const tweets = await client.v2.search('(from:vincit_amore) -is:reply -is:retweet', {
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'attachments'],
+      'user.fields': ['profile_image_url', 'username', 'name'],
+      'media.fields': ['url', 'preview_image_url'],
+      expansions: ['author_id', 'attachments.media_keys'],
+      max_results: 10
+    })
+    
+    const tweetData = tweets.data.data // Access the array of tweets
+    console.log('Search results:', {
+      count: tweetData?.length || 0,
+      hasEntities: tweetData?.some((t: TweetV2) => !!t.entities) || false,
+      sampleTweet: tweetData?.[0] ? {
+        id: tweetData[0].id,
+        text: tweetData[0].text.substring(0, 50) + '...',
+        hasEntities: !!tweetData[0].entities,
+        urlCount: tweetData[0].entities?.urls?.length || 0
+      } : null
+    })
+    
+    return tweets
+  } catch (error) {
+    console.error('Error searching tweets:', error)
+    throw error
+  }
+}
+
+export async function getUserTweets(client: TwitterApi, userId: string) {
+  console.log('Fetching user tweets...')
+  try {
+    const tweets = await client.v2.userTimeline(userId, {
+      exclude: ['replies', 'retweets'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'attachments'],
+      'user.fields': ['profile_image_url', 'username', 'name'],
+      'media.fields': ['url', 'preview_image_url'],
+      expansions: ['author_id', 'attachments.media_keys'],
+      max_results: 10
+    })
+    
+    const tweetData = tweets.data.data // Access the array of tweets
+    console.log('User timeline results:', {
+      count: tweetData?.length || 0,
+      hasEntities: tweetData?.some((t: TweetV2) => !!t.entities) || false,
+      sampleTweet: tweetData?.[0] ? {
+        id: tweetData[0].id,
+        text: tweetData[0].text.substring(0, 50) + '...',
+        hasEntities: !!tweetData[0].entities,
+        urlCount: tweetData[0].entities?.urls?.length || 0
+      } : null
+    })
+    
+    return tweets
+  } catch (error) {
+    console.error('Error fetching user tweets:', error)
+    throw error
+  }
+}
+
+export async function saveTweets(tweets: TweetV2[]) {
+  console.log('Saving tweets to blob storage...')
+  try {
     const data: SelectedTweets = {
       tweets,
-      timestamp: Date.now()
-    };
-    
+      timestamp: new Date().toISOString()
+    }
     await put(SELECTED_TWEETS_FILE, JSON.stringify(data), {
       access: 'public',
       addRandomSuffix: false,
       contentType: 'application/json'
     });
-    
-    console.log('Selected tweets updated:', {
-      count: tweets.length,
-      timestamp: new Date(data.timestamp).toISOString(),
-      filename: SELECTED_TWEETS_FILE
-    });
+    console.log('Successfully saved tweets')
   } catch (error) {
-    console.error('Error updating selected tweets:', error);
-    throw error;
+    console.error('Error saving tweets:', error)
+    throw error
   }
 } 

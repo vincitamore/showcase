@@ -1,14 +1,42 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { TwitterApi } from 'twitter-api-v2'
+import { TwitterApi, TweetV2 } from 'twitter-api-v2'
 import { getCachedTweets, getSelectedTweets } from '@/lib/blob-storage'
 
 export const dynamic = 'force-dynamic'
 
-// Helper function to get random items from array
-function getRandomItems<T>(array: T[], count: number): T[] {
-  const shuffled = [...array].sort(() => 0.5 - Math.random())
-  return shuffled.slice(0, count)
+// Helper function to check if a tweet has entities with URLs
+function hasTweetEntities(tweet: TweetV2): boolean {
+  return !!tweet.entities?.urls && tweet.entities.urls.length > 0
+}
+
+// Helper function to get random items from array with priority for tweets with entities
+function getRandomItems<T extends TweetV2>(array: T[], count: number): T[] {
+  // Separate tweets with and without entities
+  const tweetsWithEntities = array.filter(hasTweetEntities)
+  const tweetsWithoutEntities = array.filter(tweet => !hasTweetEntities(tweet))
+  
+  console.log('Tweet selection stats:', {
+    totalTweets: array.length,
+    withEntities: tweetsWithEntities.length,
+    withoutEntities: tweetsWithoutEntities.length
+  })
+  
+  // If we have enough tweets with entities, use those first
+  if (tweetsWithEntities.length >= count) {
+    const shuffled = [...tweetsWithEntities].sort(() => 0.5 - Math.random())
+    return shuffled.slice(0, count)
+  }
+  
+  // Otherwise, fill remaining slots with tweets without entities
+  const shuffledWithEntities = [...tweetsWithEntities].sort(() => 0.5 - Math.random())
+  const shuffledWithoutEntities = [...tweetsWithoutEntities].sort(() => 0.5 - Math.random())
+  const remaining = count - shuffledWithEntities.length
+  
+  return [
+    ...shuffledWithEntities,
+    ...shuffledWithoutEntities.slice(0, remaining)
+  ]
 }
 
 export async function GET() {
@@ -21,13 +49,35 @@ export async function GET() {
       return NextResponse.json({ tweets: [] })
     }
     
-    // Always return exactly 4 tweets (or all if less than 4 available)
+    // Get selected tweets with full data including entities
+    const selectedTweets = await getSelectedTweets()
+    console.log('Selected tweets response:', selectedTweets)
+    
+    if (selectedTweets && selectedTweets.tweets && selectedTweets.tweets.length > 0) {
+      console.log('Using selected tweets with entities:', {
+        count: selectedTweets.tweets.length,
+        tweets: selectedTweets.tweets.map(t => ({
+          id: t.id,
+          text: t.text.substring(0, 50) + '...',
+          hasEntities: hasTweetEntities(t),
+          urlCount: t.entities?.urls?.length || 0
+        }))
+      })
+      return NextResponse.json({ tweets: selectedTweets.tweets })
+    }
+    
+    // Fallback to random tweets from cache, prioritizing those with entities
     const tweetsToReturn = getRandomItems(cachedData.tweets, Math.min(4, cachedData.tweets.length))
     
     console.log('Returning tweets:', {
       availableInCache: cachedData.tweets.length,
       returning: tweetsToReturn.length,
-      tweets: tweetsToReturn.map(t => ({ id: t.id, text: t.text.substring(0, 50) + '...' }))
+      tweets: tweetsToReturn.map(t => ({
+        id: t.id,
+        text: t.text.substring(0, 50) + '...',
+        hasEntities: hasTweetEntities(t),
+        urlCount: t.entities?.urls?.length || 0
+      }))
     })
     
     return NextResponse.json({ tweets: tweetsToReturn })

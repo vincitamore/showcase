@@ -118,10 +118,24 @@ const BlogSection = () => {
       }
       
       const data = await response.json();
-      console.log('Received tweets response:', {
-        hasTweets: Array.isArray(data?.tweets),
-        tweetCount: data?.tweets?.length ?? 0,
-        tweets: data?.tweets?.map((t: any) => ({ id: t.id, text: t.text.substring(0, 50) + '...' }))
+      
+      // Enhanced debug logging
+      console.log('Raw tweet response:', JSON.stringify(data, null, 2));
+      
+      // Log each tweet's structure
+      data?.tweets?.forEach((tweet: Tweet, index: number) => {
+        console.log(`Tweet ${index + 1} Structure:`, {
+          id: tweet.id,
+          text: tweet.text,
+          hasEntities: !!tweet.entities,
+          entitiesType: tweet.entities ? typeof tweet.entities : 'undefined',
+          urlsCount: tweet.entities?.urls?.length || 0,
+          rawEntities: tweet.entities,
+          rawUrls: tweet.entities?.urls,
+          created_at: tweet.created_at,
+          metrics: tweet.public_metrics,
+          author: tweet.author
+        });
       });
       
       if (!data.tweets || !Array.isArray(data.tweets)) {
@@ -133,6 +147,17 @@ const BlogSection = () => {
         });
         return;
       }
+      
+      // Log the final processed tweets
+      console.log('Setting tweets state with:', {
+        count: data.tweets.length,
+        tweets: data.tweets.map((t: Tweet) => ({
+          id: t.id,
+          textPreview: t.text.substring(0, 50) + '...',
+          hasEntities: !!t.entities,
+          urlsCount: t.entities?.urls?.length || 0
+        }))
+      });
       
       setTweets(data.tweets);
     } catch (error) {
@@ -199,17 +224,36 @@ const BlogSection = () => {
   }
 
   const renderTweetText = (tweet: Tweet) => {
-    console.log('Rendering tweet:', {
+    // Enhanced debug logging for tweet rendering
+    console.log('Rendering tweet - Full structure:', {
       id: tweet.id,
       text: tweet.text,
       hasEntities: !!tweet.entities,
+      entitiesType: tweet.entities ? typeof tweet.entities : 'undefined',
       urlCount: tweet.entities?.urls?.length || 0,
-      entities: tweet.entities
+      entities: tweet.entities,
+      rawUrls: tweet.entities?.urls,
+      created_at: tweet.created_at,
+      metrics: tweet.public_metrics,
+      author: tweet.author
     });
 
     if (!tweet.text) {
       console.log('Tweet has no text, skipping render');
       return null;
+    }
+
+    // Log URL processing
+    if (tweet.entities?.urls?.length) {
+      console.log('Processing URLs:', tweet.entities.urls.map(url => ({
+        original: url.url,
+        expanded: url.expanded_url,
+        display: url.display_url,
+        indices: url.indices,
+        hasTitle: !!url.title,
+        hasDescription: !!url.description,
+        hasImages: !!url.images?.length
+      })));
     }
 
     const renderLink = (url: string, displayText: string) => (
