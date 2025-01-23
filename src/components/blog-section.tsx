@@ -11,7 +11,14 @@ import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
-import { TwitterTweetEmbed } from 'react-twitter-embed'
+import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
+
+interface UrlEntity {
+  url: string
+  expanded_url: string
+  display_url: string
+  indices: number[]
+}
 
 interface TweetMetrics {
   like_count?: number
@@ -29,85 +36,16 @@ interface Tweet {
     username?: string
     name?: string
   }
+  entities?: {
+    urls?: UrlEntity[]
+  }
+  referenced_tweets?: {
+    type: 'quoted' | 'replied_to'
+    id: string
+  }[]
 }
 
 const DEFAULT_PROFILE_IMAGE = "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png"
-
-const URL_REGEX = /(https?:\/\/[^\s]+)/g
-const TWEET_URL_REGEX = /https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/g
-
-function parseLinks(text: string) {
-  const parts = []
-  let lastIndex = 0
-  
-  // First find all tweet URLs and replace them with embeds
-  const tweetMatches = Array.from(text.matchAll(TWEET_URL_REGEX))
-  if (tweetMatches.length > 0) {
-    tweetMatches.forEach((match) => {
-      const [fullMatch, tweetId] = match
-      const offset = match.index!
-      
-      // Add text before the tweet
-      if (offset > lastIndex) {
-        parts.push(text.slice(lastIndex, offset))
-      }
-      
-      // Add the tweet embed
-      parts.push(
-        <div 
-          key={`tweet-${tweetId}`} 
-          className="my-4" 
-          onClick={(e) => e.stopPropagation()}
-        >
-          <TwitterTweetEmbed
-            tweetId={tweetId}
-            options={{ theme: 'dark', width: '100%' }}
-          />
-        </div>
-      )
-      
-      lastIndex = offset + fullMatch.length
-    })
-  }
-  
-  // Then handle remaining regular URLs
-  const remainingText = text.slice(lastIndex)
-  remainingText.replace(URL_REGEX, (match, offset) => {
-    // Skip if this URL was already handled as a tweet
-    if (tweetMatches.some(([tweetUrl]) => tweetUrl === match)) {
-      return match
-    }
-    
-    // Add text before the link
-    if (offset > 0) {
-      parts.push(remainingText.slice(0, offset))
-    }
-    
-    // Add the link
-    parts.push(
-      <a
-        key={`link-${offset}`}
-        href={match}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-primary hover:text-primary/80 underline"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {match}
-      </a>
-    )
-    
-    lastIndex = offset + match.length
-    return match
-  })
-  
-  // Add any remaining text
-  if (remainingText.length > lastIndex) {
-    parts.push(remainingText.slice(lastIndex))
-  }
-  
-  return parts
-}
 
 const BlogSection = () => {
   const [tweets, setTweets] = useState<Tweet[]>([])
@@ -115,6 +53,7 @@ const BlogSection = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { toast } = useToast()
+  useTwitterEmbed()
 
   useEffect(() => {
     fetchCachedTweets()
@@ -242,6 +181,48 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
+  const renderTweetText = (tweet: Tweet) => {
+    if (!tweet.text) return null;
+    
+    let text = tweet.text;
+    const entities = tweet.entities?.urls || [];
+    
+    // Sort entities by their position in reverse order to replace from end to start
+    const sortedEntities = [...entities].sort((a, b) => 
+      (b.indices[0] || 0) - (a.indices[0] || 0)
+    );
+
+    // Replace each URL with a clickable link
+    sortedEntities.forEach(entity => {
+      const start = entity.indices[0];
+      const end = entity.indices[1];
+      
+      if (typeof start === 'number' && typeof end === 'number') {
+        const before = text.slice(0, start);
+        const after = text.slice(end);
+        const link = (
+          `<a 
+            href="${entity.expanded_url}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            ${entity.display_url}
+          </a>`
+        );
+        text = before + link + after;
+      }
+    });
+
+    return (
+      <div 
+        className="text-sm text-muted-foreground/90 leading-relaxed mb-6"
+        dangerouslySetInnerHTML={{ __html: text }}
+      />
+    );
+  };
+
   return (
     <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
       <div className="mb-12 text-center">
@@ -336,9 +317,21 @@ const BlogSection = () => {
                       𝕏
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground/90 leading-relaxed mb-6">
-                    {parseLinks(tweet.text)}
-                  </p>
+                  {renderTweetText(tweet)}
+                  {tweet.referenced_tweets?.map((ref) => (
+                    <div 
+                      key={ref.id}
+                      className="mb-4 rounded-lg border border-border/50 overflow-hidden"
+                    >
+                      <blockquote 
+                        className="twitter-tweet" 
+                        data-conversation="none"
+                        data-theme="dark"
+                      >
+                        <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                      </blockquote>
+                    </div>
+                  ))}
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
