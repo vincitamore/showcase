@@ -7,7 +7,39 @@ export const dynamic = 'force-dynamic'
 
 // Helper function to check if a tweet has entities with URLs
 function hasTweetEntities(tweet: TweetV2): boolean {
-  return !!tweet.entities?.urls && tweet.entities.urls.length > 0
+  // Log the full entities structure for debugging
+  console.log('[Twitter] Checking entities for tweet:', {
+    id: tweet.id,
+    hasEntities: !!tweet.entities,
+    entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+    urlCount: tweet.entities?.urls?.length || 0,
+    fullEntities: tweet.entities
+  });
+
+  // Check for any type of entity, not just URLs
+  if (!tweet.entities) return false;
+
+  // Check for various entity types that exist in TweetEntitiesV2
+  const hasUrls = !!tweet.entities.urls?.length;
+  const hasMentions = !!tweet.entities.mentions?.length;
+  const hasHashtags = !!tweet.entities.hashtags?.length;
+  const hasAnnotations = !!tweet.entities.annotations?.length;
+  const hasCashtags = !!tweet.entities.cashtags?.length;
+
+  const hasAnyEntity = hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
+
+  // Log detailed entity presence
+  console.log('[Twitter] Entity detection result:', {
+    id: tweet.id,
+    hasUrls,
+    hasMentions,
+    hasHashtags,
+    hasAnnotations,
+    hasCashtags,
+    hasAnyEntity
+  });
+
+  return hasAnyEntity;
 }
 
 // Helper function to validate and clean tweet data
@@ -27,6 +59,14 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
       entities: tweet.entities,
       public_metrics: tweet.public_metrics
     } as TweetV2;
+
+    // Log the full tweet structure for debugging
+    console.log('[Twitter] Validating tweet:', {
+      id: tweet.id,
+      hasEntities: !!tweet.entities,
+      entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+      fullTweet: tweet
+    });
 
     // Ensure required fields exist
     if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
@@ -73,6 +113,11 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
+    }
+
+    // Ensure entities are properly copied
+    if (tweet.entities) {
+      cleanTweet.entities = JSON.parse(JSON.stringify(tweet.entities));
     }
 
     return cleanTweet;
