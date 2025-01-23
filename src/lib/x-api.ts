@@ -1,4 +1,9 @@
 import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
+import { 
+  canMakeRequest,
+  getRateLimitTimestamp,
+  updateRateLimitTimestamp
+} from '@/lib/blob-storage';
 
 interface RateLimitCache {
   search: {
@@ -150,137 +155,66 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<St
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
-export async function getReadOnlyClient() {
+async function getReadOnlyClient(): Promise<TwitterApiv2> {
   console.log('[Twitter API] Initializing read-only client...');
-  
-  // Check for required environment variables
+
+  // Check if we can make a request based on rate limit
+  const canRequest = await canMakeRequest(Date.now());
+  if (!canRequest) {
+    const lastUpdate = await getRateLimitTimestamp();
+    console.log('[Twitter API] Rate limited during initialization, last update:', lastUpdate);
+    throw new Error('Rate limited during client initialization');
+  }
+
   const apiKey = process.env.TWITTER_API_KEY?.trim();
   const apiSecret = process.env.TWITTER_API_SECRET?.trim();
   const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim();
   const accessSecret = process.env.TWITTER_ACCESS_SECRET?.trim();
-  
+
   if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
-    console.error('[Twitter API] Missing or empty API credentials:', {
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length,
-      hasApiSecret: !!apiSecret,
-      apiSecretLength: apiSecret?.length,
-      hasAccessToken: !!accessToken,
-      accessTokenLength: accessToken?.length,
-      hasAccessSecret: !!accessSecret,
-      accessSecretLength: accessSecret?.length,
-      env: {
-        NODE_ENV: process.env.NODE_ENV,
-        VERCEL_ENV: process.env.VERCEL_ENV
-      }
-    });
-    throw new Error('Missing or empty Twitter API credentials in environment variables');
+    console.error('[Twitter API] Missing required credentials');
+    throw new Error('Twitter API credentials not configured');
   }
-  
+
+  console.log('[Twitter API] Creating client with credentials:', {
+    apiKeyLength: apiKey.length,
+    apiSecretLength: apiSecret.length,
+    accessTokenLength: accessToken.length,
+    accessSecretLength: accessSecret.length
+  });
+
   try {
-    console.log('[Twitter API] Creating client with credentials:', {
-      apiKeyLength: apiKey.length,
-      apiSecretLength: apiSecret.length,
-      accessTokenLength: accessToken.length,
-      accessSecretLength: accessSecret.length
-    });
-
-    // Create client with OAuth 1.0a User Context auth
     const client = new TwitterApi({
-      appKey: apiKey,         // API Key
-      appSecret: apiSecret,   // API Key Secret
-      accessToken: accessToken,     // Access Token
-      accessSecret: accessSecret,   // Access Token Secret
+      appKey: apiKey,
+      appSecret: apiSecret,
+      accessToken: accessToken,
+      accessSecret: accessSecret,
     });
 
-    // Test the credentials with a public endpoint that works with OAuth 1.0a
-    try {
-      // Use a public endpoint that doesn't require user context
-      const testUser = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
-      if (!testUser) {
-        throw new Error('NEXT_PUBLIC_TWITTER_USERNAME is required for credential verification');
-      }
-      
-      const result = await client.v2.userByUsername(testUser);
-      if (!result?.data) {
-        throw new Error('Failed to verify credentials - no data returned');
-      }
-      console.log('[Twitter API] Credentials verified successfully');
-    } catch (error) {
-      console.error('[Twitter API] Credential verification failed:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        details: error instanceof Error && 'data' in error ? error.data : undefined
-      });
-      
-      // Check for specific error conditions
-      if (error instanceof Error) {
-        if (error.message.includes('401')) {
-          throw new Error('Invalid Twitter API credentials - please check your API keys and tokens');
-        } else if (error.message.includes('403')) {
-          throw new Error('Twitter API access forbidden - please check your app permissions');
-        }
-      }
-      throw new Error('Twitter API credential verification failed');
+    // Verify credentials with a test request
+    const testUser = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
+    if (!testUser) {
+      throw new Error('Twitter username not configured for verification');
     }
 
-    const v2Client = client.v2;
-    console.log('[Twitter API] Client initialized with OAuth 1.0a User Context authentication');
-    
-    // Wrap the client to handle rate limits
-    return new Proxy(v2Client, {
-      get(target: TwitterApiv2, prop: string | symbol) {
-        const value = target[prop as keyof TwitterApiv2];
-        if (typeof value === 'function') {
-          return async (...args: unknown[]) => {
-            try {
-              // Determine which endpoint we're calling
-              const endpoint = prop === 'search' ? 'search' : 'timeline';
-              
-              // Check if we're rate limited
-              if (isRateLimited(endpoint)) {
-                const waitTime = rateLimitCache[endpoint].reset - Date.now();
-                console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
-                throw new Error(`Rate limit exceeded for ${endpoint}`);
-              }
-
-              console.log(`[Twitter API] Making request to ${String(prop)}...`);
-              const result = await (value as Function).apply(target, args);
-              
-              // Update rate limit info from response headers if available
-              if (result?.rateLimit) {
-                updateRateLimitInfo(endpoint, result.rateLimit);
-              }
-              
-              return result;
-            } catch (error) {
-              // Log detailed error information
-              console.error('[Twitter API] Request failed:', {
-                endpoint: String(prop),
-                error: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : undefined,
-                details: error instanceof Error && 'data' in error ? error.data : undefined,
-                env: {
-                  NODE_ENV: process.env.NODE_ENV,
-                  VERCEL_ENV: process.env.VERCEL_ENV
-                }
-              });
-              throw error;
-            }
-          };
-        }
-        return value;
-      }
-    });
-  } catch (error) {
-    console.error('[Twitter API] Failed to initialize client:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      details: error instanceof Error && 'data' in error ? error.data : undefined,
-      env: {
-        NODE_ENV: process.env.NODE_ENV,
-        VERCEL_ENV: process.env.VERCEL_ENV
-      }
+    try {
+      await client.v2.userByUsername(testUser);
+      console.log('[Twitter API] Credentials verified successfully');
+      await updateRateLimitTimestamp();
+      return client.v2;
+    } catch (verifyError: any) {
+      console.error('[Twitter API] Credential verification failed:', {
+        error: verifyError.message,
+        stack: verifyError.stack,
+        details: verifyError.data
+      });
+      throw verifyError;
+    }
+  } catch (error: any) {
+    console.error('[Twitter API] Client initialization failed:', {
+      error: error.message,
+      stack: error.stack,
+      details: error.data
     });
     throw error;
   }
