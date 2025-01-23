@@ -185,7 +185,7 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<St
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
-async function getReadOnlyClient(): Promise<TwitterApiv2> {
+export async function getReadOnlyClient(): Promise<TwitterApiv2> {
   console.log('[Twitter API] Initializing read-only client...');
 
   // Check if we can make a request based on rate limit
