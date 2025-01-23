@@ -88,15 +88,34 @@ export async function getReadOnlyClient() {
       accessSecret: accessSecret,   // Access Token Secret
     });
 
-    // Test the credentials with a simple API call
+    // Test the credentials with a public endpoint that works with OAuth 1.0a
     try {
-      await client.v2.me();
+      // Use a public endpoint that doesn't require user context
+      const testUser = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
+      if (!testUser) {
+        throw new Error('NEXT_PUBLIC_TWITTER_USERNAME is required for credential verification');
+      }
+      
+      const result = await client.v2.userByUsername(testUser);
+      if (!result?.data) {
+        throw new Error('Failed to verify credentials - no data returned');
+      }
       console.log('[Twitter API] Credentials verified successfully');
     } catch (error) {
       console.error('[Twitter API] Credential verification failed:', {
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        details: error instanceof Error && 'data' in error ? error.data : undefined
       });
+      
+      // Check for specific error conditions
+      if (error instanceof Error) {
+        if (error.message.includes('401')) {
+          throw new Error('Invalid Twitter API credentials - please check your API keys and tokens');
+        } else if (error.message.includes('403')) {
+          throw new Error('Twitter API access forbidden - please check your app permissions');
+        }
+      }
       throw new Error('Twitter API credential verification failed');
     }
 
@@ -135,6 +154,7 @@ export async function getReadOnlyClient() {
                 endpoint: String(prop),
                 error: error instanceof Error ? error.message : 'Unknown error',
                 stack: error instanceof Error ? error.stack : undefined,
+                details: error instanceof Error && 'data' in error ? error.data : undefined,
                 env: {
                   NODE_ENV: process.env.NODE_ENV,
                   VERCEL_ENV: process.env.VERCEL_ENV
@@ -151,6 +171,7 @@ export async function getReadOnlyClient() {
     console.error('[Twitter API] Failed to initialize client:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
+      details: error instanceof Error && 'data' in error ? error.data : undefined,
       env: {
         NODE_ENV: process.env.NODE_ENV,
         VERCEL_ENV: process.env.VERCEL_ENV
