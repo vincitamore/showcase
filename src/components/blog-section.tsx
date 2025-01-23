@@ -11,7 +11,6 @@ import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
-import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 
 interface UrlEntity {
   url: string
@@ -61,7 +60,6 @@ const BlogSection = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { toast } = useToast()
-  useTwitterEmbed()
 
   useEffect(() => {
     fetchCachedTweets()
@@ -189,26 +187,39 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
+  const renderQuotedTweet = (tweetId: string) => {
+    return (
+      <div 
+        className="mt-2 rounded-lg border border-border/50 overflow-hidden bg-accent/5 p-4 hover:bg-accent/10 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          window.open(`https://twitter.com/x/status/${tweetId}`, '_blank', 'noopener,noreferrer');
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Image
+            src={profileConfig.profileImage}
+            alt={profileConfig.username}
+            width={24}
+            height={24}
+            className="rounded-full"
+            unoptimized
+          />
+          <span className="text-sm font-medium">{profileConfig.displayName}</span>
+          <span className="text-xs text-muted-foreground">@{profileConfig.username}</span>
+        </div>
+        <div className="text-sm text-muted-foreground/90">
+          Click to view quoted tweet
+        </div>
+      </div>
+    );
+  };
+
   const renderTweetText = (tweet: Tweet) => {
     if (!tweet.text) return null;
     
-    console.log('Tweet data:', {
-      text: tweet.text,
-      entities: tweet.entities,
-      urls: tweet.entities?.urls
-    });
-    
-    // If no entities or urls, just return the text
-    if (!tweet.entities?.urls?.length) {
-      return (
-        <div className="text-sm text-muted-foreground/90 leading-relaxed mb-2">
-          {tweet.text}
-        </div>
-      );
-    }
-    
     let text = tweet.text;
-    const entities = tweet.entities.urls;
+    const entities = tweet.entities?.urls || [];
     const urlPreviews: JSX.Element[] = [];
     
     // Create an array of text segments and links
@@ -220,57 +231,48 @@ const BlogSection = () => {
       (a.indices[0] || 0) - (b.indices[0] || 0)
     );
 
-    console.log('Sorted entities:', sortedEntities);
-
     // Build segments array with text and link elements
     sortedEntities.forEach((entity, index) => {
-      console.log('Processing entity:', {
-        entity,
-        start: entity.indices[0],
-        end: entity.indices[1],
-        currentLastIndex: lastIndex
-      });
-
       const start = entity.indices[0];
       const end = entity.indices[1];
       
       if (typeof start === 'number' && typeof end === 'number') {
         // Add text before the link
         if (start > lastIndex) {
-          const beforeText = text.slice(lastIndex, start);
-          console.log('Adding text before link:', beforeText);
-          segments.push(beforeText);
+          segments.push(text.slice(lastIndex, start));
         }
         
-        // Add the link
-        console.log('Adding link:', entity.display_url);
-        segments.push(
-          <button
-            key={`link-${index}`}
-            type="button"
-            className="text-primary hover:text-primary/80 hover:underline px-1 font-normal"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
-            }}
-          >
-            {entity.display_url}
-          </button>
-        );
-        
-        lastIndex = end;
+        // Check if this is a Twitter status URL
+        const twitterMatch = entity.expanded_url.match(/twitter\.com\/\w+\/status\/(\d+)/);
+        if (twitterMatch) {
+          // Don't show the link in text if it's a quoted tweet
+          lastIndex = end;
+          urlPreviews.push(renderQuotedTweet(twitterMatch[1]));
+        } else {
+          // Add regular link
+          segments.push(
+            <button
+              key={`link-${index}`}
+              type="button"
+              className="text-primary hover:text-primary/80 hover:underline px-1 font-normal"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              {entity.display_url}
+            </button>
+          );
+          lastIndex = end;
+        }
       }
     });
     
     // Add any remaining text
     if (lastIndex < text.length) {
-      const remainingText = text.slice(lastIndex);
-      console.log('Adding remaining text:', remainingText);
-      segments.push(remainingText);
+      segments.push(text.slice(lastIndex));
     }
-
-    console.log('Final segments:', segments);
 
     return (
       <>
