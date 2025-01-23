@@ -44,18 +44,22 @@ function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<str
   });
 }
 
-// Initialize the read-only client for public tweet fetching using API Key/Secret
+// Initialize the read-only client for public tweet fetching using OAuth 1.0a
 export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
   
   // Check for required environment variables
   const apiKey = process.env.TWITTER_API_KEY;
   const apiSecret = process.env.TWITTER_API_SECRET;
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
+  const accessSecret = process.env.TWITTER_ACCESS_SECRET;
   
-  if (!apiKey || !apiSecret) {
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
     console.error('[Twitter API] Missing API credentials:', {
       hasApiKey: !!apiKey,
       hasApiSecret: !!apiSecret,
+      hasAccessToken: !!accessToken,
+      hasAccessSecret: !!accessSecret,
       env: {
         NODE_ENV: process.env.NODE_ENV,
         VERCEL_ENV: process.env.VERCEL_ENV
@@ -65,13 +69,15 @@ export async function getReadOnlyClient() {
   }
   
   try {
-    // Create client with API Key/Secret auth
+    // Create client with OAuth 1.0a User Context auth
     const client = new TwitterApi({
       appKey: apiKey,         // API Key
       appSecret: apiSecret,   // API Key Secret
+      accessToken: accessToken,     // Access Token
+      accessSecret: accessSecret,   // Access Token Secret
     });
 
-    console.log('[Twitter API] Client initialized with API Key/Secret authentication');
+    console.log('[Twitter API] Client initialized with OAuth 1.0a User Context authentication');
     
     // Wrap the client to handle rate limits
     return new Proxy(client, {
