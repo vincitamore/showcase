@@ -18,6 +18,14 @@ interface UrlEntity {
   expanded_url: string
   display_url: string
   indices: number[]
+  title?: string
+  description?: string
+  unwound_url?: string
+  images?: Array<{
+    url: string
+    width: number
+    height: number
+  }>
 }
 
 interface TweetMetrics {
@@ -181,11 +189,51 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
+  const renderUrlPreview = (urlEntity: UrlEntity) => {
+    if (!urlEntity.images?.[0] && !urlEntity.title) return null;
+    
+    return (
+      <div 
+        className="mt-2 mb-4 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          window.open(urlEntity.expanded_url, '_blank', 'noopener,noreferrer');
+        }}
+      >
+        {urlEntity.images?.[0] && (
+          <div className="relative w-full h-[200px]">
+            <Image
+              src={urlEntity.images[0].url}
+              alt={urlEntity.title || 'Link preview'}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        )}
+        <div className="p-4">
+          {urlEntity.title && (
+            <h4 className="font-medium text-sm mb-1">{urlEntity.title}</h4>
+          )}
+          {urlEntity.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {urlEntity.description}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground/70 mt-2">
+            {new URL(urlEntity.unwound_url || urlEntity.expanded_url).hostname}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const renderTweetText = (tweet: Tweet) => {
     if (!tweet.text) return null;
     
     let text = tweet.text;
     const entities = tweet.entities?.urls || [];
+    const urlPreviews: JSX.Element[] = [];
     
     // Sort entities by their position in reverse order to replace from end to start
     const sortedEntities = [...entities].sort((a, b) => 
@@ -200,7 +248,10 @@ const BlogSection = () => {
       if (typeof start === 'number' && typeof end === 'number') {
         const before = text.slice(0, start);
         const after = text.slice(end);
-        const link = (
+        
+        // Don't show the link in text if it's going to be shown as a preview card
+        const shouldShowPreview = entity.images?.[0] || entity.title;
+        const link = shouldShowPreview ? '' : (
           `<a 
             href="${entity.expanded_url}"
             target="_blank"
@@ -211,15 +262,25 @@ const BlogSection = () => {
             ${entity.display_url}
           </a>`
         );
+        
         text = before + link + after;
+        
+        // Add preview if available
+        const preview = renderUrlPreview(entity);
+        if (preview) {
+          urlPreviews.push(preview);
+        }
       }
     });
 
     return (
-      <div 
-        className="text-sm text-muted-foreground/90 leading-relaxed mb-6"
-        dangerouslySetInnerHTML={{ __html: text }}
-      />
+      <>
+        <div 
+          className="text-sm text-muted-foreground/90 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: text.trim() }}
+        />
+        {urlPreviews}
+      </>
     );
   };
 
