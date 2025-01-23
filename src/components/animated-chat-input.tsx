@@ -42,13 +42,11 @@ export function AnimatedChatInput() {
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const inputElement = e.currentTarget.querySelector('input[type="text"]') as HTMLInputElement;
-    let actualInput = localInput.trim() ? localInput : inputElement.placeholder;
+    let actualInput = input.trim() ? input : inputElement.placeholder;
 
-    // Here we manually call handleSubmit with the actualInput
-    handleSubmit({ message: actualInput });
+    // Here we manually call handleSubmit with the event
+    handleSubmit(e);
     setIsDialogOpen(true);
-    // Reset local input after submission
-    setLocalInput('');
   }
 
   const markdownComponents: Components = {
