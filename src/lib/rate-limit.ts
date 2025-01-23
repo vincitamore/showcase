@@ -2,9 +2,14 @@ import { prisma } from '@/lib/db'
 import { env } from '@/env'
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour in milliseconds
-const MAX_REQUESTS = env.NODE_ENV === 'production' ? 20 : 100
+const MAX_REQUESTS = env.NODE_ENV === 'production' ? 20 : 1000 // Much higher limit in development
 
 export async function checkRateLimit(ipAddress: string): Promise<boolean> {
+  // In development, skip rate limiting
+  if (env.NODE_ENV !== 'production') {
+    return true;
+  }
+
   const now = new Date()
   const resetAt = new Date(now.getTime() + RATE_LIMIT_WINDOW)
 
@@ -46,6 +51,14 @@ export async function checkRateLimit(ipAddress: string): Promise<boolean> {
 }
 
 export async function getRateLimitInfo(ipAddress: string) {
+  // In development, return unlimited
+  if (env.NODE_ENV !== 'production') {
+    return {
+      remaining: MAX_REQUESTS,
+      reset: new Date(Date.now() + RATE_LIMIT_WINDOW),
+    };
+  }
+
   try {
     const rateLimit = await prisma.rateLimit.findUnique({
       where: { ipAddress },

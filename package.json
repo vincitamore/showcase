@@ -27,6 +27,7 @@
     "@types/nodemailer": "^6.4.14",
     "@types/react": "^18.2.47",
     "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^10.0.0",
     "@vercel/analytics": "^1.1.1",
     "@vercel/blob": "^0.27.1",
     "ai": "^4.1.0",
@@ -38,6 +39,7 @@
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.302.0",
     "next": "^14.2.23",
+    "next-auth": "^4.24.11",
     "next-themes": "^0.2.1",
     "nodemailer": "^6.9.7",
     "postcss": "^8",
@@ -52,6 +54,7 @@
     "tailwindcss-animate": "^1.0.7",
     "twitter-api-v2": "^1.15.2",
     "typescript": "^5.3.3",
+    "uuid": "^11.0.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
