@@ -23,6 +23,7 @@ interface StoredTweet {
   edit_history_tweet_ids: string[];
   created_at?: string;
   public_metrics?: TweetPublicMetricsV2;
+  entities?: any;
 }
 
 // Cache for rate limit info per endpoint
@@ -42,17 +43,14 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
   let created_at: string | undefined;
   if (tweet.created_at) {
     try {
-      // Parse and validate the date
       const date = new Date(tweet.created_at);
       if (isNaN(date.getTime())) {
         console.warn('[Twitter API] Invalid date found in tweet:', tweet.id);
-        created_at = undefined;
       } else {
         created_at = date.toISOString();
       }
     } catch (error) {
       console.warn('[Twitter API] Error parsing date for tweet:', tweet.id, error);
-      created_at = undefined;
     }
   }
 
@@ -61,7 +59,8 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
     text: tweet.text,
     edit_history_tweet_ids: tweet.edit_history_tweet_ids,
     created_at,
-    public_metrics: tweet.public_metrics
+    public_metrics: tweet.public_metrics,
+    entities: tweet.entities
   };
 }
 
@@ -88,70 +87,101 @@ function updateRateLimitInfo(endpoint: keyof RateLimitCache, headers: Record<str
 
 async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
   console.log('[Init] Searching for .build tweets...');
-  const paginator = await client.search('".build" lang:en -is:retweet', {
-    'tweet.fields': ['created_at', 'public_metrics', 'entities'],
-    'max_results': 10
-  });
+  try {
+    // Use proper query syntax for Twitter API v2
+    const query = '(.build) lang:en -is:retweet -is:reply';
+    console.log('[Init] Using search query:', query);
+    
+    const paginator = await client.search(query, {
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'max_results': 10
+    });
 
-  const page = await paginator.fetchNext();
-  if (!page?.data) {
-    console.log('[Init] No .build tweets found');
-    return [];
-  }
-
-  const tweets = Array.isArray(page.data) ? page.data : [page.data];
-  console.log('[Init] Found .build tweets:', tweets.length);
-  
-  // Filter out tweets with invalid dates before converting
-  const validTweets = tweets.filter(tweet => {
-    if (!tweet.created_at) return true; // Keep tweets without dates
-    try {
-      const date = new Date(tweet.created_at);
-      return !isNaN(date.getTime());
-    } catch {
-      console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
-      return false;
+    const page = await paginator.fetchNext();
+    if (!page?.data) {
+      console.log('[Init] No .build tweets found');
+      return [];
     }
-  });
 
-  return validTweets.map(tweet => convertToStoredTweet(tweet));
+    const tweets = Array.isArray(page.data) ? page.data : [page.data];
+    console.log('[Init] Found .build tweets:', tweets.length);
+    
+    // Filter out tweets with invalid dates before converting
+    const validTweets = tweets.filter(tweet => {
+      if (!tweet.created_at) return true; // Keep tweets without dates
+      try {
+        const date = new Date(tweet.created_at);
+        const isValid = !isNaN(date.getTime());
+        if (!isValid) {
+          console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
+        }
+        return isValid;
+      } catch (error) {
+        console.warn('[Twitter API] Error validating tweet date:', tweet.id, error);
+        return false;
+      }
+    });
+
+    return validTweets.map(tweet => convertToStoredTweet(tweet));
+  } catch (error: any) {
+    console.error('[Twitter API] Search request failed:', {
+      error: error.message,
+      details: error.data,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
 
 async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
   console.log('[Init] Fetching user tweets...');
-  const user = await client.userByUsername(username);
-  if (!user?.data) {
-    throw new Error('User not found');
-  }
-
-  const paginator = await client.userTimeline(user.data.id, {
-    'exclude': ['replies', 'retweets'],
-    'tweet.fields': ['created_at', 'public_metrics', 'entities'],
-    'max_results': 10
-  });
-
-  const page = await paginator.fetchNext();
-  if (!page?.data) {
-    console.log('[Init] No user tweets found');
-    return [];
-  }
-
-  const tweets = Array.isArray(page.data) ? page.data : [page.data];
-  console.log('[Init] Found user tweets:', tweets.length);
-  
-  // Filter out tweets with invalid dates before converting
-  const validTweets = tweets.filter(tweet => {
-    if (!tweet.created_at) return true; // Keep tweets without dates
-    try {
-      const date = new Date(tweet.created_at);
-      return !isNaN(date.getTime());
-    } catch {
-      console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
-      return false;
+  try {
+    const user = await client.userByUsername(username);
+    if (!user?.data) {
+      throw new Error('User not found');
     }
-  });
 
-  return validTweets.map(tweet => convertToStoredTweet(tweet));
+    const paginator = await client.userTimeline(user.data.id, {
+      'exclude': ['retweets'],  // Only exclude retweets, allow replies
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'max_results': 10
+    });
+
+    const page = await paginator.fetchNext();
+    if (!page?.data) {
+      console.log('[Init] No user tweets found');
+      return [];
+    }
+
+    const tweets = Array.isArray(page.data) ? page.data : [page.data];
+    console.log('[Init] Found user tweets:', tweets.length);
+    
+    // Filter out tweets with invalid dates before converting
+    const validTweets = tweets.filter(tweet => {
+      if (!tweet.created_at) return true; // Keep tweets without dates
+      try {
+        const date = new Date(tweet.created_at);
+        const isValid = !isNaN(date.getTime());
+        if (!isValid) {
+          console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
+        }
+        return isValid;
+      } catch (error) {
+        console.warn('[Twitter API] Error validating tweet date:', tweet.id, error);
+        return false;
+      }
+    });
+
+    return validTweets.map(tweet => convertToStoredTweet(tweet));
+  } catch (error: any) {
+    console.error('[Twitter API] User timeline request failed:', {
+      username,
+      error: error.message,
+      details: error.data,
+      stack: error.stack
+    });
+    throw error;
+  }
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
@@ -264,7 +294,7 @@ export const fetchTechTweets = async (username: string) => {
   }
 
   const tweets = await client.userTimeline(user.data.id, {
-    exclude: ['replies', 'retweets'],
+    exclude: ['retweets'],  // Only exclude retweets, allow replies
     expansions: ['author_id', 'attachments.media_keys'],
     'tweet.fields': ['created_at', 'text', 'public_metrics'],
     'user.fields': ['profile_image_url', 'username'],
