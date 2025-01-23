@@ -5,7 +5,7 @@ import { Card3D } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { MessageSquare, Share2, Heart, MessageCircle, Repeat2 } from "lucide-react"
+import { MessageSquare, Share2, Heart, MessageCircle, Repeat2, ExternalLink } from "lucide-react"
 import { ChatInput } from "@/components/chat-input"
 import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
@@ -68,8 +68,10 @@ const BlogSection = () => {
 
   const checkAuth = async () => {
     try {
+      console.log('Checking authentication status...');
       const response = await fetch('/api/twitter/auth/status')
       const { isAuthenticated: authStatus } = await response.json()
+      console.log('Auth status:', { authStatus });
       setIsAuthenticated(authStatus)
     } catch (error) {
       console.error('Auth check failed:', error)
@@ -79,10 +81,13 @@ const BlogSection = () => {
 
   const handleLogin = async () => {
     try {
+      console.log('Initiating Twitter login...');
       const response = await fetch('/api/twitter/auth')
       const { url } = await response.json()
+      console.log('Received auth URL:', url);
       if (url) window.location.href = url
     } catch (error) {
+      console.error('Login failed:', error)
       toast({
         title: "Error",
         description: "Failed to initiate login. Please try again.",
@@ -145,6 +150,7 @@ const BlogSection = () => {
   const handlePost = async () => {
     if (!message.trim()) return
     setIsLoading(true)
+    console.log('Attempting to post tweet:', { message });
 
     try {
       const response = await fetch('/api/twitter', {
@@ -153,7 +159,10 @@ const BlogSection = () => {
         body: JSON.stringify({ text: message }),
       })
 
+      console.log('Post response status:', response.status);
+
       if (response.status === 401) {
+        console.log('User not authenticated, showing login prompt');
         setIsAuthenticated(false)
         toast({
           title: "Authentication Required",
@@ -165,14 +174,16 @@ const BlogSection = () => {
 
       if (!response.ok) throw new Error('Failed to post message')
 
+      console.log('Tweet posted successfully');
       toast({
         title: "Success!",
         description: "Your message has been posted.",
       })
 
       setMessage('')
-      fetchCachedTweets() // Refresh the tweets list
+      fetchCachedTweets()
     } catch (error) {
+      console.error('Error posting tweet:', error)
       toast({
         title: "Error",
         description: "Failed to post your message. Please try again.",
@@ -187,104 +198,149 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
-  const renderQuotedTweet = (tweetId: string) => {
-    return (
-      <div 
-        className="mt-2 rounded-lg border border-border/50 overflow-hidden bg-accent/5 p-4 hover:bg-accent/10 transition-colors"
-        onClick={(e) => {
-          e.stopPropagation();
-          window.open(`https://twitter.com/x/status/${tweetId}`, '_blank', 'noopener,noreferrer');
-        }}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <Image
-            src={profileConfig.profileImage}
-            alt={profileConfig.username}
-            width={24}
-            height={24}
-            className="rounded-full"
-            unoptimized
-          />
-          <span className="text-sm font-medium">{profileConfig.displayName}</span>
-          <span className="text-xs text-muted-foreground">@{profileConfig.username}</span>
-        </div>
-        <div className="text-sm text-muted-foreground/90">
-          Click to view quoted tweet
-        </div>
-      </div>
-    );
-  };
-
   const renderTweetText = (tweet: Tweet) => {
-    if (!tweet.text) return null;
-    
-    let text = tweet.text;
-    const entities = tweet.entities?.urls || [];
-    const urlPreviews: JSX.Element[] = [];
-    
-    // Create an array of text segments and links
-    const segments: Array<JSX.Element | string> = [];
-    let lastIndex = 0;
-    
-    // Sort entities by their position
-    const sortedEntities = [...entities].sort((a, b) => 
-      (a.indices[0] || 0) - (b.indices[0] || 0)
-    );
-
-    // Build segments array with text and link elements
-    sortedEntities.forEach((entity, index) => {
-      const start = entity.indices[0];
-      const end = entity.indices[1];
-      
-      if (typeof start === 'number' && typeof end === 'number') {
-        // Add text before the link
-        if (start > lastIndex) {
-          segments.push(text.slice(lastIndex, start));
-        }
-        
-        // Check if this is a Twitter status URL
-        const twitterMatch = entity.expanded_url.match(/twitter\.com\/\w+\/status\/(\d+)/);
-        if (twitterMatch) {
-          // Don't show the link in text if it's a quoted tweet
-          lastIndex = end;
-          urlPreviews.push(renderQuotedTweet(twitterMatch[1]));
-        } else {
-          // Add regular link
-          segments.push(
-            <button
-              key={`link-${index}`}
-              type="button"
-              className="text-primary hover:text-primary/80 hover:underline px-1 font-normal"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              {entity.display_url}
-            </button>
-          );
-          lastIndex = end;
-        }
-      }
+    console.log('Rendering tweet:', {
+      id: tweet.id,
+      text: tweet.text,
+      hasEntities: !!tweet.entities,
+      urlCount: tweet.entities?.urls?.length || 0,
+      entities: tweet.entities
     });
-    
-    // Add any remaining text
-    if (lastIndex < text.length) {
-      segments.push(text.slice(lastIndex));
+
+    if (!tweet.text) {
+      console.log('Tweet has no text, skipping render');
+      return null;
     }
 
-    return (
-      <>
-        <div className="text-sm text-muted-foreground/90 leading-relaxed mb-2">
-          {segments}
-        </div>
-        {urlPreviews.length > 0 && (
-          <div className="space-y-2">
-            {urlPreviews}
+    const renderLink = (url: string, displayText: string) => (
+      <span
+        className="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline cursor-pointer"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }}
+      >
+        {displayText}
+        <ExternalLink className="h-3 w-3 inline-block" />
+      </span>
+    );
+
+    // Function to process text and replace URLs with clickable links
+    const processText = () => {
+      if (!tweet.entities?.urls?.length) {
+        console.log('No URLs to process in tweet');
+        return <span>{tweet.text}</span>;
+      }
+
+      console.log('Processing URLs in tweet:', {
+        urlCount: tweet.entities.urls.length,
+        urls: tweet.entities.urls.map(u => u.expanded_url)
+      });
+
+      const segments: Array<JSX.Element | string> = [];
+      let lastIndex = 0;
+
+      // Sort URLs by their position in the text
+      const sortedUrls = [...tweet.entities.urls].sort(
+        (a, b) => (a.indices[0] || 0) - (b.indices[0] || 0)
+      );
+
+      sortedUrls.forEach((urlEntity, index) => {
+        const start = urlEntity.indices[0];
+        const end = urlEntity.indices[1];
+
+        if (typeof start === 'number' && typeof end === 'number') {
+          // Add text before the URL
+          if (start > lastIndex) {
+            segments.push(tweet.text.slice(lastIndex, start));
+          }
+
+          // Add the URL as a clickable link
+          segments.push(
+            <span key={`link-${index}`} className="mx-1">
+              {renderLink(urlEntity.expanded_url, urlEntity.display_url)}
+            </span>
+          );
+
+          lastIndex = end;
+        }
+      });
+
+      // Add any remaining text
+      if (lastIndex < tweet.text.length) {
+        segments.push(tweet.text.slice(lastIndex));
+      }
+
+      return segments;
+    };
+
+    // Function to render preview cards for non-Twitter URLs
+    const renderPreviews = () => {
+      if (!tweet.entities?.urls) {
+        console.log('No URLs available for preview cards');
+        return null;
+      }
+
+      const previewUrls = tweet.entities.urls
+        .filter(url => !url.expanded_url.includes('twitter.com') && !url.expanded_url.includes('x.com'));
+
+      console.log('Rendering preview cards:', {
+        totalUrls: tweet.entities.urls.length,
+        previewableUrls: previewUrls.length,
+        urls: previewUrls.map(u => ({
+          url: u.expanded_url,
+          hasImage: !!u.images?.[0],
+          title: u.title
+        }))
+      });
+
+      return previewUrls.map((url, index) => (
+        <div
+          key={`preview-${index}`}
+          className="mt-3 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
+          }}
+        >
+          {url.images?.[0] && (
+            <div className="relative w-full h-[160px] bg-accent/5">
+              <Image
+                src={url.images[0].url}
+                alt={url.title || 'Link preview'}
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          )}
+          <div className="p-4">
+            <h4 className="font-medium text-sm mb-2 line-clamp-1">
+              {url.title || new URL(url.expanded_url).hostname}
+            </h4>
+            {url.description && (
+              <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                {url.description}
+              </p>
+            )}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+              <ExternalLink className="h-3 w-3" />
+              {new URL(url.expanded_url).hostname}
+            </div>
           </div>
-        )}
-      </>
+        </div>
+      ));
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="text-sm text-muted-foreground/90 leading-relaxed">
+          {processText()}
+        </div>
+        {renderPreviews()}
+      </div>
     );
   };
 
