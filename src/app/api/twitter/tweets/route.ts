@@ -10,54 +10,55 @@ function hasTweetEntities(tweet: TweetV2): boolean {
   return !!tweet.entities?.urls && tweet.entities.urls.length > 0
 }
 
-// Helper function to safely convert dates
-function safeISOString(dateStr: string | undefined): string | undefined {
-  if (!dateStr) return undefined;
-  try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      console.warn('[Twitter] Invalid date found:', dateStr);
-      return undefined;
-    }
-    return date.toISOString();
-  } catch (error) {
-    console.warn('[Twitter] Error parsing date:', dateStr, error);
-    return undefined;
-  }
-}
-
 // Helper function to validate and clean tweet data
-function validateTweet(tweet: any): TweetV2 {
-  // Ensure created_at is a valid date if it exists
-  if (tweet.created_at) {
-    tweet.created_at = safeISOString(tweet.created_at);
-  }
-  
-  // Ensure required fields exist
-  if (!tweet.id || !tweet.text || !Array.isArray(tweet.edit_history_tweet_ids)) {
-    console.warn('[Twitter] Invalid tweet structure:', tweet);
-    throw new Error('Invalid tweet structure');
-  }
+function validateTweet(tweet: any): TweetV2 | null {
+  try {
+    // Create a clean copy of the tweet
+    const cleanTweet = {
+      id: tweet.id,
+      text: tweet.text,
+      edit_history_tweet_ids: tweet.edit_history_tweet_ids,
+      entities: tweet.entities,
+      public_metrics: tweet.public_metrics
+    } as TweetV2;
 
-  return tweet as TweetV2;
+    // Ensure required fields exist
+    if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
+      console.warn('[Twitter] Invalid tweet structure:', tweet);
+      return null;
+    }
+
+    // Handle created_at separately
+    if (tweet.created_at) {
+      try {
+        const date = new Date(tweet.created_at);
+        if (!isNaN(date.getTime())) {
+          cleanTweet.created_at = date.toISOString();
+        } else {
+          console.warn('[Twitter] Invalid date found in tweet:', tweet.id);
+        }
+      } catch (error) {
+        console.warn('[Twitter] Error parsing date for tweet:', tweet.id, error);
+      }
+    }
+
+    return cleanTweet;
+  } catch (error) {
+    console.warn('[Twitter] Error validating tweet:', error);
+    return null;
+  }
 }
 
 // Helper function to get random items from array with priority for tweets with entities
-function getRandomItems<T extends TweetV2>(array: T[], count: number): T[] {
+function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   if (!array?.length || count <= 0) {
     return [];
   }
 
   // Validate and clean tweets before processing
-  const validTweets = array.filter(tweet => {
-    try {
-      validateTweet(tweet);
-      return true;
-    } catch (error) {
-      console.warn('[Twitter] Filtering out invalid tweet:', tweet?.id);
-      return false;
-    }
-  });
+  const validTweets = array
+    .map(tweet => validateTweet(tweet))
+    .filter((tweet): tweet is TweetV2 => tweet !== null);
 
   // Separate tweets with and without entities
   const tweetsWithEntities = validTweets.filter(hasTweetEntities)
@@ -102,15 +103,9 @@ export async function GET() {
     
     if (selectedTweets && selectedTweets.tweets && selectedTweets.tweets.length > 0) {
       // Validate and clean selected tweets
-      const validSelectedTweets = selectedTweets.tweets.filter(tweet => {
-        try {
-          validateTweet(tweet);
-          return true;
-        } catch (error) {
-          console.warn('[Twitter] Filtering out invalid selected tweet:', tweet?.id);
-          return false;
-        }
-      });
+      const validSelectedTweets = selectedTweets.tweets
+        .map(tweet => validateTweet(tweet))
+        .filter((tweet): tweet is TweetV2 => tweet !== null);
 
       console.log('Using selected tweets with entities:', {
         count: validSelectedTweets.length,
@@ -118,7 +113,8 @@ export async function GET() {
           id: t.id,
           text: t.text.substring(0, 50) + '...',
           hasEntities: hasTweetEntities(t),
-          urlCount: t.entities?.urls?.length || 0
+          urlCount: t.entities?.urls?.length || 0,
+          hasDate: !!t.created_at
         }))
       })
       return NextResponse.json({ tweets: validSelectedTweets })
@@ -134,7 +130,8 @@ export async function GET() {
         id: t.id,
         text: t.text.substring(0, 50) + '...',
         hasEntities: hasTweetEntities(t),
-        urlCount: t.entities?.urls?.length || 0
+        urlCount: t.entities?.urls?.length || 0,
+        hasDate: !!t.created_at
       }))
     })
     
