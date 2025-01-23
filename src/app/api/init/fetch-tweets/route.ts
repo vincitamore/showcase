@@ -20,18 +20,28 @@ interface StoredTweet {
 }
 
 function convertToStoredTweet(tweet: TweetV2): StoredTweet {
+  // Ensure created_at is a valid ISO string if it exists
+  const created_at = tweet.created_at 
+    ? new Date(tweet.created_at).toISOString()
+    : undefined;
+
   return {
     id: tweet.id,
     text: tweet.text,
     edit_history_tweet_ids: tweet.edit_history_tweet_ids,
-    created_at: tweet.created_at,
+    created_at,
     public_metrics: tweet.public_metrics
   };
 }
 
 // Helper function to get random items from array
 function getRandomItems<T>(array: T[], count: number): T[] {
-  return [...array].sort(() => Math.random() - 0.5).slice(0, count);
+  if (!array?.length || count <= 0) {
+    return [];
+  }
+  // Ensure we don't try to get more items than exist
+  const safeCount = Math.min(count, array.length);
+  return [...array].sort(() => Math.random() - 0.5).slice(0, safeCount);
 }
 
 async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
@@ -42,12 +52,14 @@ async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
   });
 
   const page = await paginator.fetchNext();
-  if (!page || !Array.isArray(page.data)) {
+  if (!page?.data) {
+    console.log('[Init] No .build tweets found');
     return [];
   }
 
-  console.log('[Init] Found .build tweets:', page.data.length);
-  return page.data.map((tweet: TweetV2) => convertToStoredTweet(tweet));
+  const tweets = Array.isArray(page.data) ? page.data : [page.data];
+  console.log('[Init] Found .build tweets:', tweets.length);
+  return tweets.map(tweet => convertToStoredTweet(tweet));
 }
 
 async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
@@ -64,12 +76,14 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<St
   });
 
   const page = await paginator.fetchNext();
-  if (!page || !Array.isArray(page.data)) {
+  if (!page?.data) {
+    console.log('[Init] No user tweets found');
     return [];
   }
 
-  console.log('[Init] Found user tweets:', page.data.length);
-  return page.data.map((tweet: TweetV2) => convertToStoredTweet(tweet));
+  const tweets = Array.isArray(page.data) ? page.data : [page.data];
+  console.log('[Init] Found user tweets:', tweets.length);
+  return tweets.map(tweet => convertToStoredTweet(tweet));
 }
 
 // This route is called during build/deployment to initialize tweets
@@ -106,18 +120,35 @@ export async function GET(request: Request) {
       });
     }
 
-    // Cache the tweets
-    await cacheTweets(tweets);
+    // Validate tweets before caching
+    const validTweets = tweets.filter(tweet => {
+      // Ensure all required fields are present
+      const isValid = tweet.id && tweet.text && Array.isArray(tweet.edit_history_tweet_ids);
+      if (!isValid) {
+        console.log('[Init] Filtering out invalid tweet:', tweet.id);
+      }
+      return isValid;
+    });
+
+    if (validTweets.length === 0) {
+      console.log('[Init] No valid tweets found after filtering');
+      return NextResponse.json({ 
+        message: 'No valid tweets found to cache'
+      });
+    }
+
+    // Cache the valid tweets
+    await cacheTweets(validTweets);
     await updateRateLimitTimestamp();
 
     // Select random tweets for display
-    const selectedTweets = getRandomItems(tweets, 4);
+    const selectedTweets = getRandomItems(validTweets, 4);
     await updateSelectedTweets(selectedTweets);
 
     console.log('[Init] Successfully cached and selected tweets');
     return NextResponse.json({ 
       success: true,
-      tweetsCount: tweets.length,
+      tweetsCount: validTweets.length,
       selectedCount: selectedTweets.length
     });
   } catch (error) {

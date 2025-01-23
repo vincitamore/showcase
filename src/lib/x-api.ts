@@ -49,38 +49,62 @@ export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
   
   // Check for required environment variables
-  const apiKey = process.env.TWITTER_API_KEY;
-  const apiSecret = process.env.TWITTER_API_SECRET;
-  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
-  const accessSecret = process.env.TWITTER_ACCESS_SECRET;
+  const apiKey = process.env.TWITTER_API_KEY?.trim();
+  const apiSecret = process.env.TWITTER_API_SECRET?.trim();
+  const accessToken = process.env.TWITTER_ACCESS_TOKEN?.trim();
+  const accessSecret = process.env.TWITTER_ACCESS_SECRET?.trim();
   
   if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
-    console.error('[Twitter API] Missing API credentials:', {
+    console.error('[Twitter API] Missing or empty API credentials:', {
       hasApiKey: !!apiKey,
+      apiKeyLength: apiKey?.length,
       hasApiSecret: !!apiSecret,
+      apiSecretLength: apiSecret?.length,
       hasAccessToken: !!accessToken,
+      accessTokenLength: accessToken?.length,
       hasAccessSecret: !!accessSecret,
+      accessSecretLength: accessSecret?.length,
       env: {
         NODE_ENV: process.env.NODE_ENV,
         VERCEL_ENV: process.env.VERCEL_ENV
       }
     });
-    throw new Error('Missing Twitter API credentials in environment variables');
+    throw new Error('Missing or empty Twitter API credentials in environment variables');
   }
   
   try {
+    console.log('[Twitter API] Creating client with credentials:', {
+      apiKeyLength: apiKey.length,
+      apiSecretLength: apiSecret.length,
+      accessTokenLength: accessToken.length,
+      accessSecretLength: accessSecret.length
+    });
+
     // Create client with OAuth 1.0a User Context auth
     const client = new TwitterApi({
       appKey: apiKey,         // API Key
       appSecret: apiSecret,   // API Key Secret
       accessToken: accessToken,     // Access Token
       accessSecret: accessSecret,   // Access Token Secret
-    }).v2;
+    });
 
+    // Test the credentials with a simple API call
+    try {
+      await client.v2.me();
+      console.log('[Twitter API] Credentials verified successfully');
+    } catch (error) {
+      console.error('[Twitter API] Credential verification failed:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw new Error('Twitter API credential verification failed');
+    }
+
+    const v2Client = client.v2;
     console.log('[Twitter API] Client initialized with OAuth 1.0a User Context authentication');
     
     // Wrap the client to handle rate limits
-    return new Proxy(client, {
+    return new Proxy(v2Client, {
       get(target: TwitterApiv2, prop: string | symbol) {
         const value = target[prop as keyof TwitterApiv2];
         if (typeof value === 'function') {
