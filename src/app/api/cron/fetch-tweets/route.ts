@@ -85,7 +85,10 @@ async function checkRateLimit() {
 async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[]) {
   try {
     logStatus('Searching for .build tweets');
-    const searchResults = await client.search('.build', {
+    const query = '(.build) lang:en -is:retweet -is:reply';
+    logStatus('Using search query:', query);
+    
+    const searchResults = await client.search(query, {
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,
     });
@@ -95,29 +98,22 @@ async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[
       return null;
     }
 
-    const cachedIds = new Set(cachedTweets.map(tweet => tweet.id));
-    const newTweets = (Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data])
-      .filter(tweet => !cachedIds.has(tweet.id));
+    // Always return the tweets, even if they're already cached
+    const tweets = Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data];
     
     logStatus('Search results', {
-      totalFound: Array.isArray(searchResults.data) ? searchResults.data.length : 1,
-      newTweetsFound: newTweets.length,
-      withEntities: newTweets.filter(hasTweetEntities).length
+      totalFound: tweets.length,
+      withEntities: tweets.filter(hasTweetEntities).length
     });
     
-    return newTweets.length > 0 ? newTweets : null;
+    return tweets;
   } catch (error) {
-    // If rate limited, log and return null
-    if (error instanceof Error && error.message.includes('Rate limit exceeded for search')) {
-      logStatus('Search rate limit exceeded, skipping search');
-      return null;
-    }
     logStatus('Error searching tweets', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
 }
 
-async function getRandomUserTweet(client: TwitterApiv2, username: string, cachedTweets: TweetV2[]) {
+async function getRandomUserTweet(client: TwitterApiv2, username: string) {
   try {
     logStatus('Fetching user tweets', { username });
     const user = await client.userByUsername(username);
@@ -127,7 +123,7 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string, cached
     }
 
     const timeline = await client.userTimeline(user.data.id, {
-      exclude: ['replies', 'retweets'],
+      exclude: ['retweets'],  // Allow replies to increase chances of finding tweets
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
       max_results: 10,
     });
@@ -137,34 +133,17 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string, cached
       return null;
     }
 
-    const cachedIds = new Set(cachedTweets.map(tweet => tweet.id));
-    const availableTweets = (Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data])
-      .filter(tweet => !cachedIds.has(tweet.id));
+    const tweets = Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data];
     
     logStatus('Timeline results', {
-      totalFound: Array.isArray(timeline.data.data) ? timeline.data.data.length : 1,
-      newTweetsAvailable: availableTweets.length,
-      withEntities: availableTweets.filter(hasTweetEntities).length
+      totalFound: tweets.length,
+      withEntities: tweets.filter(hasTweetEntities).length
     });
     
-    if (availableTweets.length === 0) return null;
-    
-    // Prioritize tweets with entities
-    const tweetsWithEntities = availableTweets.filter(hasTweetEntities);
-    if (tweetsWithEntities.length > 0) {
-      const randomIndex = Math.floor(Math.random() * tweetsWithEntities.length);
-      return [tweetsWithEntities[randomIndex]];
-    }
-    
-    // Fallback to any tweet if none have entities
-    const randomIndex = Math.floor(Math.random() * availableTweets.length);
-    return [availableTweets[randomIndex]];
+    // Always return at least one tweet
+    const randomIndex = Math.floor(Math.random() * tweets.length);
+    return [tweets[randomIndex]];
   } catch (error) {
-    // If rate limited, log and return null
-    if (error instanceof Error && error.message.includes('Rate limit exceeded for timeline')) {
-      logStatus('Timeline rate limit exceeded, skipping user tweets');
-      return null;
-    }
     logStatus('Error fetching random user tweet', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
@@ -226,61 +205,76 @@ export async function GET(request: Request) {
       throw new Error('Twitter username not configured');
     }
 
-    // Try to fetch new tweets
+    // Always try both search and user tweets
     const newBuildTweets = await searchNewBuildTweets(client, currentTweets);
-    const tweetsToCache = newBuildTweets || await getRandomUserTweet(client, username, currentTweets);
+    const userTweets = await getRandomUserTweet(client, username);
 
-    // Update cache if we got new tweets
-    let updatedTweets = currentTweets;
-    if (tweetsToCache) {
-      updatedTweets = [...tweetsToCache, ...currentTweets].slice(0, 100);
-      await cacheTweets(updatedTweets);
-      await updateRateLimitTimestamp();
-      logStatus('Cache updated with new tweets', {
-        newTweetsAdded: tweetsToCache.length,
-        totalTweets: updatedTweets.length,
-        withEntities: updatedTweets.filter(hasTweetEntities).length
-      });
+    // Combine new tweets, ensuring we have at least one
+    const newTweets = [
+      ...(newBuildTweets || []),
+      ...(userTweets || [])
+    ];
+
+    if (newTweets.length === 0) {
+      throw new Error('Failed to fetch any new tweets');
     }
 
-    // Always select and update random tweets for display, whether we got new ones or not
+    // Update cache with new tweets, replacing any duplicates
+    const tweetMap = new Map<string, TweetV2>();
+    
+    // Add new tweets first (so they take precedence over old ones)
+    newTweets.forEach(tweet => tweetMap.set(tweet.id, tweet));
+    
+    // Add existing tweets that aren't being replaced
+    currentTweets.forEach(tweet => {
+      if (!tweetMap.has(tweet.id)) {
+        tweetMap.set(tweet.id, tweet);
+      }
+    });
+
+    // Convert back to array, limiting to 100 most recent
+    const updatedTweets = Array.from(tweetMap.values()).slice(0, 100);
+    
+    // Update cache and rate limit timestamp
+    await cacheTweets(updatedTweets);
+    await updateRateLimitTimestamp();
+    
+    logStatus('Cache updated', {
+      newTweetsAdded: newTweets.length,
+      totalTweets: updatedTweets.length,
+      withEntities: updatedTweets.filter(hasTweetEntities).length
+    });
+
+    // Select and update random tweets for display
     const selectedTweets = getRandomItems(updatedTweets, 4);
     await updateSelectedTweets(selectedTweets);
+    
     logStatus('Updated selected tweets', {
       available: updatedTweets.length,
       selected: selectedTweets.length,
       withEntities: selectedTweets.filter(hasTweetEntities).length
     });
 
-    const duration = Date.now() - startTime;
-    logStatus('Cron job completed successfully', {
-      newTweetsAdded: tweetsToCache?.length ?? 0,
-      totalTweetsInCache: updatedTweets.length,
-      selectedTweetsCount: selectedTweets.length,
-      withEntities: selectedTweets.filter(hasTweetEntities).length,
-      executionTimeMs: duration
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      newTweetsCount: tweetsToCache?.length ?? 0,
-      totalTweetsCount: updatedTweets.length,
-      selectedTweetsCount: selectedTweets.length,
-      executionTimeMs: duration,
-      timestamp: new Date().toISOString()
+    const executionTime = Date.now() - startTime;
+    return NextResponse.json({
+      message: 'Successfully updated tweets',
+      newTweetsAdded: newTweets.length,
+      totalTweets: updatedTweets.length,
+      selectedTweets: selectedTweets.length,
+      executionTimeMs: executionTime
     });
   } catch (error) {
-    const duration = Date.now() - startTime;
+    const executionTime = Date.now() - startTime;
     logStatus('Cron job failed', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      executionTimeMs: duration
+      executionTimeMs: executionTime
     });
     
-    return NextResponse.json({ 
-      error: 'Failed to fetch and cache tweets',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      executionTimeMs: duration
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      executionTimeMs: executionTime
     }, { status: 500 });
   }
 } 
