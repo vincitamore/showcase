@@ -212,7 +212,7 @@ const BlogSection = () => {
         <div className="mt-8">
           <h3 className="text-lg sm:text-xl font-semibold mb-4">Recent Posts</h3>
           <Carousel 
-            className="w-full max-w-[100rem] mx-auto" 
+            className="w-full max-w-[100rem] mx-auto pb-4" 
             opts={{ 
               loop: true, 
               align: "start",
@@ -228,15 +228,14 @@ const BlogSection = () => {
                   "group cursor-pointer",
                   "p-4 sm:p-6",
                   "mx-2 sm:mx-4",
-                  "w-[calc(100vw-3rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[40rem]",
-                  "max-h-[calc(100vh-12rem)]",
+                  "w-[calc(100vw-2rem)] sm:w-[calc(100vw-6rem)] md:w-[calc(85vw-6rem)] lg:w-[32rem]",
                   "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
                 )}
-                containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl overflow-y-auto"
+                containerClassName="min-h-[16rem] sm:min-h-[18rem] rounded-lg sm:rounded-xl"
               >
                 <div className="flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
                       <Image
                         src={profileConfig.profileImage}
                         alt={profileConfig.username}
@@ -260,15 +259,17 @@ const BlogSection = () => {
                       <Twitter className="h-5 w-5" />
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground/90 leading-relaxed mb-4">{tweet.text}</p>
+                  <p className="text-sm text-muted-foreground/90 leading-relaxed mb-6">
+                    {tweet.text}
+                  </p>
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
                     </span>
                     <time className="ml-auto">
