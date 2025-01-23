@@ -29,6 +29,8 @@ interface Tweet {
   }
 }
 
+const DEFAULT_PROFILE_IMAGE = "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png"
+
 const BlogSection = () => {
   const [tweets, setTweets] = useState<Tweet[]>([])
   const [message, setMessage] = useState('')
@@ -230,19 +232,20 @@ const BlogSection = () => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Image
-                        src={tweet.author.profile_image_url}
-                        alt={tweet.author.username}
+                        src={tweet.author?.profile_image_url || DEFAULT_PROFILE_IMAGE}
+                        alt={tweet.author?.username || 'Profile'}
                         width={40}
                         height={40}
                         className="rounded-full"
+                        unoptimized
                       />
                       <div>
-                        <p className="font-medium text-sm">{tweet.author.name}</p>
-                        <p className="text-xs text-muted-foreground">@{tweet.author.username}</p>
+                        <p className="font-medium text-sm">{tweet.author?.name || 'Anonymous'}</p>
+                        <p className="text-xs text-muted-foreground">@{tweet.author?.username || 'user'}</p>
                       </div>
                     </div>
                     <a 
-                      href={`https://twitter.com/${tweet.author.username}/status/${tweet.id}`}
+                      href={tweet.author?.username ? `https://twitter.com/${tweet.author.username}/status/${tweet.id}` : '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:text-primary/80 transition-colors"
