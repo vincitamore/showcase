@@ -276,23 +276,35 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
   const canRequest = await canMakeRequest(now);
   const lastUpdate = await getRateLimitTimestamp() ?? 0; // Default to 0 if null
   
-  console.log('[Twitter API] Rate limit check:', {
+  // Calculate time windows
+  const minutesSinceLastUpdate = lastUpdate ? Math.floor((now - lastUpdate) / (60 * 1000)) : Infinity;
+  const withinRateLimit = lastUpdate && (now - lastUpdate) < RATE_LIMIT_WINDOW;
+  const timeUntilReset = lastUpdate ? Math.round((lastUpdate + RATE_LIMIT_WINDOW - now) / 1000) : 0;
+  
+  console.log('[Twitter API] Rate limit evaluation:', {
     canRequest,
     lastUpdate,
     lastUpdateDate: lastUpdate ? new Date(lastUpdate).toISOString() : 'never',
-    minutesSinceLastUpdate: lastUpdate ? Math.floor((now - lastUpdate) / (60 * 1000)) : Infinity,
+    minutesSinceLastUpdate,
+    withinRateLimit,
+    timeUntilReset: timeUntilReset + 's',
+    rateLimitWindow: RATE_LIMIT_WINDOW / 1000 + 's',
     now: new Date(now).toISOString()
   });
 
-  // Only block if we can't make a request AND we're within the rate limit window
-  const withinRateLimit = lastUpdate && (now - lastUpdate) < RATE_LIMIT_WINDOW;
-  if (!canRequest && withinRateLimit) {
-    console.log('[Twitter API] Rate limited during initialization:', {
-      lastUpdate,
-      lastUpdateDate: new Date(lastUpdate).toISOString(),
-      timeUntilReset: Math.round((lastUpdate + RATE_LIMIT_WINDOW - now) / 1000) + 's'
+  // We should only block requests if:
+  // 1. canRequest is false AND
+  // 2. we're within the rate limit window AND
+  // 3. we have a valid last update timestamp
+  if (!canRequest && withinRateLimit && lastUpdate > 0) {
+    console.log('[Twitter API] Rate limit check failed:', {
+      reason: 'Local rate limit check',
+      canRequest,
+      withinRateLimit,
+      minutesSinceLastUpdate,
+      timeUntilReset: timeUntilReset + 's'
     });
-    throw new Error('Rate limited during client initialization');
+    throw new Error('Local rate limit check failed during client initialization');
   }
 
   const apiKey = process.env.TWITTER_API_KEY?.trim();
@@ -328,15 +340,31 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
 
     try {
       await executeWithRateLimit('verify', async () => {
-        await client.v2.userByUsername(testUser);
+        const response = await client.v2.userByUsername(testUser);
         console.log('[Twitter API] Credentials verified successfully');
-        await updateRateLimitTimestamp();
+        
+        // Only update timestamp on successful request
+        if (response?.data) {
+          await updateRateLimitTimestamp();
+          console.log('[Twitter API] Updated rate limit timestamp after successful verification');
+        }
       });
       return client.v2;
     } catch (verifyError: any) {
+      // Check if this is a Twitter API rate limit response
+      if (verifyError?.data?.status === 429) {
+        console.error('[Twitter API] Twitter rate limit exceeded:', {
+          error: verifyError.message,
+          status: verifyError.data?.status,
+          retryAfter: verifyError.data?.headers?.['retry-after'],
+          rateLimitReset: verifyError.data?.headers?.['x-rate-limit-reset']
+        });
+        throw new Error('Twitter API rate limit exceeded during verification');
+      }
+      
       console.error('[Twitter API] Credential verification failed:', {
         error: verifyError.message,
-        stack: verifyError.stack,
+        status: verifyError.data?.status,
         details: verifyError.data
       });
       throw verifyError;
@@ -344,7 +372,7 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
   } catch (error: any) {
     console.error('[Twitter API] Client initialization failed:', {
       error: error.message,
-      stack: error.stack,
+      status: error.data?.status,
       details: error.data
     });
     throw error;
