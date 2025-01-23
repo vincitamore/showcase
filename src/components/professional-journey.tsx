@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 interface TimelineItem {
   title: string
   company: string
-  date: string
+  period: string
   description: string
   highlights: string[]
   icon?: React.ReactNode
@@ -20,7 +20,7 @@ const timelineData: TimelineItem[] = [
   {
     title: "IT/OT Specialist",
     company: "Municipal Utilities",
-    date: "2021 - Present",
+    period: "2021 - Present",
     description: "Lead enterprise IT operations while managing IT/OT integration initiatives. Responsible for maintaining corporate networks, systems, and security infrastructure alongside SCADA networks and industrial control systems. Drive modernization efforts across both IT and OT environments.",
     highlights: [
       "Manage enterprise IT infrastructure and systems",
@@ -32,23 +32,9 @@ const timelineData: TimelineItem[] = [
     icon: <Wrench className="h-6 w-6" />
   },
   {
-    title: "Industrial Automation",
-    company: "Manufacturing Plant",
-    date: "2019 - 2021",
-    description: "Specialized in industrial automation and control systems, focusing on the integration of modern technology with traditional manufacturing processes.",
-    highlights: [
-      "Implemented automated production systems",
-      "Optimized manufacturing processes",
-      "Maintained industrial control systems",
-      "Developed safety protocols",
-      "Trained operators on new systems"
-    ],
-    icon: <Building2 className="h-6 w-6" />
-  },
-  {
     title: "Internet Technician",
     company: "ISP Services",
-    date: "2014 - 2021",
+    period: "2014 - 2021",
     description: "Specialized in network infrastructure and customer solutions.",
     highlights: [
       "Installed and maintained fiber optic, cable, and wireless networks",
@@ -60,37 +46,48 @@ const timelineData: TimelineItem[] = [
     icon: <Network className="h-6 w-6" />
   },
   {
-    title: "Plant Operations",
-    company: "Energy Sector",
-    date: "2012 - 2014",
-    description: "Managed critical systems in power generation facilities, ensuring reliable operation and maintenance of essential infrastructure.",
+    title: "Regulatory Compliance Technician",
+    company: "Fuel Systems Service",
+    period: "2013 - 2014",
+    description: "Conducted technical inspections and maintenance of underground fuel systems across multiple states.",
     highlights: [
-      "Operated power generation systems",
-      "Monitored environmental controls",
-      "Performed preventive maintenance",
-      "Implemented safety procedures",
-      "Coordinated with maintenance teams"
+      "Performed complex regulatory testing procedures",
+      "Installed and maintained cathodic protection systems",
+      "Managed detailed compliance documentation",
+      "Troubleshot sophisticated monitoring systems"
     ],
     icon: <Fuel className="h-6 w-6" />
   },
   {
-    title: "Construction Technology",
-    company: "Construction Firm",
-    date: "2010 - 2012",
-    description: "Integrated technology solutions in construction projects, improving efficiency and safety in building operations.",
+    title: "Construction Specialist",
+    company: "Various Projects",
+    period: "2012 - 2013",
+    description: "Contributed to diverse construction projects from residential to marine infrastructure.",
     highlights: [
-      "Implemented digital construction tools",
-      "Managed project technology systems",
-      "Coordinated with contractors",
-      "Developed safety protocols",
-      "Trained staff on new technologies"
+      "Built custom homes and specialized structures",
+      "Constructed marine infrastructure (docks, seawalls)",
+      "Managed material logistics and project timelines",
+      "Coordinated with multiple trade specialists"
+    ],
+    icon: <Building2 className="h-6 w-6" />
+  },
+  {
+    title: "Heavy Equipment Operator",
+    company: "Rock Quarry Operations",
+    period: "2009 - 2012",
+    description: "Operated and maintained heavy machinery in a high-precision industrial environment.",
+    highlights: [
+      "Managed complex industrial processes",
+      "Maintained quality control standards",
+      "Performed equipment maintenance and repairs",
+      "Optimized operational efficiency"
     ],
     icon: <HardHat className="h-6 w-6" />
   },
   {
     title: "Agricultural Operations",
     company: "Family Farm",
-    date: "2005 - Present",
+    period: "2005 - Present",
     description: "Integral part of a family-operated corn and soybean farm, developing foundational skills in problem-solving and systems management.",
     highlights: [
       "Managed complex agricultural systems",
@@ -102,7 +99,7 @@ const timelineData: TimelineItem[] = [
   }
 ]
 
-function TimelineCard({ title, company, date, description, highlights, icon, index }: TimelineItem & { index: number }) {
+function TimelineCard({ title, company, period, description, highlights, icon, index }: TimelineItem & { index: number }) {
   const cardRef = useRef(null)
   const isInView = useInView(cardRef, { 
     once: false,
@@ -195,7 +192,7 @@ function TimelineCard({ title, company, date, description, highlights, icon, ind
                   </h3>
                   <p className="text-sm text-muted-foreground">{company}</p>
                 </div>
-                <span className="text-sm text-muted-foreground whitespace-nowrap">{date}</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">{period}</span>
               </div>
               <p className={`text-muted-foreground ${isEven ? "" : "text-right"}`}>{description}</p>
               <ul className={`space-y-1 ${isEven ? "" : "text-right"}`}>
@@ -231,4 +228,4 @@ export function ProfessionalJourney() {
       </div>
     </div>
   )
-} 
+}
