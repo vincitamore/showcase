@@ -21,9 +21,22 @@ interface StoredTweet {
 
 function convertToStoredTweet(tweet: TweetV2): StoredTweet {
   // Ensure created_at is a valid ISO string if it exists
-  const created_at = tweet.created_at 
-    ? new Date(tweet.created_at).toISOString()
-    : undefined;
+  let created_at: string | undefined;
+  if (tweet.created_at) {
+    try {
+      // Parse and validate the date
+      const date = new Date(tweet.created_at);
+      if (isNaN(date.getTime())) {
+        console.warn('[Init] Invalid date found in tweet:', tweet.id);
+        created_at = undefined;
+      } else {
+        created_at = date.toISOString();
+      }
+    } catch (error) {
+      console.warn('[Init] Error parsing date for tweet:', tweet.id, error);
+      created_at = undefined;
+    }
+  }
 
   return {
     id: tweet.id,
@@ -98,6 +111,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Check if we can make a request based on rate limit
+    const canRequest = await canMakeRequest(Date.now());
+    if (!canRequest) {
+      const lastUpdate = await getRateLimitTimestamp();
+      console.log('[Init] Rate limited, last update:', lastUpdate);
+      
+      // Get cached tweets instead
+      const rawCachedTweets = await getCachedTweets();
+      const cachedTweets = Array.isArray(rawCachedTweets) ? rawCachedTweets as StoredTweet[] : [];
+      if (!cachedTweets.length) {
+        return NextResponse.json({ 
+          message: 'Rate limited and no cached tweets available'
+        });
+      }
+
+      // Select random tweets from cache
+      const selectedTweets = getRandomItems(cachedTweets, 4);
+      await updateSelectedTweets(selectedTweets);
+
+      console.log('[Init] Used cached tweets due to rate limit');
+      return NextResponse.json({ 
+        success: true,
+        tweetsCount: cachedTweets.length,
+        selectedCount: selectedTweets.length,
+        fromCache: true
+      });
+    }
+
     const client = await getReadOnlyClient();
     const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
     
@@ -149,7 +190,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ 
       success: true,
       tweetsCount: validTweets.length,
-      selectedCount: selectedTweets.length
+      selectedCount: selectedTweets.length,
+      fromCache: false
     });
   } catch (error) {
     console.error('[Init] Error during initial tweet fetch:', error);

@@ -33,11 +33,29 @@ const rateLimitCache: RateLimitCache = {
 };
 
 function convertToStoredTweet(tweet: TweetV2): StoredTweet {
+  // Ensure created_at is a valid ISO string if it exists
+  let created_at: string | undefined;
+  if (tweet.created_at) {
+    try {
+      // Parse and validate the date
+      const date = new Date(tweet.created_at);
+      if (isNaN(date.getTime())) {
+        console.warn('[Twitter API] Invalid date found in tweet:', tweet.id);
+        created_at = undefined;
+      } else {
+        created_at = date.toISOString();
+      }
+    } catch (error) {
+      console.warn('[Twitter API] Error parsing date for tweet:', tweet.id, error);
+      created_at = undefined;
+    }
+  }
+
   return {
     id: tweet.id,
     text: tweet.text,
     edit_history_tweet_ids: tweet.edit_history_tweet_ids,
-    created_at: tweet.created_at,
+    created_at,
     public_metrics: tweet.public_metrics
   };
 }
@@ -78,7 +96,20 @@ async function searchBuildTweets(client: TwitterApiv2): Promise<StoredTweet[]> {
 
   const tweets = Array.isArray(page.data) ? page.data : [page.data];
   console.log('[Init] Found .build tweets:', tweets.length);
-  return tweets.map(tweet => convertToStoredTweet(tweet));
+  
+  // Filter out tweets with invalid dates before converting
+  const validTweets = tweets.filter(tweet => {
+    if (!tweet.created_at) return true; // Keep tweets without dates
+    try {
+      const date = new Date(tweet.created_at);
+      return !isNaN(date.getTime());
+    } catch {
+      console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
+      return false;
+    }
+  });
+
+  return validTweets.map(tweet => convertToStoredTweet(tweet));
 }
 
 async function getUserTweets(client: TwitterApiv2, username: string): Promise<StoredTweet[]> {
@@ -102,7 +133,20 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<St
 
   const tweets = Array.isArray(page.data) ? page.data : [page.data];
   console.log('[Init] Found user tweets:', tweets.length);
-  return tweets.map(tweet => convertToStoredTweet(tweet));
+  
+  // Filter out tweets with invalid dates before converting
+  const validTweets = tweets.filter(tweet => {
+    if (!tweet.created_at) return true; // Keep tweets without dates
+    try {
+      const date = new Date(tweet.created_at);
+      return !isNaN(date.getTime());
+    } catch {
+      console.warn('[Twitter API] Filtering out tweet with invalid date:', tweet.id);
+      return false;
+    }
+  });
+
+  return validTweets.map(tweet => convertToStoredTweet(tweet));
 }
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
