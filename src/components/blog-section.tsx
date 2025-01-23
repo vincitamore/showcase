@@ -5,8 +5,11 @@ import { Card3D } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { MessageSquare, Share2, Heart } from "lucide-react"
+import { MessageSquare, Share2, Heart, Twitter, MessageCircle, Repeat2 } from "lucide-react"
 import { ChatInput } from "@/components/chat-input"
+import { Carousel } from "@/components/ui/carousel"
+import { cn } from "@/lib/utils"
+import Image from "next/image"
 
 interface TweetMetrics {
   like_count?: number
@@ -19,6 +22,11 @@ interface Tweet {
   text: string
   created_at?: string
   public_metrics?: TweetMetrics
+  author: {
+    profile_image_url: string
+    username: string
+    name: string
+  }
 }
 
 const BlogSection = () => {
@@ -193,52 +201,79 @@ const BlogSection = () => {
       </Card3D>
 
       {/* Tweets Display */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 max-w-7xl mx-auto">
-        {tweets.map((tweet) => (
-          <a 
-            key={tweet.id}
-            href={`https://x.com/i/web/status/${tweet.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative transition-all duration-200 hover:scale-[1.02]"
+      {tweets && tweets.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-lg sm:text-xl font-semibold mb-4">Recent Posts</h3>
+          <Carousel 
+            className="w-full max-w-[100rem] mx-auto" 
+            opts={{ 
+              loop: true, 
+              align: "start",
+              containScroll: "trimSnaps",
+              dragFree: false
+            }}
           >
-            <Card3D className="p-6 transition-colors group-hover:bg-muted/50 h-full">
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 bg-black/5 dark:bg-white/5 backdrop-blur-sm rounded-xl">
-                <div className="flex items-center gap-2 rounded-md bg-primary px-3 py-1 text-sm text-primary-foreground shadow-sm">
-                  <Share2 className="h-4 w-4" />
-                  <span>View on X</span>
+            {tweets.map((tweet, index) => (
+              <Card3D
+                key={tweet.id}
+                className={cn(
+                  "group cursor-pointer",
+                  "p-4 sm:p-6",
+                  "mx-2 sm:mx-4",
+                  "w-[calc(100vw-3rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[40rem]",
+                  "max-h-[calc(100vh-12rem)]",
+                  "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+                )}
+                containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl overflow-y-auto"
+              >
+                <div className="flex flex-col h-full">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src={tweet.author.profile_image_url}
+                        alt={tweet.author.username}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">{tweet.author.name}</p>
+                        <p className="text-xs text-muted-foreground">@{tweet.author.username}</p>
+                      </div>
+                    </div>
+                    <a 
+                      href={`https://twitter.com/${tweet.author.username}/status/${tweet.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Twitter className="h-5 w-5" />
+                    </a>
+                  </div>
+                  <p className="text-sm text-muted-foreground/90 leading-relaxed mb-4">{tweet.text}</p>
+                  <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
+                    </span>
+                    <time className="ml-auto">
+                      {tweet.created_at 
+                        ? new Date(tweet.created_at).toLocaleDateString()
+                        : 'Just now'
+                      }
+                    </time>
+                  </div>
                 </div>
-              </div>
-              <p className="mb-4 text-foreground/90">{tweet.text}</p>
-              <div className="flex items-center gap-6 text-sm text-muted-foreground mt-auto">
-                <div className="flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  <span>{tweet.public_metrics?.like_count ?? 0}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>{tweet.public_metrics?.reply_count ?? 0}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Share2 className="h-4 w-4" />
-                  <span>{tweet.public_metrics?.retweet_count ?? 0}</span>
-                </div>
-                <span className="ml-auto">
-                  {tweet.created_at 
-                    ? new Date(tweet.created_at).toLocaleDateString()
-                    : 'Just now'
-                  }
-                </span>
-              </div>
-            </Card3D>
-          </a>
-        ))}
-        {tweets.length === 0 && (
-          <div className="text-center text-muted-foreground col-span-full">
-            No tweets to display yet.
-          </div>
-        )}
-      </div>
+              </Card3D>
+            ))}
+          </Carousel>
+        </div>
+      )}
     </section>
   )
 }

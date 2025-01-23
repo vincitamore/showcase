@@ -103,32 +103,32 @@ function TimelineCard({ title, company, period, description, highlights, icon, i
   const cardRef = useRef(null)
   const isInView = useInView(cardRef, { 
     once: false,
-    amount: 0.4,
-    margin: "-100px 0px"
+    amount: 0.3,
+    margin: "-50px 0px"
   })
 
   const isEven = index % 2 === 0
 
   return (
-    <div className="relative mb-16">
+    <div className="relative mb-8 sm:mb-12">
       {/* Center dot */}
       <motion.div
         initial={{ scale: 0 }}
         animate={isInView ? { scale: 1 } : { scale: 0 }}
         transition={{ 
           duration: 0.6,
-          delay: index * 0.3,
+          delay: index * 0.2,
           ease: "easeOut"
         }}
         className={cn(
-          "absolute top-8 w-4 h-4 rounded-full",
+          "absolute w-3 h-3 sm:w-4 sm:h-4 rounded-full",
           "bg-background/60 backdrop-blur-[1px]",
           "ring-1 ring-primary/20",
           "before:absolute before:inset-[2px] before:rounded-full before:bg-primary/10 before:backdrop-blur-sm",
           "after:absolute after:inset-[-4px] after:rounded-full after:bg-primary/5 after:blur-[2px]",
-          isEven 
-            ? "left-1/2 -translate-x-1/2" 
-            : "left-1/2 -translate-x-1/2 -ml-4",
+          "left-0 sm:left-1/2 top-6 sm:top-8",
+          "sm:-translate-x-1/2",
+          !isEven && "sm:-ml-4",
           "z-10"
         )}
       />
@@ -136,28 +136,35 @@ function TimelineCard({ title, company, period, description, highlights, icon, i
       {/* Timeline line */}
       <motion.div
         initial={{ height: 0 }}
-        animate={isInView ? { height: "calc(100% + 2rem)" } : { height: 0 }}
+        animate={isInView ? { height: "calc(100% + 1rem)" } : { height: 0 }}
         transition={{ 
           duration: 0.8,
-          delay: index * 0.3,
+          delay: index * 0.2,
           ease: "easeOut"
         }}
         className={cn(
-          "absolute left-1/2 top-10 -translate-x-1/2",
+          "absolute left-[6px] sm:left-1/2 top-8 sm:top-10 -translate-x-1/2",
           "w-[1px] bg-gradient-to-b from-primary/20 via-primary/10 to-transparent",
           "before:absolute before:inset-0 before:-left-[1px] before:w-[3px] before:bg-primary/5 before:blur-[2px]"
         )}
       />
 
       {/* Card container */}
-      <div className={`relative ${isEven ? "ml-[calc(50%+2rem)]" : "mr-[calc(50%+2rem)]"} max-w-[calc(50%-3rem)]`}>
+      <div className={cn(
+        "relative",
+        "pl-8 sm:pl-0",
+        "w-full sm:w-[calc(50%-2rem)]",
+        isEven 
+          ? "sm:ml-[calc(50%+1rem)]" 
+          : "sm:mr-[calc(50%+1rem)]",
+        "max-w-xl"
+      )}>
         <motion.div
           ref={cardRef}
           initial={{ 
             opacity: 0,
-            scale: 0.7,
-            x: isEven ? -20 : 20,
-            transformOrigin: isEven ? "left center" : "right center"
+            scale: 0.9,
+            x: isEven ? 20 : -20
           }}
           animate={isInView ? {
             opacity: 1,
@@ -165,39 +172,55 @@ function TimelineCard({ title, company, period, description, highlights, icon, i
             x: 0,
             transition: {
               type: "spring",
-              stiffness: 45,
+              stiffness: 50,
               damping: 15,
-              delay: index * 0.3
+              delay: index * 0.2
             }
           } : {
             opacity: 0,
-            scale: 0.7,
-            x: isEven ? -20 : 20,
-            transition: {
-              duration: 0.4,
-              ease: "easeIn"
-            }
+            scale: 0.9,
+            x: isEven ? 20 : -20
           }}
         >
           <Card3D 
-            className="w-full p-6 backdrop-blur-sm bg-background/20"
-            containerClassName="transition-transform duration-300 hover:scale-[1.02]"
+            className="w-full p-3 sm:p-4 backdrop-blur-sm bg-background/20"
+            containerClassName="transition-transform duration-300 hover:scale-[1.02] rounded-lg sm:rounded-xl"
           >
-            <div className="flex flex-col gap-3">
-              <div className={`flex items-start ${isEven ? "" : "flex-row-reverse"} justify-between`}>
-                <div className={isEven ? "" : "text-right"}>
-                  <h3 className={`text-lg font-semibold flex items-center gap-2 ${isEven ? "" : "flex-row-reverse justify-end"}`}>
+            <div className="flex flex-col gap-2 sm:gap-3">
+              <div className="flex items-start justify-between flex-col sm:flex-row gap-1 sm:gap-2">
+                <div className={cn(
+                  "w-full sm:w-auto",
+                  !isEven && "sm:text-right"
+                )}>
+                  <h3 className={cn(
+                    "text-base sm:text-lg font-semibold flex items-center gap-2",
+                    !isEven && "sm:flex-row-reverse sm:justify-end"
+                  )}>
                     {icon}
                     {title}
                   </h3>
-                  <p className="text-sm text-muted-foreground">{company}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{company}</p>
                 </div>
-                <span className="text-sm text-muted-foreground whitespace-nowrap">{period}</span>
+                <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">{period}</span>
               </div>
-              <p className={`text-muted-foreground ${isEven ? "" : "text-right"}`}>{description}</p>
-              <ul className={`space-y-1 ${isEven ? "" : "text-right"}`}>
+              <p className={cn(
+                "text-xs sm:text-sm text-muted-foreground/90 leading-relaxed",
+                !isEven && "sm:text-right"
+              )}>{description}</p>
+              <ul className={cn(
+                "space-y-1",
+                !isEven && "sm:text-right"
+              )}>
                 {highlights.map((highlight, idx) => (
-                  <li key={idx} className={`text-sm text-muted-foreground ${isEven ? "before:mr-2 before:content-['•']" : "after:ml-2 after:content-['•']"}`}>
+                  <li 
+                    key={idx} 
+                    className={cn(
+                      "text-xs sm:text-sm text-muted-foreground/80",
+                      isEven 
+                        ? "before:mr-2 before:content-['•']" 
+                        : "sm:after:ml-2 sm:after:content-['•'] before:sm:content-none before:mr-2 before:content-['•']"
+                    )}
+                  >
                     {highlight}
                   </li>
                 ))}
@@ -212,16 +235,16 @@ function TimelineCard({ title, company, period, description, highlights, icon, i
 
 export function ProfessionalJourney() {
   return (
-    <div className="space-y-16">
-      <div className="text-center space-y-4">
-        <h2 className="text-3xl font-bold">Professional Journey</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+    <div className="space-y-12">
+      <div className="text-center space-y-3 sm:space-y-4 px-4">
+        <h2 className="text-2xl sm:text-3xl font-bold">Professional Journey</h2>
+        <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
           My diverse background spans technology, industrial operations, and agriculture. 
           This unique combination brings a practical, solution-oriented approach to technical challenges, 
           grounded in real-world experience and a deep understanding of various industries.
         </p>
       </div>
-      <div className="relative">
+      <div className="relative px-4">
         {timelineData.map((item: TimelineItem, index: number) => (
           <TimelineCard key={index} {...item} index={index} />
         ))}

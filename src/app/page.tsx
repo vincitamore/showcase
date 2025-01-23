@@ -82,21 +82,12 @@ export default function Home() {
         <ProjectsSection />
 
         {/* Skills Section */}
-        <section id="skills" className="container relative mx-auto px-4 py-16 scroll-mt-16">
-          <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
-            Technical Expertise
-          </h2>
-          <div className="mb-8 mx-auto max-w-2xl text-center">
-            <p className="text-lg text-muted-foreground">
-              With over a decade of experience in IT and network infrastructure, 
-              I bring a comprehensive skill set spanning from network engineering to modern web development.
-            </p>
-          </div>
+        <section id="skills" className="container relative mx-auto px-4 py-8 scroll-mt-16">
           <SkillsGrid />
         </section>
 
         {/* Experience Section */}
-        <section id="experience" className="container relative mx-auto px-4 py-16 scroll-mt-16">
+        <section id="experience" className="container relative mx-auto px-4 py-8 scroll-mt-16">
           <ProfessionalJourney />
           
           <div className="mt-16 mx-auto max-w-3xl text-center">

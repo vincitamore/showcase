@@ -5,6 +5,7 @@ import { Card3D } from "@/components/ui/card"
 import { ImageModal } from "@/components/image-modal"
 import { ProjectDetailsModal } from "@/components/project-details-modal"
 import { Carousel } from "@/components/ui/carousel"
+import { cn } from "@/lib/utils"
 
 const projects = [
   {
@@ -66,31 +67,36 @@ const ProjectsSection = () => {
         Featured Projects
       </h2>
       <Carousel 
-        className="w-full max-w-[100rem] mx-auto" 
+        className="w-full max-w-[100rem] mx-auto pb-4" 
         opts={{ 
           loop: true, 
-          align: "center",
+          align: "start",
           containScroll: "trimSnaps",
-          dragFree: true,
-          skipSnaps: true
+          dragFree: false
         }}
       >
         {projects.map((project, index) => (
           <Card3D
             key={index}
-            className="group cursor-pointer p-8 mx-6 w-[44rem] backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
-            containerClassName="min-h-[30rem] rounded-3xl"
+            className={cn(
+              "group cursor-pointer",
+              "p-4 sm:p-6",
+              "mx-2 sm:mx-4",
+              "w-[calc(100vw-2rem)] sm:w-[calc(100vw-6rem)] md:w-[calc(85vw-6rem)] lg:w-[42rem]",
+              "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+            )}
+            containerClassName="min-h-[26rem] sm:min-h-[28rem] md:min-h-[30rem] rounded-lg sm:rounded-xl"
           >
             <div className="flex h-full flex-col justify-between">
               <div>
-                <h3 className="mb-3 text-2xl font-semibold tracking-tight">{project.title}</h3>
-                <p className="mb-4 text-muted-foreground">{project.description}</p>
+                <h3 className="mb-2 text-lg sm:text-xl font-semibold tracking-tight">{project.title}</h3>
+                <p className="mb-3 text-sm text-muted-foreground leading-relaxed">{project.description}</p>
                 {project.highlights && (
-                  <ul className="mb-8 space-y-2">
+                  <ul className="mb-4 space-y-1.5">
                     {project.highlights.map((highlight, highlightIndex) => (
                       <li 
                         key={highlightIndex}
-                        className="text-sm before:mr-2 before:content-['•'] before:text-primary"
+                        className="text-xs sm:text-sm text-muted-foreground/90 before:mr-2 before:content-['•'] before:text-primary"
                       >
                         {highlight}
                       </li>
@@ -99,31 +105,31 @@ const ProjectsSection = () => {
                 )}
               </div>
               <div>
-                <div className="mb-8 flex flex-wrap gap-2">
+                <div className="mb-4 flex flex-wrap gap-1.5">
                   {project.tags.map((tag, tagIndex) => (
                     <span
                       key={tagIndex}
-                      className="rounded-full bg-primary/5 px-3 py-1 text-sm font-medium text-primary ring-1 ring-inset ring-primary/10 transition-colors group-hover:bg-primary/10"
+                      className="rounded-full bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary ring-1 ring-inset ring-primary/10 transition-colors group-hover:bg-primary/10"
                     >
                       {tag}
                     </span>
                   ))}
                 </div>
                 {project.images && (
-                  <div className="mb-8 grid gap-4 md:grid-cols-2">
+                  <div className="mb-4 grid gap-2 grid-cols-2">
                     {project.images.map((image, imageIndex) => (
                       <ImageModal
                         key={imageIndex}
                         src={image}
                         alt={`${project.title} screenshot ${imageIndex + 1}`}
-                        className="aspect-video rounded-xl ring-1 ring-foreground/5 transition-all duration-300 group-hover:ring-foreground/10"
+                        className="aspect-video rounded-md sm:rounded-lg ring-1 ring-foreground/5 transition-all duration-300 group-hover:ring-foreground/10"
                       />
                     ))}
                   </div>
                 )}
                 <button
                   onClick={() => setSelectedProject(project)}
-                  className="inline-flex items-center text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                  className="inline-flex items-center text-xs sm:text-sm font-medium text-primary transition-colors hover:text-primary/80"
                 >
                   Learn more <span className="ml-1 transition-transform group-hover:translate-x-0.5">→</span>
                 </button>
