@@ -196,32 +196,44 @@ const BlogSection = () => {
     const entities = tweet.entities?.urls || [];
     const urlPreviews: JSX.Element[] = [];
     
-    // Sort entities by their position in reverse order to replace from end to start
+    // Create an array of text segments and links
+    const segments: Array<JSX.Element | string> = [];
+    let lastIndex = 0;
+    
+    // Sort entities by their position
     const sortedEntities = [...entities].sort((a, b) => 
-      (b.indices[0] || 0) - (a.indices[0] || 0)
+      (a.indices[0] || 0) - (b.indices[0] || 0)
     );
 
-    // Replace each URL with a clickable link and generate preview
-    sortedEntities.forEach(entity => {
+    // Build segments array with text and link elements
+    sortedEntities.forEach((entity, index) => {
       const start = entity.indices[0];
       const end = entity.indices[1];
       
       if (typeof start === 'number' && typeof end === 'number') {
-        const before = text.slice(0, start);
-        const after = text.slice(end);
+        // Add text before the link
+        if (start > lastIndex) {
+          segments.push(text.slice(lastIndex, start));
+        }
         
-        // Always show the link in text, regardless of preview
-        const link = `<a 
-          href="${entity.expanded_url}"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-primary hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          ${entity.display_url}
-        </a>`;
+        // Add the link
+        segments.push(
+          <a
+            key={`link-${index}`}
+            href={entity.expanded_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(entity.expanded_url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            {entity.display_url}
+          </a>
+        );
         
-        text = before + link + after;
+        lastIndex = end;
         
         // Generate preview card if it's not a Twitter URL
         if (!entity.expanded_url.includes('twitter.com') && !entity.expanded_url.includes('x.com')) {
@@ -272,13 +284,17 @@ const BlogSection = () => {
         }
       }
     });
+    
+    // Add any remaining text
+    if (lastIndex < text.length) {
+      segments.push(text.slice(lastIndex));
+    }
 
     return (
       <>
-        <div 
-          className="text-sm text-muted-foreground/90 leading-relaxed mb-2"
-          dangerouslySetInnerHTML={{ __html: text.trim() }}
-        />
+        <div className="text-sm text-muted-foreground/90 leading-relaxed mb-2">
+          {segments}
+        </div>
         {urlPreviews.length > 0 && (
           <div className="space-y-2">
             {urlPreviews}
