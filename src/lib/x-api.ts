@@ -71,13 +71,10 @@ export async function getReadOnlyClient() {
       appSecret: apiSecret,   // API Key Secret
     });
 
-    // Get app-only bearer token
-    console.log('[Twitter API] Requesting app-only bearer token...');
-    const appClient = await client.appLogin();
-    console.log('[Twitter API] Successfully obtained bearer token');
+    console.log('[Twitter API] Client initialized with API Key/Secret authentication');
     
     // Wrap the client to handle rate limits
-    return new Proxy(appClient, {
+    return new Proxy(client, {
       get(target: TwitterApi, prop: string | symbol) {
         const value = target[prop as keyof TwitterApi];
         if (typeof value === 'function') {
