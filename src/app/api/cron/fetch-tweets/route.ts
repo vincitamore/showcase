@@ -265,7 +265,7 @@ export async function GET(req: Request) {
         step: 'no-new-tweets'
       });
       
-      return NextResponse.json({ 
+      return NextResponse.json({
         status: 'success',
         tweetCount: cachedTweets.length,
         newTweets: 0,
@@ -341,7 +341,7 @@ export async function GET(req: Request) {
         }
       });
     }
-
+    
     return NextResponse.json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Unknown error'

@@ -134,6 +134,12 @@ const SkillsGrid = () => {
           containScroll: "trimSnaps",
           dragFree: false
         }}
+        classNames={{
+          viewport: "overflow-visible",
+          prevNextButton: "bg-transparent hover:bg-transparent static",
+          prevButton: "-left-4",
+          nextButton: "-right-4",
+        }}
       >
         {skillCategories.map((category, index) => (
           <Card3D
@@ -141,8 +147,8 @@ const SkillsGrid = () => {
             className={cn(
               "group cursor-pointer",
               "p-4 sm:p-5",
-              "mx-2 sm:mx-3",
-              "w-[calc(100vw-3rem)] sm:w-[calc(50vw-3rem)] md:w-[calc(33vw-3rem)] lg:w-[24rem]",
+              "mx-4",
+              "w-[calc(100vw-6rem)] sm:w-[calc(50vw-3rem)] md:w-[calc(33vw-3rem)] lg:w-[24rem]",
               "max-w-[24rem]",
               "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
             )}

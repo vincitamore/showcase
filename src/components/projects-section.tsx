@@ -67,12 +67,18 @@ const ProjectsSection = () => {
         Featured Projects
       </h2>
       <Carousel 
-        className="w-full max-w-[100rem] mx-auto pb-4" 
+        className="w-full max-w-[90rem] mx-auto pb-4" 
         opts={{ 
           loop: true, 
-          align: "start",
+          align: "center",
           containScroll: "trimSnaps",
           dragFree: false
+        }}
+        classNames={{
+          viewport: "overflow-visible",
+          prevNextButton: "bg-transparent hover:bg-transparent static",
+          prevButton: "-left-4",
+          nextButton: "-right-4",
         }}
       >
         {projects.map((project, index) => (
@@ -80,13 +86,13 @@ const ProjectsSection = () => {
             key={index}
             className={cn(
               "group cursor-pointer",
-              "p-3 sm:p-4",
-              "mx-1.5",
-              "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[42rem]",
+              "p-4 sm:p-5",
+              "mx-4",
+              "w-[calc(100vw-6rem)] sm:w-[calc(75vw-4rem)] md:w-[calc(66vw-4rem)] lg:w-[42rem]",
               "max-w-[42rem]",
               "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
             )}
-            containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
+            containerClassName="min-h-[16rem] sm:min-h-[18rem] rounded-lg sm:rounded-xl"
           >
             <div className="flex h-full flex-col justify-between">
               <div>
