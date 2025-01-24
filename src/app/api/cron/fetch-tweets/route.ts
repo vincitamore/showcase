@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient } from '@/lib/x-api';
-import { 
-  cacheTweets, 
-  getCachedTweets, 
-  updateSelectedTweets, 
-  SELECTED_TWEET_COUNT,
-  FIFTEEN_MINUTES,
-  MAX_TWEETS,
-  canMakeRequest,
-  updateRateLimit
-} from '@/lib/tweet-storage';
+import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEET_COUNT, FIFTEEN_MINUTES } from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError } from 'twitter-api-v2';
+import { 
+  canMakeRequest,
+  getRateLimit,
+  updateRateLimit,
+  MAX_TWEETS 
+} from '@/lib/tweet-storage';
 
 type TweetWithEntities = {
   id: string;
@@ -110,6 +107,7 @@ export const maxDuration = 58 // Just under Vercel's 60s limit
 
 export async function GET(req: Request) {
   const startTime = Date.now();
+  let cachedTweets: any[] = [];
   
   try {
     // Verify cron secret
@@ -128,15 +126,34 @@ export async function GET(req: Request) {
       step: 'start'
     });
 
+    // Check cache first
+    const { tweets } = await getCachedTweets('current');
+    cachedTweets = tweets;
+
+    // If we have enough recent tweets, skip the API call
+    if (cachedTweets.length >= MAX_TWEETS) {
+      const mostRecentTweet = cachedTweets[0];
+      const cacheAge = Date.now() - new Date(mostRecentTweet.createdAt).getTime();
+
+      // If cache is less than 15 minutes old, skip update
+      if (cacheAge < FIFTEEN_MINUTES) {
+        console.log('[Cron] Using recent cache:', {
+          tweetCount: cachedTweets.length,
+          cacheAgeMinutes: Math.floor(cacheAge / 60000),
+          timestamp: new Date().toISOString(),
+          step: 'using-cache'
+        });
+        return NextResponse.json({
+          status: 'success',
+          tweetCount: cachedTweets.length,
+          source: 'cache'
+        });
+      }
+    }
+
     // Initialize Twitter client
     const client = await getReadOnlyClient();
     
-    console.log('[Cron] Client initialized, preparing search...', {
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'client-ready'
-    });
-
     // Get user info for query
     const username = env.TWITTER_USERNAME?.replace('@', '');
     if (!username) {
@@ -146,28 +163,43 @@ export async function GET(req: Request) {
 
     const query = `from:${username} -is:retweet`;
 
-    // Check if we can make the request based on our 15-min window
+    // Check if we can make the request
     const canMakeReq = await canMakeRequest('tweets/search/recent');
     if (!canMakeReq) {
-      console.log('[Twitter API] Within rate limit window, skipping request:', {
+      const rateLimit = await getRateLimit('tweets/search/recent');
+      const resetAt = new Date(rateLimit.resetAt);
+      
+      console.log('[Twitter API] Rate limited, using cache:', {
         endpoint: 'tweets/search/recent',
+        resetAt: resetAt.toISOString(),
+        remaining: rateLimit.remaining,
+        cachedTweetCount: cachedTweets.length,
         timestamp: new Date().toISOString(),
-        step: 'skip-request'
+        step: 'rate-limited'
       });
+
+      // Return cached tweets if available
+      if (cachedTweets.length > 0) {
+        return NextResponse.json({
+          status: 'success',
+          tweetCount: cachedTweets.length,
+          source: 'cache',
+          rateLimit: {
+            resetAt: resetAt.toISOString(),
+            message: 'Using cached tweets due to rate limit'
+          }
+        });
+      }
+
       return NextResponse.json({
-        status: 'skipped',
-        message: 'Within rate limit window'
-      });
+        status: 'rate_limited',
+        resetAt: resetAt.toISOString(),
+        message: 'Rate limit exceeded, try again after reset time'
+      }, { status: 429 });
     }
 
-    // Make the API request
-    console.log('[Twitter API] Making search request:', {
-      query,
-      timestamp: new Date().toISOString(),
-      step: 'search-start'
-    });
-
-    const response = await client.search(query, {
+    // Prepare search parameters
+    const searchParams: any = {
       max_results: MAX_TWEETS,
       'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
       'user.fields': ['profile_image_url', 'username'],
@@ -189,40 +221,77 @@ export async function GET(req: Request) {
         'referenced_tweets.id',
         'referenced_tweets.id.author_id'
       ]
+    };
+
+    // If we have cached tweets, only fetch newer ones
+    if (cachedTweets.length > 0) {
+      const mostRecentTweet = cachedTweets[0];
+      searchParams.since_id = mostRecentTweet.id;
+    }
+
+    // Make the API request
+    console.log('[Twitter API] Making search request:', {
+      query,
+      sinceId: searchParams.since_id,
+      timestamp: new Date().toISOString(),
+      step: 'search-start'
     });
 
-    // Get tweets from the response
-    const tweets = response.data.data;
-    if (!tweets?.length) {
-      console.log('[Twitter API] No tweets found:', {
+    const response = await client.search(query, searchParams);
+
+    // Update rate limit after successful request
+    if (response.rateLimit) {
+      const remainingRequests = parseInt(response.rateLimit.remaining.toString());
+      const rateLimitReset = new Date(parseInt(response.rateLimit.reset.toString()) * 1000);
+
+      await updateRateLimit('tweets/search/recent', rateLimitReset, remainingRequests);
+
+      console.log('[Twitter API] Updated rate limits:', {
+        endpoint: 'tweets/search/recent',
+        remaining: remainingRequests,
+        resetAt: rateLimitReset.toISOString(),
         timestamp: new Date().toISOString(),
-        step: 'no-tweets'
-      });
-      return NextResponse.json({ 
-        status: 'success',
-        tweetCount: 0
+        step: 'rate-limit-update'
       });
     }
 
-    // Update our rate limit window after successful request
-    await updateRateLimit(
-      'tweets/search/recent',
-      new Date(Date.now() + FIFTEEN_MINUTES),
-      1 // We don't track remaining requests anymore
-    );
+    // Get tweets from the response
+    const newTweets = response.data.data;
+    
+    if (!newTweets?.length) {
+      console.log('[Twitter API] No new tweets found:', {
+        timestamp: new Date().toISOString(),
+        cachedCount: cachedTweets.length,
+        step: 'no-new-tweets'
+      });
+      
+      return NextResponse.json({ 
+        status: 'success',
+        tweetCount: cachedTweets.length,
+        newTweets: 0,
+        source: 'cache'
+      });
+    }
 
     console.log('[Twitter API] Search complete:', {
-      tweetCount: tweets.length,
+      newTweetCount: newTweets.length,
       timestamp: new Date().toISOString(),
       step: 'search-complete'
     });
 
+    // Merge with existing tweets if needed
+    const tweetsToCache = searchParams.since_id
+      ? [...newTweets, ...cachedTweets].slice(0, MAX_TWEETS)
+      : newTweets;
+
     // Cache the tweets
-    await cacheTweets(tweets, 'current', response.includes);
+    await cacheTweets(tweetsToCache, 'current', response.includes);
 
     return NextResponse.json({
       status: 'success',
-      tweetCount: tweets.length
+      tweetCount: tweetsToCache.length,
+      newTweets: newTweets.length,
+      source: 'api'
     });
 
   } catch (error) {
@@ -232,16 +301,45 @@ export async function GET(req: Request) {
       timestamp: new Date().toISOString()
     });
 
-    // For rate limit errors (429), just log and return
+    // Handle rate limit errors specifically
     if (error instanceof ApiResponseError && error.code === 429) {
-      console.log('[Twitter API] Rate limited by API, will retry next cron run:', {
-        timestamp: new Date().toISOString(),
-        step: 'rate-limited'
-      });
+      const resetAt = error.rateLimit?.reset 
+        ? new Date(parseInt(error.rateLimit.reset.toString()) * 1000)
+        : new Date(Date.now() + 15 * 60 * 1000); // Default to 15 minutes if no reset time
+
+      await updateRateLimit('tweets/search/recent', resetAt, 0);
+
+      // Return cached tweets if available
+      if (cachedTweets?.length > 0) {
+        return NextResponse.json({
+          status: 'success',
+          tweetCount: cachedTweets.length,
+          source: 'cache',
+          rateLimit: {
+            resetAt: resetAt.toISOString(),
+            message: 'Using cached tweets due to rate limit error'
+          }
+        });
+      }
+
       return NextResponse.json({
         status: 'rate_limited',
-        message: 'Rate limited by API, will retry next cron run'
+        resetAt: resetAt.toISOString(),
+        message: 'Rate limit exceeded from API response'
       }, { status: 429 });
+    }
+    
+    // For other errors, return cached tweets if available
+    if (cachedTweets?.length > 0) {
+      return NextResponse.json({
+        status: 'success',
+        tweetCount: cachedTweets.length,
+        source: 'cache',
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          type: 'api_error'
+        }
+      });
     }
 
     return NextResponse.json({

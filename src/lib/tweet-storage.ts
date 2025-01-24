@@ -549,7 +549,7 @@ export async function updateRateLimit(endpoint: string, resetAt: Date, remaining
     step: 'pre-update'
   });
 
-  const result = await prisma.twitterRateLimit.upsert({
+  const result = await (prisma as any).twitterRateLimit.upsert({
     where: {
       endpoint
     },
@@ -585,7 +585,7 @@ export async function getRateLimit(endpoint: string) {
     step: 'pre-fetch'
   });
 
-  const rateLimit = await prisma.twitterRateLimit.findUnique({
+  const rateLimit = await (prisma as any).twitterRateLimit.findUnique({
     where: {
       endpoint
     }
@@ -615,7 +615,7 @@ export async function getRateLimit(endpoint: string) {
       step: 'creating-default'
     });
 
-    const newLimit = await prisma.twitterRateLimit.create({
+    const newLimit = await (prisma as any).twitterRateLimit.create({
       data: {
         endpoint,
         resetAt,
@@ -647,33 +647,57 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
     step: 'start-check'
   });
 
-  const rateLimit = await prisma.twitterRateLimit.findUnique({
-    where: {
-      endpoint
-    }
-  });
-
-  // If no rate limit info exists or if it's been more than 15 minutes since last reset,
-  // allow the request
-  if (!rateLimit || Date.now() > rateLimit.resetAt.getTime()) {
-    console.log('[Twitter Storage] No rate limit or window expired, allowing request:', {
+  const rateLimit = await getRateLimit(endpoint);
+  const now = new Date();
+  
+  // If no rate limit info exists, allow the request
+  if (!rateLimit) {
+    console.log('[Twitter Storage] No rate limit found, allowing request:', {
       endpoint,
-      lastResetAt: rateLimit?.resetAt?.toISOString(),
-      timestamp: new Date().toISOString(),
+      timestamp: now.toISOString(),
       durationMs: Date.now() - startTime,
-      step: 'check-window-expired'
+      step: 'check-no-limit'
     });
     return true;
   }
 
-  // We're still within the 15-minute window
-  const timeUntilReset = rateLimit.resetAt.getTime() - Date.now();
-  console.log('[Twitter Storage] Within rate limit window:', {
+  const resetAt = toValidDate(rateLimit.resetAt);
+  const timeUntilReset = resetAt.getTime() - now.getTime();
+  
+  // If we're past the reset time, allow the request
+  if (now > resetAt) {
+    console.log('[Twitter Storage] Rate limit reset time passed:', {
+      endpoint,
+      resetAt: resetAt.toISOString(),
+      now: now.toISOString(),
+      remaining: rateLimit.remaining,
+      durationMs: Date.now() - startTime,
+      step: 'check-reset-passed'
+    });
+    return true;
+  }
+
+  // If we still have remaining requests, allow the request
+  if (rateLimit.remaining > 0) {
+    console.log('[Twitter Storage] Requests remaining:', {
+      endpoint,
+      remaining: rateLimit.remaining,
+      resetAt: resetAt.toISOString(),
+      timeUntilReset: Math.floor(timeUntilReset / 1000) + 's',
+      durationMs: Date.now() - startTime,
+      step: 'check-has-remaining'
+    });
+    return true;
+  }
+
+  // We're rate limited
+  console.error('[Twitter Storage] Rate limited:', {
     endpoint,
-    resetAt: rateLimit.resetAt.toISOString(),
+    resetAt: resetAt.toISOString(),
+    remaining: rateLimit.remaining,
     timeUntilReset: Math.floor(timeUntilReset / 1000) + 's',
     durationMs: Date.now() - startTime,
-    step: 'check-window-active'
+    step: 'check-rate-limited'
   });
   return false;
 } 

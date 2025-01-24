@@ -185,7 +185,7 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
 }
 
 // Initialize read-only client for fetching tweets
-export async function getReadOnlyClient(): Promise<TwitterApiv2> {
+export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
   return new TwitterApi({
     appKey: env.TWITTER_API_KEY,
@@ -201,24 +201,87 @@ export async function executeWithRateLimit<T>(
   params: any,
   apiCall: () => Promise<T>
 ): Promise<T> {
+  console.log('[Twitter API] Starting rate limit check:', {
+    endpoint,
+    params,
+    timestamp: new Date().toISOString(),
+    step: 'pre-check'
+  });
+
+  const rateLimit = await getRateLimit(endpoint);
+  const now = new Date();
+  const resetAt = rateLimit ? new Date(rateLimit.resetAt) : null;
+
+  // If we have rate limit info and we're still within the window
+  if (rateLimit && resetAt && now < resetAt) {
+    // If we have no remaining requests, wait until reset
+    if (rateLimit.remaining <= 0) {
+      const waitTime = resetAt.getTime() - now.getTime();
+      console.log('[Twitter API] Rate limit exceeded, waiting:', {
+        endpoint,
+        resetAt: resetAt.toISOString(),
+        waitTimeMs: waitTime,
+        timestamp: now.toISOString(),
+        step: 'waiting'
+      });
+
+      // Wait until reset time plus 1 second buffer
+      await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+      
+      // Clear rate limit after waiting
+      await updateRateLimit(endpoint, new Date(Date.now() + RATE_LIMIT_WINDOW), 0);
+    }
+  }
+
   console.log('[Twitter API] Making request:', {
     endpoint,
     params,
     timestamp: new Date().toISOString(),
+    checkDurationMs: Date.now() - now.getTime(),
     step: 'pre-request'
   });
 
   try {
     const response = await apiCall();
+    
+    // Update rate limit from response headers if available
+    const rateLimitInfo = (response as any).rateLimit;
+    if (rateLimitInfo) {
+      const resetTime = new Date(rateLimitInfo.reset * 1000);
+      await updateRateLimit(endpoint, resetTime, rateLimitInfo.remaining);
+      
+      console.log('[Twitter API] Rate limit updated:', {
+        endpoint,
+        remaining: rateLimitInfo.remaining,
+        resetTime: resetTime.toISOString(),
+        timestamp: new Date().toISOString(),
+        requestDurationMs: Date.now() - now.getTime(),
+        step: 'rate-limit-updated'
+      });
+    }
+
     return response;
   } catch (error) {
-    // For rate limit errors (429), just log and throw
-    if (error instanceof ApiResponseError && error.code === 429) {
-      console.log('[Twitter API] Rate limited by API:', {
-        endpoint,
-        timestamp: new Date().toISOString(),
-        step: 'rate-limited'
-      });
+    if (error instanceof Error && error.message.includes('429')) {
+      // Get rate limit info from error response
+      const rateLimitInfo = (error as any).rateLimit;
+      if (rateLimitInfo) {
+        const resetTime = new Date(rateLimitInfo.reset * 1000);
+        await updateRateLimit(endpoint, resetTime, 0);
+        
+        // Wait and retry once
+        const waitTime = resetTime.getTime() - Date.now();
+        console.log('[Twitter API] Rate limit hit, waiting to retry:', {
+          endpoint,
+          resetTime: resetTime.toISOString(),
+          waitTimeMs: waitTime,
+          timestamp: new Date().toISOString(),
+          step: 'retry-wait'
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+        return executeWithRateLimit(endpoint, params, apiCall);
+      }
     }
     throw error;
   }
@@ -266,15 +329,16 @@ export const fetchTechTweets = async (username: string) => {
   
   const client = await getReadOnlyClient();
   
-  // Use search endpoint
-  const response = await client.search(`from:${cleanUsername} -is:retweet`, {
+  // Use search endpoint instead of user lookup
+  const tweets = await client.get('tweets/search/recent', {
+    query: `from:${cleanUsername} -is:retweet`,
     expansions: ['author_id', 'attachments.media_keys'],
     'tweet.fields': ['created_at', 'text', 'public_metrics'],
     'user.fields': ['profile_image_url', 'username'],
     max_results: 50,
   });
   
-  return response.data;
+  return tweets.data;
 };
 
 // Post a new tweet (requires OAuth 2.0 user authentication)
