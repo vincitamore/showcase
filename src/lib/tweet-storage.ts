@@ -5,6 +5,7 @@ import type { Prisma } from '.prisma/client'
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000 // 15 minutes in milliseconds
 export const MAX_TWEETS = 100
+export const SELECTED_TWEET_COUNT = 10
 export const CACHE_TYPES = {
   CURRENT: 'current',
   PREVIOUS: 'previous',
@@ -306,7 +307,6 @@ export async function getCachedTweets(type: CacheType = CACHE_TYPES.CURRENT) {
 
 const TWEET_LIMIT = 100;
 const CACHE_LIMIT = 1000;
-const SELECTED_TWEET_COUNT = 10;
 
 export async function updateSelectedTweets(tweetIds: string[]) {
   const selectedTweetIds = tweetIds.slice(0, SELECTED_TWEET_COUNT);
@@ -320,7 +320,7 @@ export async function updateSelectedTweets(tweetIds: string[]) {
     data: {
       isActive: false
     }
-  })
+  });
 
   // Create new selected cache
   const cache = await (prisma as any).tweetCache.create({
@@ -331,9 +331,9 @@ export async function updateSelectedTweets(tweetIds: string[]) {
         connect: selectedTweetIds.map(id => ({ id }))
       }
     }
-  })
+  });
 
-  return cache
+  return cache;
 }
 
 export async function getSelectedTweets(): Promise<TweetV2[]> {

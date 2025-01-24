@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
-import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
+import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEET_COUNT } from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError, TweetSearchRecentV2Paginator, TwitterRateLimit } from 'twitter-api-v2';
 
@@ -261,7 +261,7 @@ export async function GET(request: Request) {
         )
         .map(t => t.id);
       
-      const selectedCount = Math.min(10, tweetIds.length);
+      const selectedCount = Math.min(SELECTED_TWEET_COUNT, tweetIds.length);
       const selectedIds: string[] = [];
       
       while (selectedIds.length < selectedCount) {

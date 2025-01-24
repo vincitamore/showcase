@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { TwitterApi, TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
-import { getCachedTweets, getSelectedTweets } from '@/lib/tweet-storage'
+import { getCachedTweets, getSelectedTweets, SELECTED_TWEET_COUNT } from '@/lib/tweet-storage'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -288,8 +288,8 @@ export async function GET() {
       return NextResponse.json({ tweets: [] });
     }
 
-    // Get 10 random tweets from the cache, prioritizing those with entities
-    const selectedFromCache = getRandomItems(cachedTweets.tweets, 10);
+    // Get random tweets from the cache, prioritizing those with entities
+    const selectedFromCache = getRandomItems(cachedTweets.tweets, SELECTED_TWEET_COUNT);
     console.log('[Twitter] Selected tweets from cache:', {
       totalCached: cachedTweets.tweets.length,
       selected: selectedFromCache.length,
