@@ -188,83 +188,40 @@ const BlogSection = () => {
                 retweet_count: 0
               };
 
-          const entities = dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
+          // Convert entities directly without reducing
+          const entities = dbTweet.entities?.map((entity: any) => {
             try {
-              const entityData = entity.metadata 
+              const metadata = entity.metadata 
                 ? (typeof entity.metadata === 'string'
                     ? JSON.parse(entity.metadata)
                     : entity.metadata)
                 : {};
-              
-              switch (entity.type) {
-                case 'url':
-                  if (!acc.urls) acc.urls = [];
-                  acc.urls.push({
-                    url: entity.url,
-                    expanded_url: entity.expandedUrl || entity.url,
-                    display_url: entity.text || entity.url,
-                    indices: entityData.indices || [0, 0],
-                    title: entityData.title,
-                    description: entityData.description,
-                    images: entityData.images?.map((img: any) => ({
-                      url: img.url,
-                      width: img.width || 0,
-                      height: img.height || 0
-                    }))
-                  });
-                  break;
-                case 'mention':
-                  if (!acc.mentions) acc.mentions = [];
-                  acc.mentions.push({
-                    username: entity.text,
-                    indices: entityData.indices || [0, 0]
-                  });
-                  break;
-                case 'hashtag':
-                  if (!acc.hashtags) acc.hashtags = [];
-                  acc.hashtags.push({
-                    tag: entity.text,
-                    indices: entityData.indices || [0, 0]
-                  });
-                  break;
-                case 'media':
-                  if (!acc.media) acc.media = [];
-                  acc.media.push({
-                    media_key: entity.mediaKey || '',
-                    type: entityData.type || 'photo',
-                    url: entityData.url || '',
-                    preview_image_url: entityData.preview_image_url || entityData.url || '',
-                    width: entityData.width || 0,
-                    height: entityData.height || 0
-                  });
-                  
-                  // Log media entity processing
-                  console.log('[Tweet Processing] Media entity:', {
-                    mediaKey: entity.mediaKey,
-                    type: entityData.type,
-                    url: entityData.url,
-                    preview_url: entityData.preview_image_url,
-                    metadata: entityData
-                  });
-                  break;
-              }
-              return acc;
+
+              return {
+                id: entity.id,
+                type: entity.type,
+                text: entity.text,
+                url: entity.url,
+                expandedUrl: entity.expandedUrl,
+                displayUrl: entity.displayUrl,
+                mediaKey: entity.mediaKey,
+                metadata
+              };
             } catch (entityError) {
               console.error('Error processing entity:', { entity, error: entityError });
-              return acc;
+              return null;
             }
-          }, {} as TweetEntities);
+          }).filter(Boolean);
 
           // Log processed entities
           console.log('[Tweet Processing] Processed entities:', {
             tweetId: dbTweet.id,
-            entityCounts: {
-              urls: entities?.urls?.length || 0,
-              mentions: entities?.mentions?.length || 0,
-              hashtags: entities?.hashtags?.length || 0,
-              media: entities?.media?.length || 0
-            },
-            mediaEntities: entities?.media || []
+            entityCount: entities?.length || 0,
+            entities: entities?.map((e: TweetEntity) => ({
+              type: e.type,
+              text: e.text,
+              mediaKey: e.mediaKey
+            }))
           });
 
           return {
