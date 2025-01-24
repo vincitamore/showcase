@@ -349,13 +349,22 @@ export async function getSelectedTweets(): Promise<TweetV2[]> {
         },
         orderBy: {
           createdAt: 'desc'
-        },
-        take: SELECTED_TWEET_COUNT
+        }
       }
     }
   });
   
-  return cache?.tweets || [];
+  // Ensure we return exactly SELECTED_TWEET_COUNT tweets
+  const tweets = cache?.tweets || [];
+  if (tweets.length > SELECTED_TWEET_COUNT) {
+    console.log('[Twitter Storage] Trimming selected tweets to limit:', {
+      total: tweets.length,
+      limit: SELECTED_TWEET_COUNT
+    });
+    return tweets.slice(0, SELECTED_TWEET_COUNT);
+  }
+  
+  return tweets;
 }
 
 // Rate limit management
