@@ -72,113 +72,175 @@ export async function GET(request: Request) {
     // Verify cron secret
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      console.error('[Cron] Invalid authorization');
+      console.error('[Cron] Unauthorized request:', {
+        hasAuth: !!authHeader,
+        timestamp: new Date().toISOString(),
+        step: 'auth-check'
+      });
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     console.log('[Cron] Starting tweet fetch...', {
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      step: 'start'
     });
 
     // Get Twitter client
     const client = await getReadOnlyClient();
     
+    console.log('[Cron] Client initialized, fetching user...', {
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'client-ready'
+    });
+
     // Get user info
     const username = env.TWITTER_USERNAME?.replace('@', '');
     if (!username) {
-      console.error('[Cron] Twitter username not configured');
+      console.error('[Cron] Twitter username not configured:', {
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'config-error'
+      });
       return new NextResponse('Twitter username not configured', { status: 500 });
     }
 
-    const user = await client.userByUsername(username);
+    // Get user data with rate limit handling
+    const user = await executeWithRateLimit(
+      'users/by/username',
+      { username },
+      () => client.userByUsername(username)
+    );
+
     if (!user.data) {
-      console.error('[Cron] User not found:', { username });
+      console.error('[Cron] User not found:', {
+        username,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'user-not-found'
+      });
       return new NextResponse('User not found', { status: 404 });
     }
 
-    console.log('[Cron] Found user:', {
-      id: user.data.id,
-      username: user.data.username
+    console.log('[Cron] User found, fetching timeline...', {
+      userId: user.data.id,
+      username: user.data.username,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'user-found'
     });
 
-    // Fetch tweets with proper parameters
+    // Fetch tweets with rate limit handling
     const tweets = await executeWithRateLimit(
-      'userTimeline',
+      'users/:id/tweets',
       {
         userId: user.data.id,
-        exclude: ['replies', 'retweets'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
-        'user.fields': ['name', 'username', 'profile_image_url'],
-        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        exclude: ['retweets', 'replies'],
         expansions: ['author_id', 'attachments.media_keys'],
-        max_results: 40
+        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+        'user.fields': ['profile_image_url', 'username'],
+        'media.fields': ['url', 'preview_image_url', 'alt_text'],
+        max_results: 100
       },
       () => client.userTimeline(user.data.id, {
-        exclude: ['replies', 'retweets'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
-        'user.fields': ['name', 'username', 'profile_image_url'],
-        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        exclude: ['retweets', 'replies'],
         expansions: ['author_id', 'attachments.media_keys'],
-        max_results: 40
+        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+        'user.fields': ['profile_image_url', 'username'],
+        'media.fields': ['url', 'preview_image_url', 'alt_text'],
+        max_results: 100
       })
     );
 
     if (!tweets.data?.data?.length) {
-      console.error('[Cron] No tweets found for user:', { username });
+      console.error('[Cron] No tweets found:', {
+        username,
+        userId: user.data.id,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'no-tweets'
+      });
       return new NextResponse('No tweets found', { status: 404 });
     }
 
-    console.log('[Cron] Retrieved tweets:', {
+    console.log('[Cron] Timeline fetched:', {
       count: tweets.data.data.length,
       firstTweetId: tweets.data.data[0].id,
-      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id
+      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-fetched'
     });
 
     // Cache the tweets
     const cache = await cacheTweets(tweets.data.data);
-    console.log('[Cron] Cached tweets:', {
+    console.log('[Cron] Tweets cached:', {
       cacheId: cache.id,
-      tweetCount: tweets.data.data.length
+      tweetCount: tweets.data.data.length,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-cached'
     });
 
     // Get current cached tweets
     const cachedTweets = await getCachedTweets();
     if (!cachedTweets?.tweets?.length) {
-      console.error('[Cron] Failed to verify cached tweets');
+      console.error('[Cron] Failed to verify cached tweets:', {
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'cache-verification-failed'
+      });
       return new NextResponse('Failed to verify cached tweets', { status: 500 });
     }
 
-    // Convert and update selected tweets
-    const selectedTweets = cachedTweets.tweets
-      .slice(0, 7) // Get first 7 tweets
-      .sort(() => 0.5 - Math.random()) // Randomize order
-      .map((tweet: TweetWithEntities) => tweet.id);
-
-    await updateSelectedTweets(selectedTweets);
+    // Select random tweets
+    const tweetIds = tweets.data.data.map(t => t.id);
+    const selectedCount = Math.min(3, tweetIds.length);
+    const selectedIds: string[] = [];
     
-    const executionTime = Date.now() - startTime;
-    console.log('[Cron] Job completed successfully:', {
-      tweetsStored: tweets.data.data.length,
-      selectedTweets: selectedTweets.length,
-      executionTimeMs: executionTime
+    while (selectedIds.length < selectedCount) {
+      const randomIndex = Math.floor(Math.random() * tweetIds.length);
+      const id = tweetIds[randomIndex];
+      if (!selectedIds.includes(id)) {
+        selectedIds.push(id);
+      }
+    }
+
+    console.log('[Cron] Selected random tweets:', {
+      selectedCount,
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-selected'
+    });
+
+    // Update selected tweets
+    const selectedCache = await updateSelectedTweets(selectedIds);
+    
+    console.log('[Cron] Selected tweets updated:', {
+      selectedCacheId: selectedCache.id,
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'complete'
     });
 
     return NextResponse.json({
-      success: true,
-      tweetsStored: tweets.data.data.length,
-      selectedTweets: selectedTweets.length,
-      executionTimeMs: executionTime
+      message: 'Tweets fetched and cached successfully',
+      tweetCount: tweets.data.data.length,
+      selectedCount: selectedIds.length
     });
   } catch (error) {
-    const executionTime = Date.now() - startTime;
     console.error('[Cron] Job failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      executionTimeMs: executionTime
+      executionTimeMs: Date.now() - startTime,
+      step: 'error',
+      timestamp: new Date().toISOString()
     });
-
+    
     return new NextResponse(
-      error instanceof Error ? error.message : 'Internal Server Error', 
+      error instanceof Error ? error.message : 'Internal Server Error',
       { status: 500 }
     );
   }
