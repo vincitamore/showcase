@@ -391,10 +391,10 @@ const BlogSection = () => {
   return (
     <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
       <div className="mb-12 text-center">
-        <h2 className="text-3xl font-bold mb-4">Tech Thoughts</h2>
+        <h2 className="text-3xl font-bold mb-4">Tech Twitter Thoughts</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Sharing insights and experiences from my journey in software development,
-          network engineering, and cybersecurity.
+          network engineering, and cybersecurity; plus a good bit of poasting.
         </p>
       </div>
 
