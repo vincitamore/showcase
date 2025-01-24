@@ -7,10 +7,12 @@ interface CachedTweets {
 }
 
 // Cache keys
-export const CACHE_KEY_PREFIX = 'cached-tweets';
-export const RATE_LIMIT_PREFIX = 'rate-limit-timestamp';
-export const RATE_LIMIT_FILE = 'rate-limit-timestamp.txt';
-export const SELECTED_TWEETS_FILE = 'selected-tweets.json';
+export const CACHE_KEY_PREFIX = 'tweets';
+export const CURRENT_CACHE_FILE = 'tweets/current.json';
+export const PREVIOUS_CACHE_FILE = 'tweets/previous.json';
+export const RATE_LIMIT_PREFIX = 'rate-limit';
+export const RATE_LIMIT_FILE = 'rate-limit/timestamp.txt';
+export const SELECTED_TWEETS_FILE = 'tweets/selected.json';
 
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -69,13 +71,15 @@ function hasTweetEntities(tweet: TweetV2): boolean {
 
 async function checkStorageUsage(): Promise<number> {
   try {
-    const { blobs } = await list({ prefix: CACHE_KEY_PREFIX });
-    const totalBytes = blobs.reduce((acc, blob) => acc + (blob.size || 0), 0);
+    // Check all tweet-related storage
+    const { blobs: currentBlobs } = await list({ prefix: 'tweets/' });
+    const totalBytes = currentBlobs.reduce((acc, blob) => acc + (blob.size || 0), 0);
     const totalMB = totalBytes / BYTES_PER_MB;
     
-    console.log('Current blob storage usage:', {
+    console.log('Current tweet storage usage:', {
       totalMB: Math.round(totalMB * 100) / 100,
-      totalFiles: blobs.length
+      totalFiles: currentBlobs.length,
+      files: currentBlobs.map(b => b.pathname)
     });
     
     return totalMB;
@@ -95,10 +99,11 @@ async function cleanupOldCachedTweets(): Promise<void> {
     }
     
     console.log('Storage usage exceeds limit, starting cleanup...');
-    const { blobs } = await list({ prefix: CACHE_KEY_PREFIX });
+    const { blobs } = await list({ prefix: 'tweets/' });
     
     // Sort blobs by date, keeping most recent
     const sortedBlobs = blobs
+      .filter(blob => !blob.pathname.includes('current.json') && !blob.pathname.includes('selected.json'))
       .map(blob => ({
         pathname: blob.pathname,
         url: blob.url,
@@ -107,20 +112,8 @@ async function cleanupOldCachedTweets(): Promise<void> {
       }))
       .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
     
-    let currentSize = 0;
-    const blobsToKeep: BlobInfo[] = [];
-    const blobsToDelete: BlobInfo[] = [];
-    
-    // Keep adding blobs until we hit 80% of our limit
-    for (const blob of sortedBlobs) {
-      const newSize = currentSize + (blob.size / BYTES_PER_MB);
-      if (newSize < STORAGE_LIMIT_MB * 0.8) {
-        blobsToKeep.push(blob);
-        currentSize = newSize;
-      } else {
-        blobsToDelete.push(blob);
-      }
-    }
+    // Delete all but the most recent previous cache
+    const blobsToDelete = sortedBlobs.slice(1);
     
     // Delete old blobs
     for (const blob of blobsToDelete) {
@@ -129,9 +122,8 @@ async function cleanupOldCachedTweets(): Promise<void> {
     }
     
     console.log('Cleanup completed:', {
-      filesKept: blobsToKeep.length,
-      filesDeleted: blobsToDelete.length,
-      newSizeMB: Math.round(currentSize * 100) / 100
+      filesKept: sortedBlobs.length - blobsToDelete.length,
+      filesDeleted: blobsToDelete.length
     });
   } catch (error) {
     console.error('Error during storage cleanup:', error);
@@ -140,56 +132,42 @@ async function cleanupOldCachedTweets(): Promise<void> {
 
 export async function getCachedTweets(): Promise<CachedTweets | null> {
   try {
-    console.log('Listing blobs with prefix:', CACHE_KEY_PREFIX);
-    const { blobs } = await list({ prefix: CACHE_KEY_PREFIX });
-    console.log('Found blobs:', blobs.map(b => ({ url: b.url, pathname: b.pathname })));
+    // First try to get current cache
+    const { blobs: currentBlobs } = await list({ prefix: CURRENT_CACHE_FILE });
+    let cacheBlob = currentBlobs[0];
     
-    if (blobs.length === 0) {
-      console.log('No blobs found with prefix:', CACHE_KEY_PREFIX);
+    // If no current cache, try previous
+    if (!cacheBlob) {
+      const { blobs: previousBlobs } = await list({ prefix: PREVIOUS_CACHE_FILE });
+      cacheBlob = previousBlobs[0];
+    }
+    
+    // If no cache found at all
+    if (!cacheBlob) {
+      console.log('No cached tweets found');
       return null;
     }
     
-    // Fetch and parse all blobs
-    const allTweets = new Map<string, TweetV2>(); // Use Map to deduplicate by tweet ID
-    
-    for (const blob of blobs) {
-      try {
-        console.log('Fetching blob:', blob.pathname);
-        const response = await fetch(blob.url);
-        
-        if (!response.ok) {
-          console.error('Failed to fetch blob content:', blob.pathname, response.statusText);
-          continue;
-        }
-        
-        const text = await response.text();
-        const parsed = JSON.parse(text);
-        
-        if (Array.isArray(parsed?.tweets)) {
-          parsed.tweets.forEach((tweet: TweetV2) => {
-            if (tweet.id && !allTweets.has(tweet.id)) {
-              allTweets.set(tweet.id, tweet);
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Error processing blob:', blob.pathname, error);
-        continue;
-      }
+    // Fetch the blob content
+    const response = await fetch(cacheBlob.url);
+    if (!response.ok) {
+      console.error('Failed to fetch cache content:', response.statusText);
+      return null;
     }
     
-    const uniqueTweets = Array.from(allTweets.values());
-    console.log('Aggregated unique tweets:', {
-      totalBlobs: blobs.length,
-      uniqueTweets: uniqueTweets.length,
-      withEntities: uniqueTweets.filter(hasTweetEntities).length,
-      tweetIds: uniqueTweets.map(t => t.id)
+    const data = await response.json();
+    if (!data?.tweets || !Array.isArray(data.tweets)) {
+      console.error('Invalid cache data structure');
+      return null;
+    }
+    
+    console.log('Retrieved cached tweets:', {
+      source: cacheBlob.pathname,
+      count: data.tweets.length,
+      withEntities: data.tweets.filter(hasTweetEntities).length
     });
     
-    return {
-      tweets: uniqueTweets,
-      timestamp: Date.now().toString()
-    };
+    return data;
   } catch (error) {
     console.error('Error getting cached tweets:', error);
     return null;
@@ -206,27 +184,54 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
       timestamp: Date.now().toString()
     };
     
-    const filename = `${CACHE_KEY_PREFIX}-${Date.now()}.json`;
-    console.log('Caching tweets to:', filename, {
+    // First, try to get current cache
+    const { blobs: currentBlobs } = await list({ prefix: CURRENT_CACHE_FILE });
+    
+    // If current cache exists, move it to previous
+    if (currentBlobs.length > 0) {
+      console.log('Moving current cache to previous');
+      const currentResponse = await fetch(currentBlobs[0].url);
+      if (currentResponse.ok) {
+        const currentData = await currentResponse.text();
+        await put(PREVIOUS_CACHE_FILE, currentData, {
+          contentType: 'application/json',
+          access: 'public',
+          addRandomSuffix: false
+        });
+      }
+      // Delete old current cache
+      await del(currentBlobs[0].url);
+    }
+    
+    // Delete old previous cache if it exists
+    const { blobs: previousBlobs } = await list({ prefix: PREVIOUS_CACHE_FILE });
+    if (previousBlobs.length > 0) {
+      console.log('Deleting old previous cache');
+      await del(previousBlobs[0].url);
+    }
+    
+    // Store new tweets as current cache
+    console.log('Storing new tweets as current cache', {
       count: tweetsToCache.length,
       withEntities: tweetsToCache.filter(hasTweetEntities).length
     });
     
-    await put(filename, JSON.stringify(cachedData), {
+    await put(CURRENT_CACHE_FILE, JSON.stringify(cachedData), {
       contentType: 'application/json',
       access: 'public',
+      addRandomSuffix: false
     });
     
     console.log('Successfully cached tweets:', {
       count: tweetsToCache.length,
       timestamp: new Date().toISOString(),
-      withEntities: tweetsToCache.filter(hasTweetEntities).length
+      withEntities: tweetsToCache.filter(hasTweetEntities).length,
+      currentFile: CURRENT_CACHE_FILE,
+      previousFile: PREVIOUS_CACHE_FILE
     });
-    
-    // Check storage usage and cleanup if needed
-    await cleanupOldCachedTweets();
   } catch (error) {
     console.error('Error caching tweets:', error);
+    throw error; // Propagate error to caller
   }
 }
 
@@ -313,13 +318,50 @@ export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
   }
 }
 
+// Helper function to get random items ensuring at least one has entities
+function getRandomTweetsWithOneEntity(tweets: TweetV2[], count: number): TweetV2[] {
+  // First, separate tweets with and without entities
+  const tweetsWithEntities = tweets.filter(hasTweetEntities);
+  const tweetsWithoutEntities = tweets.filter(t => !hasTweetEntities(t));
+  
+  // If no tweets with entities, just return random selection
+  if (tweetsWithEntities.length === 0) {
+    console.log('No tweets with entities available');
+    return getRandomItems(tweets, count);
+  }
+  
+  // Get one random tweet with entities
+  const selectedEntityTweet = getRandomItems(tweetsWithEntities, 1)[0];
+  
+  // Combine remaining tweets and get random selection
+  const remainingTweets = tweets.filter(t => t.id !== selectedEntityTweet.id);
+  const additionalTweets = getRandomItems(remainingTweets, count - 1);
+  
+  // Combine and shuffle the final selection
+  const finalSelection = [selectedEntityTweet, ...additionalTweets];
+  return getRandomItems(finalSelection, finalSelection.length);
+}
+
 export async function getSelectedTweets(): Promise<SelectedTweets | null> {
   try {
     console.log('Getting selected tweets...');
     const { blobs } = await list({ prefix: SELECTED_TWEETS_FILE });
     
     if (blobs.length === 0) {
-      console.log('No selected tweets found');
+      // If no selected tweets, try to get from current cache
+      console.log('No selected tweets found, checking current cache...');
+      const currentCache = await getCachedTweets();
+      if (currentCache?.tweets.length) {
+        // Select tweets ensuring at least one has entities
+        const selectedTweets = getRandomTweetsWithOneEntity(currentCache.tweets, 4);
+        if (selectedTweets.length) {
+          await updateSelectedTweets(selectedTweets);
+          return {
+            tweets: selectedTweets,
+            timestamp: Date.now().toString()
+          };
+        }
+      }
       return null;
     }
     
@@ -330,10 +372,35 @@ export async function getSelectedTweets(): Promise<SelectedTweets | null> {
     }
     
     const data = await response.json() as SelectedTweets;
+    
+    // Check if selected tweets are older than 15 minutes
+    const timestamp = parseInt(data.timestamp);
+    if (!isNaN(timestamp) && Date.now() - timestamp >= FIFTEEN_MINUTES) {
+      console.log('Selected tweets are older than 15 minutes, selecting new ones...');
+      const currentCache = await getCachedTweets();
+      if (currentCache?.tweets.length) {
+        // Filter out currently selected tweets to ensure rotation
+        const availableTweets = currentCache.tweets.filter(tweet => 
+          !data.tweets.some(selected => selected.id === tweet.id)
+        );
+        if (availableTweets.length) {
+          const selectedTweets = getRandomTweetsWithOneEntity(availableTweets, 4);
+          if (selectedTweets.length) {
+            await updateSelectedTweets(selectedTweets);
+            return {
+              tweets: selectedTweets,
+              timestamp: Date.now().toString()
+            };
+          }
+        }
+      }
+    }
+    
     console.log('Retrieved selected tweets:', {
       count: data.tweets.length,
       timestamp: new Date(data.timestamp).toISOString(),
-      withEntities: data.tweets.filter(hasTweetEntities).length
+      withEntities: data.tweets.filter(hasTweetEntities).length,
+      tweetIds: data.tweets.map(t => t.id)
     });
     
     return data;
@@ -341,6 +408,12 @@ export async function getSelectedTweets(): Promise<SelectedTweets | null> {
     console.error('Error getting selected tweets:', error);
     return null;
   }
+}
+
+// Helper function to get random items from an array
+function getRandomItems<T>(array: T[], count: number): T[] {
+  const shuffled = [...array].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
 }
 
 export async function canMakeRequest(lastTimestamp: number | null): Promise<boolean> {

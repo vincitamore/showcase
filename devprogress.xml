@@ -1,163 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <dev-progress>
     <meta>
-        <description>Current development progress and next steps tracking</description>
+        <description>Development progress tracking</description>
         <version>1.0.0</version>
         <last-updated>2024-01-21</last-updated>
     </meta>
 
-    <current-status>
-        <completed-items>
-            <item id="entity-handling">
-                <title>Tweet Entity Handling</title>
-                <status>Complete</status>
-                <details>
-                    <detail>Implemented comprehensive entity validation and cleaning</detail>
-                    <detail>Added proper URL detection and processing</detail>
-                    <detail>Enhanced entity type handling for all categories</detail>
-                    <detail>Added detailed entity logging and monitoring</detail>
-                </details>
-                <related-files>
-                    <file>src/lib/x-api.ts</file>
-                    <file>src/lib/blob-storage.ts</file>
-                    <file>src/app/api/twitter/tweets/route.ts</file>
-                </related-files>
-            </item>
+    <completed-items>
+        <item id="tweet-content-handling" status="completed">
+            <title>Tweet Content Processing System</title>
+            <description>Comprehensive system for handling tweet content including media, entities, and metadata</description>
+            <details>
+                <detail>Implemented robust content validation system</detail>
+                <detail>Added proper media field handling and extraction</detail>
+                <detail>Enhanced entity detection and processing</detail>
+                <detail>Implemented comprehensive logging system</detail>
+                <detail>Ensured data preservation through storage cycles</detail>
+                <detail>Enhanced type safety with proper interfaces</detail>
+            </details>
+            <files>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+                <file>src/lib/x-api.ts</file>
+                <file>src/lib/blob-storage.ts</file>
+                <file>src/app/api/twitter/tweets/route.ts</file>
+            </files>
+            <related-items>
+                <item ref="chat-functionality"/>
+                <item ref="content-monitoring"/>
+            </related-items>
+        </item>
 
-            <item id="chat-functionality">
-                <title>Chat Implementation</title>
-                <status>Complete</status>
-                <details>
-                    <detail>Restored chat functionality with AI SDK v4.0</detail>
-                    <detail>Implemented proper streaming responses</detail>
-                    <detail>Added error handling and logging</detail>
-                </details>
-                <related-files>
-                    <file>src/app/api/chat/route.ts</file>
-                    <file>src/components/animated-chat-input.tsx</file>
-                </related-files>
-            </item>
+        <item id="dev-tracking" status="completed">
+            <title>Development Tracking System</title>
+            <description>XML-based system for tracking development progress and history</description>
+            <details>
+                <detail>Created structured XML tracking system</detail>
+                <detail>Implemented cross-linking between files</detail>
+                <detail>Established clear progress monitoring</detail>
+            </details>
+            <files>
+                <file>devfunction.xml</file>
+                <file>devhistory.xml</file>
+                <file>devprogress.xml</file>
+                <file>devgoal.xml</file>
+            </files>
+        </item>
+    </completed-items>
 
-            <item id="twitter-auth">
-                <title>Twitter Authentication</title>
-                <status>Complete</status>
-                <details>
-                    <detail>Properly scoped to blog composer only</detail>
-                    <detail>Split middleware into focused components</detail>
-                    <detail>Implemented blob storage auth adapter</detail>
-                </details>
-                <related-files>
-                    <file>src/lib/blob-storage.ts</file>
-                    <file>src/middleware/auth.ts</file>
-                </related-files>
-            </item>
+    <in-progress-items>
+        <item id="chat-functionality" status="in-progress">
+            <title>Chat System Implementation</title>
+            <description>Core chat functionality with tweet integration</description>
+            <sub-items>
+                <item>Media extraction and display</item>
+                <item>Entity detection and highlighting</item>
+                <item>Tweet storage and retrieval</item>
+            </sub-items>
+        </item>
+    </in-progress-items>
 
-            <item id="tweet-storage">
-                <title>Tweet Storage System</title>
-                <status>Complete</status>
-                <details>
-                    <detail>Implemented two-blob rotation system</detail>
-                    <detail>Enhanced entity detection for all types</detail>
-                    <detail>Improved logging and error handling</detail>
-                </details>
-                <related-files>
-                    <file>src/lib/blob-storage.ts</file>
-                    <file>src/app/api/cron/fetch-tweets/route.ts</file>
-                </related-files>
-            </item>
-        </completed-items>
-
-        <in-progress-items>
-            <item id="rate-limiting">
-                <title>Rate Limiting Implementation</title>
-                <status>In Progress</status>
-                <details>
-                    <detail>Database tracking implemented</detail>
-                    <detail>Need to verify timestamp calculations</detail>
-                    <detail>Monitoring needed for rate limit windows</detail>
-                </details>
-                <blockers>
-                    <blocker>Need to verify rate limit error sources</blocker>
-                    <blocker>Timestamp handling across time zones</blocker>
-                </blockers>
-            </item>
-        </in-progress-items>
-    </current-status>
-
-    <next-steps priority="high">
-        <step id="entity-verification">
-            <title>Monitor Entity Processing</title>
+    <next-steps>
+        <item id="content-monitoring" priority="high">
+            <title>Content Processing Monitoring</title>
             <tasks>
+                <task>Implement monitoring for media extraction success rates</task>
                 <task>Track entity detection accuracy</task>
-                <task>Monitor entity distribution in tweets</task>
-                <task>Verify URL metadata preservation</task>
+                <task>Monitor metadata preservation through storage cycles</task>
+                <task>Set up alerts for processing failures</task>
             </tasks>
-        </step>
-
-        <step id="storage-monitoring">
-            <title>Monitor Two-Blob System</title>
-            <tasks>
-                <task>Track blob rotation success rate</task>
-                <task>Monitor tweet preservation accuracy</task>
-                <task>Verify entity data integrity</task>
-            </tasks>
-        </step>
-
-        <step id="twitter-auth-prod">
-            <title>Test Twitter Auth in Production</title>
-            <tasks>
-                <task>Verify OAuth callback URLs</task>
-                <task>Test rate limiting behavior</task>
-                <task>Monitor error logs</task>
-            </tasks>
-        </step>
-
-        <step id="rate-limit-monitoring">
-            <title>Implement Rate Limit Monitoring</title>
-            <tasks>
-                <task>Add metrics for request tracking</task>
-                <task>Implement cache hit tracking</task>
-                <task>Add rate limit window visualization</task>
-            </tasks>
-        </step>
-
-        <step id="ui-enhancements">
-            <title>UI/UX Improvements</title>
-            <tasks>
-                <task>Add loading states for dynamic content</task>
-                <task>Enhance timeline card interactions</task>
-                <task>Verify responsive design on all devices</task>
-            </tasks>
-        </step>
+        </item>
     </next-steps>
 
-    <environment-setup>
-        <required-variables>
-            <variable name="XAI_API_KEY">For xAI Grok-2 chat functionality</variable>
-            <variable name="DATABASE_URL">PostgreSQL connection string</variable>
-            <variable name="DIRECT_URL">Direct database connection</variable>
-            <variable name="NEXT_PUBLIC_URL">Deployed application URL</variable>
-            <variable name="TWITTER_API_KEY">OAuth 1.0a read-only access</variable>
-            <variable name="TWITTER_CLIENT_ID">OAuth 2.0 user authentication</variable>
-        </required-variables>
-
-        <deployment-notes>
-            <note>Must run prisma generate during build</note>
-            <note>Database requires both URL and DIRECT_URL</note>
-            <note>Rate limiting uses database instead of Edge Config</note>
-        </deployment-notes>
-    </environment-setup>
-
     <monitoring-needs>
-        <need>Track entity detection accuracy and distribution</need>
-        <need>Monitor entity type coverage across tweets</need>
-        <need>Track URL metadata preservation</need>
-        <need>Monitor blob rotation system performance</need>
-        <need>Track tweet selection quality metrics</need>
-        <need>Verify entity preservation through storage cycles</need>
-        <need>Track rate limit windows</need>
-        <need>Monitor successful vs failed requests</need>
-        <need>Track cache hit rates</need>
-        <need>Verify timestamp consistency</need>
+        <category id="content-processing">
+            <need>Track success rates of content extraction</need>
+            <need>Monitor entity detection accuracy</need>
+            <need>Verify metadata preservation</need>
+        </category>
+        <category id="rate-limiting">
+            <need>Monitor API rate limit usage</need>
+            <need>Track request patterns</need>
+        </category>
+        <category id="auth-system">
+            <need>Monitor authentication success rates</need>
+            <need>Track token refresh patterns</need>
+        </category>
     </monitoring-needs>
 </dev-progress> 

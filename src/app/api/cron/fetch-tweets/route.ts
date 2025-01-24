@@ -8,47 +8,77 @@ import {
   canMakeRequest,
   updateSelectedTweets
 } from '@/lib/blob-storage';
-import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
+import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, MediaObjectV2 } from 'twitter-api-v2';
+
+interface TweetWithAuthor extends TweetV2 {
+  author?: {
+    id: string;
+    name: string;
+    username: string;
+    profile_image_url?: string;
+  };
+  media?: MediaObjectV2[];
+}
 
 // Helper function to check if a tweet has any type of entity
 function hasTweetEntities(tweet: TweetV2): boolean {
-  // Log the full entities structure for debugging
-  logStatus('Checking entities for tweet', {
-    id: tweet.id,
-    hasEntities: !!tweet.entities,
-    entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
-    urlCount: tweet.entities?.urls?.length || 0,
-    fullEntities: tweet.entities
-  });
-
-  // Check for any type of entity, not just URLs
   if (!tweet.entities) return false;
 
-  // Check for various entity types
   const hasUrls = !!tweet.entities.urls?.length;
   const hasMentions = !!tweet.entities.mentions?.length;
   const hasHashtags = !!tweet.entities.hashtags?.length;
   const hasAnnotations = !!tweet.entities.annotations?.length;
   const hasCashtags = !!tweet.entities.cashtags?.length;
 
-  const hasAnyEntity = hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
+  return hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
+}
 
-  // Log detailed entity presence
-  logStatus('Entity detection result', {
-    id: tweet.id,
-    hasUrls,
-    hasMentions,
-    hasHashtags,
-    hasAnnotations,
-    hasCashtags,
-    hasAnyEntity
+// Helper function to extract user data from includes
+function extractUserData(includes: any): Map<string, UserV2> {
+  if (!includes?.users) return new Map();
+  
+  const userMap = new Map<string, UserV2>();
+  includes.users.forEach((user: UserV2) => {
+    if (user.id) {
+      userMap.set(user.id, {
+        id: user.id,
+        name: user.name || '',
+        username: user.username || '',
+        profile_image_url: user.profile_image_url
+      });
+    }
   });
+  
+  return userMap;
+}
 
-  return hasAnyEntity;
+// Helper function to extract media data from includes
+function extractMediaData(includes: any): Map<string, MediaObjectV2> {
+  if (!includes?.media) return new Map();
+  
+  const mediaMap = new Map<string, MediaObjectV2>();
+  includes.media.forEach((media: MediaObjectV2) => {
+    if (media.media_key) {
+      mediaMap.set(media.media_key, {
+        media_key: media.media_key,
+        type: media.type,
+        url: media.url,
+        preview_image_url: media.preview_image_url,
+        height: media.height,
+        width: media.width
+      });
+    }
+  });
+  
+  return mediaMap;
 }
 
 // Helper function to validate and clean tweet data
-function validateTweet(tweet: TweetV2): TweetV2 | null {
+function validateTweet(
+  tweet: TweetV2, 
+  userData?: Map<string, UserV2>,
+  mediaData?: Map<string, MediaObjectV2>
+): TweetWithAuthor | null {
   try {
     // Handle null/undefined
     if (!tweet) {
@@ -57,11 +87,13 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
     }
 
     // Create a clean copy of the tweet with empty entities
-    const cleanTweet: TweetV2 = {
+    const cleanTweet: TweetWithAuthor = {
       id: tweet.id,
       text: tweet.text,
       edit_history_tweet_ids: tweet.edit_history_tweet_ids,
       public_metrics: tweet.public_metrics,
+      created_at: '', // Initialize created_at
+      author_id: tweet.author_id,
       entities: {
         urls: [],
         mentions: [],
@@ -71,11 +103,28 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
       } as TweetEntitiesV2
     };
 
+    // Add author data if available
+    if (tweet.author_id && userData?.has(tweet.author_id)) {
+      cleanTweet.author = userData.get(tweet.author_id);
+    }
+
+    // Add media data if available
+    if (tweet.attachments?.media_keys && mediaData) {
+      cleanTweet.media = tweet.attachments.media_keys
+        .map(key => mediaData.get(key))
+        .filter((media): media is MediaObjectV2 => !!media);
+    }
+
     // Log the full tweet structure for debugging
     logStatus('Validating tweet', {
       id: tweet.id,
       hasEntities: !!tweet.entities,
       entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+      hasCreatedAt: !!tweet.created_at,
+      hasAuthorId: !!tweet.author_id,
+      hasAuthorData: !!cleanTweet.author,
+      hasMediaKeys: !!tweet.attachments?.media_keys,
+      mediaCount: cleanTweet.media?.length || 0,
       fullTweet: tweet
     });
 
@@ -84,22 +133,43 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
       logStatus('Invalid tweet structure', {
         id: tweet.id,
         hasText: !!tweet.text,
-        hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids)
+        hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids),
+        hasAuthorId: !!tweet.author_id
       });
       return null;
     }
 
-    // Handle created_at separately
+    // Handle created_at - try multiple formats
     if (tweet.created_at) {
       try {
+        // First try parsing as ISO string
         const date = new Date(tweet.created_at);
         if (!isNaN(date.getTime())) {
           cleanTweet.created_at = date.toISOString();
         } else {
-          logStatus('Invalid date found in tweet', {
-            id: tweet.id,
-            date: tweet.created_at
-          });
+          // Try parsing as a timestamp
+          const timestamp = parseInt(tweet.created_at);
+          if (!isNaN(timestamp)) {
+            const timestampDate = new Date(timestamp);
+            if (!isNaN(timestampDate.getTime())) {
+              cleanTweet.created_at = timestampDate.toISOString();
+            } else {
+              logStatus('Invalid timestamp in tweet', {
+                id: tweet.id,
+                date: tweet.created_at,
+                timestamp
+              });
+              // Set to current time as fallback
+              cleanTweet.created_at = new Date().toISOString();
+            }
+          } else {
+            logStatus('Invalid date format in tweet', {
+              id: tweet.id,
+              date: tweet.created_at
+            });
+            // Set to current time as fallback
+            cleanTweet.created_at = new Date().toISOString();
+          }
         }
       } catch (error) {
         logStatus('Error parsing date for tweet', {
@@ -107,7 +177,16 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
           date: tweet.created_at,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
+        // Set to current time as fallback
+        cleanTweet.created_at = new Date().toISOString();
       }
+    } else {
+      // If no created_at provided, use current time
+      cleanTweet.created_at = new Date().toISOString();
+      logStatus('No created_at found, using current time', {
+        id: tweet.id,
+        created_at: cleanTweet.created_at
+      });
     }
 
     // Handle entities
@@ -198,7 +277,7 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
 }
 
 // Helper function to get random items from array with priority for tweets with entities
-function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
+function getRandomItems(array: TweetWithAuthor[], count: number): TweetWithAuthor[] {
   if (!array?.length || count <= 0) {
     logStatus('Invalid input for getRandomItems', {
       arrayLength: array?.length,
@@ -210,7 +289,7 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   // Validate and clean tweets before processing
   const validTweets = array
     .map(tweet => validateTweet(tweet))
-    .filter((tweet): tweet is TweetV2 => tweet !== null);
+    .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
 
   if (validTweets.length === 0) {
     logStatus('No valid tweets found');
@@ -218,8 +297,8 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   }
 
   // Separate tweets with and without entities
-  const tweetsWithEntities = validTweets.filter(hasTweetEntities);
-  const tweetsWithoutEntities = validTweets.filter(tweet => !hasTweetEntities(tweet));
+  const tweetsWithEntities = validTweets.filter(t => hasTweetEntities(t));
+  const tweetsWithoutEntities = validTweets.filter(t => !hasTweetEntities(t));
   
   logStatus('Tweet selection stats', {
     totalTweets: validTweets.length,
@@ -252,47 +331,43 @@ export const maxDuration = 300; // 5 minutes timeout
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 function logStatus(message: string, data?: any) {
-  const timestamp = new Date().toISOString();
-  console.log(`[CRON ${timestamp}] ${message}`, data ? JSON.stringify(data, null, 2) : '');
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:mm:ss only
+  console.log(`[CRON ${timestamp}] ${message}`, data ? JSON.stringify(data) : '');
 }
 
 async function checkRateLimit() {
   try {
     const lastTimestamp = await getRateLimitTimestamp();
     if (!lastTimestamp) {
-      logStatus('No previous request timestamp found, allowing request');
+      logStatus('No previous request, allowing');
       return true;
     }
     
     const now = Date.now();
-    const timeSinceLastRequest = now - lastTimestamp;
-    const minutesSince = Math.round(timeSinceLastRequest / (60 * 1000));
-    const minutesUntilNext = Math.max(0, 15 - minutesSince);
+    const minutesSince = Math.round((now - lastTimestamp) / (60 * 1000));
+    const canRequest = minutesSince >= 15;
     
-    logStatus('Rate limit status', {
-      lastRequestAt: new Date(lastTimestamp).toISOString(),
-      minutesSinceLastRequest: minutesSince,
-      minutesUntilNextAllowed: minutesUntilNext,
-      canRequest: timeSinceLastRequest >= FIFTEEN_MINUTES
+    logStatus('Rate limit check', {
+      minutesSince,
+      canRequest
     });
     
-    return timeSinceLastRequest >= FIFTEEN_MINUTES;
+    return canRequest;
   } catch (error) {
-    logStatus('Error checking rate limit', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logStatus('Rate limit check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     return false;
   }
 }
 
-async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[]) {
+async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetWithAuthor[]): Promise<TweetWithAuthor[] | null> {
   try {
-    logStatus('Searching for .build tweets');
+    logStatus('Searching .build tweets');
     const query = '(.build) lang:en -is:retweet -is:reply';
-    logStatus('Using search query:', query);
     
     const searchResults = await client.search(query, {
-      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
       'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url'],
+      'media.fields': ['url', 'preview_image_url', 'height', 'width', 'type'],
       expansions: ['author_id', 'attachments.media_keys'],
       max_results: 10,
     });
@@ -302,22 +377,30 @@ async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[
       return null;
     }
 
-    // Always return the tweets, even if they're already cached
+    // Extract user and media data from includes
+    const userData = extractUserData(searchResults.includes);
+    const mediaData = extractMediaData(searchResults.includes);
+    
+    // Validate tweets with user and media data
     const tweets = Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data];
+    const validatedTweets = tweets
+      .map(tweet => validateTweet(tweet, userData, mediaData))
+      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
     
     logStatus('Search results', {
-      totalFound: tweets.length,
-      withEntities: tweets.filter(hasTweetEntities).length
+      found: tweets.length,
+      valid: validatedTweets.length,
+      withEntities: validatedTweets.filter(t => hasTweetEntities(t)).length
     });
     
-    return tweets;
+    return validatedTweets;
   } catch (error) {
-    logStatus('Error searching tweets', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logStatus('Search failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
   }
 }
 
-async function getRandomUserTweet(client: TwitterApiv2, username: string) {
+async function getRandomUserTweet(client: TwitterApiv2, username: string): Promise<TweetWithAuthor[] | null> {
   try {
     logStatus('Fetching user tweets', { username });
     const user = await client.userByUsername(username);
@@ -328,9 +411,9 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
 
     const timeline = await client.userTimeline(user.data.id, {
       exclude: ['retweets'],  // Allow replies to increase chances of finding tweets
-      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
       'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url'],
+      'media.fields': ['url', 'preview_image_url', 'height', 'width', 'type'],
       expansions: ['author_id', 'attachments.media_keys'],
       max_results: 20, // Increased to get more candidates
     });
@@ -340,22 +423,34 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
       return null;
     }
 
+    // Extract user and media data from includes
+    const userData = extractUserData(timeline.includes);
+    const mediaData = extractMediaData(timeline.includes);
+    logStatus('Extracted includes data', {
+      userCount: userData.size,
+      userIds: Array.from(userData.keys()),
+      mediaCount: mediaData.size,
+      mediaKeys: Array.from(mediaData.keys())
+    });
+
     const tweets = Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data];
     
-    // Validate tweets before selection
+    // Validate tweets with user and media data
     const validTweets = tweets
-      .map(tweet => validateTweet(tweet))
-      .filter((tweet): tweet is TweetV2 => tweet !== null);
+      .map(tweet => validateTweet(tweet, userData, mediaData))
+      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
     
     // Separate tweets with and without entities
-    const tweetsWithEntities = validTweets.filter(hasTweetEntities);
-    const tweetsWithoutEntities = validTweets.filter(tweet => !hasTweetEntities(tweet));
+    const tweetsWithEntities = validTweets.filter(t => hasTweetEntities(t));
+    const tweetsWithoutEntities = validTweets.filter(t => !hasTweetEntities(t));
     
     logStatus('Timeline results', {
       totalFound: tweets.length,
       validTweets: validTweets.length,
       withEntities: tweetsWithEntities.length,
-      withoutEntities: tweetsWithoutEntities.length
+      withoutEntities: tweetsWithoutEntities.length,
+      withAuthorData: validTweets.filter(t => !!t.author).length,
+      withMedia: validTweets.filter(t => !!t.media && t.media.length > 0).length
     });
     
     // Prefer tweets with entities if available
@@ -379,90 +474,82 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
 
 export async function GET(request: Request) {
   const startTime = Date.now();
-  logStatus('Cron job started');
+  logStatus('Starting cron job');
   
   try {
     // Verify the request is from Vercel Cron
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      logStatus('Unauthorized cron request');
+      logStatus('Unauthorized request');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get currently cached tweets first
+    // Get currently cached tweets
     const cachedData = await getCachedTweets();
-    const currentTweets = (cachedData?.tweets || []) as TweetV2[];
-    logStatus('Current cache status', { 
-      cachedTweetCount: currentTweets.length,
+    const currentTweets = (cachedData?.tweets || []) as TweetWithAuthor[];
+    logStatus('Cache status', { 
+      tweets: currentTweets.length,
       withEntities: currentTweets.filter(hasTweetEntities).length
     });
 
-    // Check if we can make a request
+    // Check rate limit
     const canRequest = await checkRateLimit();
     if (!canRequest) {
-      logStatus('Rate limit in effect, using cached tweets');
+      logStatus('Rate limited, using cache');
       
-      // Even when rate limited, we should still update selected tweets from cache
       if (currentTweets.length > 0) {
         const selectedTweets = getRandomItems(currentTweets, 4);
         await updateSelectedTweets(selectedTweets);
-        logStatus('Updated selected tweets from cache', {
-          available: currentTweets.length,
+        logStatus('Updated from cache', {
           selected: selectedTweets.length,
           withEntities: selectedTweets.filter(hasTweetEntities).length
         });
         
         return NextResponse.json({ 
-          message: 'Rate limited but updated selected tweets from cache',
+          message: 'Rate limited, updated from cache',
           selectedCount: selectedTweets.length,
           nextRequest: await getRateLimitTimestamp()
         });
       }
       
       return NextResponse.json({ 
-        error: 'Rate limit in effect and no cached tweets available',
+        error: 'Rate limited, no cache available',
         nextRequest: await getRateLimitTimestamp()
       }, { status: 429 });
     }
 
-    // Initialize Twitter client
-    logStatus('Initializing Twitter client');
+    // Initialize client
     const client = await getReadOnlyClient();
     const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
     if (!username) {
       throw new Error('Twitter username not configured');
     }
 
-    // Always try both search and user tweets
+    // Fetch new tweets
     const newBuildTweets = await searchNewBuildTweets(client, currentTweets);
     const userTweets = await getRandomUserTweet(client, username);
 
-    // Combine new tweets, ensuring we have at least one
     const newTweets = [
       ...(newBuildTweets || []),
       ...(userTweets || [])
     ];
 
     if (newTweets.length === 0) {
-      throw new Error('Failed to fetch any new tweets');
+      throw new Error('No new tweets fetched');
     }
 
-    // Validate all tweets before caching
+    // Validate and update cache
     const validNewTweets = newTweets
       .map(tweet => validateTweet(tweet))
-      .filter((tweet): tweet is TweetV2 => tweet !== null);
+      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
 
     if (validNewTweets.length === 0) {
-      throw new Error('No valid tweets found after validation');
+      throw new Error('No valid tweets after validation');
     }
 
-    // Update cache with new tweets, replacing any duplicates
-    const tweetMap = new Map<string, TweetV2>();
-    
-    // Add new tweets first (so they take precedence over old ones)
+    // Update cache with new tweets
+    const tweetMap = new Map<string, TweetWithAuthor>();
     validNewTweets.forEach(tweet => tweetMap.set(tweet.id, tweet));
-    
-    // Add existing tweets that aren't being replaced
     currentTweets.forEach(tweet => {
       if (!tweetMap.has(tweet.id)) {
         const validTweet = validateTweet(tweet);
@@ -472,48 +559,42 @@ export async function GET(request: Request) {
       }
     });
 
-    // Convert back to array, limiting to 100 most recent
     const updatedTweets = Array.from(tweetMap.values()).slice(0, 100);
-    
-    // Update cache and rate limit timestamp
     await cacheTweets(updatedTweets);
     await updateRateLimitTimestamp();
     
     logStatus('Cache updated', {
-      newTweetsAdded: validNewTweets.length,
-      totalTweets: updatedTweets.length,
+      new: validNewTweets.length,
+      total: updatedTweets.length,
       withEntities: updatedTweets.filter(hasTweetEntities).length
     });
 
-    // Select and update random tweets for display
+    // Select new display tweets
     const selectedTweets = getRandomItems(updatedTweets, 4);
     await updateSelectedTweets(selectedTweets);
     
-    logStatus('Updated selected tweets', {
-      available: updatedTweets.length,
+    logStatus('Display tweets updated', {
       selected: selectedTweets.length,
       withEntities: selectedTweets.filter(hasTweetEntities).length
     });
 
     const executionTime = Date.now() - startTime;
     return NextResponse.json({
-      message: 'Successfully updated tweets',
-      newTweetsAdded: validNewTweets.length,
+      message: 'Success',
+      newTweets: validNewTweets.length,
       totalTweets: updatedTweets.length,
       selectedTweets: selectedTweets.length,
       executionTimeMs: executionTime
     });
   } catch (error) {
     const executionTime = Date.now() - startTime;
-    logStatus('Cron job failed', {
+    logStatus('Job failed', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
       executionTimeMs: executionTime
     });
     
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
       executionTimeMs: executionTime
     }, { status: 500 });
   }

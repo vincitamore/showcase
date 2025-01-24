@@ -2,9 +2,66 @@
 <dev-system>
     <meta>
         <description>Master configuration and reference system for development tracking and AI assistance</description>
-        <version>1.0.1</version>
+        <version>1.0.2</version>
         <last-updated>2024-01-21</last-updated>
     </meta>
+
+    <function-execution>
+        <description>Rules and formats for executing development functions</description>
+        
+        <single-function>
+            <format>@FUNCTION</format>
+            <examples>
+                <example>@RECORD</example>
+                <example>@CLEAN</example>
+            </examples>
+            <rules>
+                <rule>Prefix with @ symbol for visibility</rule>
+                <rule>Use ALL CAPS for function name</rule>
+                <rule>Place at start of message or on new line</rule>
+                <rule>One function per line if using multiple singles</rule>
+            </rules>
+        </single-function>
+
+        <function-chaining>
+            <format>@[FUNCTION1->FUNCTION2->FUNCTION3]</format>
+            <examples>
+                <chain>@[RECORD->PROCEED]</chain>
+                <chain>@[CLEAN->RECORD->PROCEED]</chain>
+            </examples>
+            <rules>
+                <rule>Use square brackets to encapsulate chain</rule>
+                <rule>Separate functions with arrow operator -></rule>
+                <rule>Prefix with @ symbol for visibility</rule>
+                <rule>Functions execute in left-to-right order</rule>
+                <rule>Place chain at start of message or on new line</rule>
+                <rule>One chain per line if using multiple chains</rule>
+            </rules>
+            <execution-notes>
+                <note>Each function in chain executes completely before next begins</note>
+                <note>Chain execution stops if any function fails</note>
+                <note>Results of previous functions inform subsequent ones</note>
+            </execution-notes>
+        </function-chaining>
+
+        <common-patterns>
+            <pattern>
+                <name>Update and Proceed</name>
+                <chain>@[RECORD->PROCEED]</chain>
+                <description>Record current progress then review all documentation before proceeding</description>
+            </pattern>
+            <pattern>
+                <name>Full System Update</name>
+                <chain>@[CLEAN->RECORD->PROCEED]</chain>
+                <description>Clean files, record progress, then review for next steps</description>
+            </pattern>
+            <pattern>
+                <name>Quick Check</name>
+                <function>@PROCEED</function>
+                <description>Quick review of all documentation before continuing</description>
+            </pattern>
+        </common-patterns>
+    </function-execution>
 
     <linked-files>
         <file id="devhistory" path="devhistory.xml">Development history and changelog</file>
@@ -65,8 +122,6 @@
     </dev-functions>
 
     <critical-rules>
-        <rule id="model-id">ALWAYS use "grok-2-latest" as the xAI model identifier</rule>
-        <rule id="streaming">NEVER use StreamingTextResponse - use streamText().toDataStreamResponse()</rule>
         <rule id="planning">ALWAYS check devprogress.xml before changes</rule>
         <rule id="updates">ALWAYS update tracking files after changes</rule>
         <rule id="types">ALWAYS check package type definitions</rule>
@@ -75,6 +130,8 @@
         <rule id="step-by-step">ALWAYS work through solutions step by step for both AI and user understanding</rule>
         <rule id="project-context">ALWAYS examine current project folder structure, files, and logic flows before generating any output to ensure contextual accuracy and consistency</rule>
         <rule id="preserve-functionality">NEVER remove or modify functionality unrelated to the specific issue being worked on - maintain strict scope isolation</rule>
+        <rule id="model-id">ALWAYS use "grok-2-latest" as the xAI model identifier</rule>
+        <rule id="streaming">NEVER use StreamingTextResponse - use streamText().toDataStreamResponse()</rule>
     </critical-rules>
 
     <logging-guidelines>
@@ -156,18 +213,4 @@
             <rule>Avoid for state management when possible</rule>
         </client-components>
     </next-patterns>
-
-    <function-chaining>
-        <format>@[FUNCTION1->FUNCTION2->FUNCTION3]</format>
-        <examples>
-            <chain>@[RECORD->PROCEED]</chain>
-            <chain>@[CLEAN->RECORD->PROCEED]</chain>
-        </examples>
-        <rules>
-            <rule>Use square brackets to encapsulate chain</rule>
-            <rule>Separate functions with arrow operator -></rule>
-            <rule>Prefix with @ symbol for visibility</rule>
-            <rule>Functions execute in left-to-right order</rule>
-        </rules>
-    </function-chaining>
 </dev-system> 

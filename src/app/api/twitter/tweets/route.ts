@@ -256,13 +256,18 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   ];
 }
 
+function logStatus(message: string, data?: any) {
+  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:mm:ss only
+  console.log(`[API ${timestamp}] ${message}`, data ? JSON.stringify(data) : '');
+}
+
 export async function GET() {
   try {
-    console.log('Fetching cached tweets...');
+    logStatus('Fetching tweets');
     const cachedData = await getCachedTweets();
     
     if (!cachedData?.tweets || !Array.isArray(cachedData.tweets) || cachedData.tweets.length === 0) {
-      console.log('No cached tweets found');
+      logStatus('No cached tweets');
       return NextResponse.json({ tweets: [] });
     }
 
@@ -271,17 +276,14 @@ export async function GET() {
       .map(tweet => validateTweet(tweet))
       .filter((tweet): tweet is TweetV2 => tweet !== null);
 
-    console.log('Aggregated unique tweets:', {
-      totalBlobs: cachedData.tweets.length,
-      uniqueTweets: new Set(validTweets.map(t => t.id)).size,
-      withEntities: validTweets.filter(t => hasTweetEntities(t)).length,
-      validDates: validTweets.filter(t => !!t.created_at).length,
-      tweetIds: validTweets.map(t => t.id)
+    logStatus('Cache status', {
+      total: cachedData.tweets.length,
+      valid: validTweets.length,
+      withEntities: validTweets.filter(t => hasTweetEntities(t)).length
     });
     
-    // Get selected tweets with full data including entities
+    // Get selected tweets with full data
     const selectedTweets = await getSelectedTweets();
-    console.log('Getting selected tweets...');
     
     if (selectedTweets?.tweets && Array.isArray(selectedTweets.tweets) && selectedTweets.tweets.length > 0) {
       // Validate and clean selected tweets
@@ -290,38 +292,27 @@ export async function GET() {
         .filter((tweet): tweet is TweetV2 => tweet !== null);
 
       if (validSelectedTweets.length > 0) {
-        console.log('Using selected tweets:', {
+        logStatus('Using selected tweets', {
           count: validSelectedTweets.length,
-          tweets: validSelectedTweets.map(t => ({
-            id: t.id,
-            text: t.text.substring(0, 50) + '...',
-            hasEntities: hasTweetEntities(t),
-            urlCount: t.entities?.urls?.length || 0,
-            hasDate: !!t.created_at
-          }))
+          withEntities: validSelectedTweets.filter(t => hasTweetEntities(t)).length
         });
         return NextResponse.json({ tweets: validSelectedTweets });
       }
     }
-    
-    // Fallback to random tweets from cache, prioritizing those with entities
+
+    // Fallback to random tweets from cache
     const tweetsToReturn = getRandomItems(validTweets, Math.min(4, validTweets.length));
     
-    console.log('Returning tweets:', {
-      availableInCache: validTweets.length,
-      returning: tweetsToReturn.length,
-      tweets: tweetsToReturn.map(t => ({
-        id: t.id,
-        text: t.text.substring(0, 50) + '...',
-        hasEntities: hasTweetEntities(t),
-        urlCount: t.entities?.urls?.length || 0,
-        hasDate: !!t.created_at
-      }))
+    logStatus('Using fallback tweets', {
+      count: tweetsToReturn.length,
+      withEntities: tweetsToReturn.filter(t => hasTweetEntities(t)).length
     });
     
     return NextResponse.json({ tweets: tweetsToReturn });
   } catch (error) {
-    console.error('Error getting selected tweets:', error);
+    logStatus('Error fetching tweets', { 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     return NextResponse.json({ 
       error: 'Failed to fetch tweets',
       details: error instanceof Error ? error.message : 'Unknown error'
@@ -331,32 +322,37 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const accessToken = cookies().get('x_access_token')?.value
+    const accessToken = cookies().get('x_access_token')?.value;
     
     if (!accessToken) {
+      logStatus('Missing access token');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
-      )
+      );
     }
 
-    const { text } = await req.json()
+    const { text } = await req.json();
     
     if (!text?.trim()) {
+      logStatus('Missing tweet text');
       return NextResponse.json(
         { error: 'Message is required' },
         { status: 400 }
-      )
+      );
     }
 
-    const client = new TwitterApi(accessToken)
-    const tweet = await client.v2.tweet(text)
-    return NextResponse.json(tweet)
+    const client = new TwitterApi(accessToken);
+    const tweet = await client.v2.tweet(text);
+    logStatus('Tweet posted', { id: tweet.data.id });
+    return NextResponse.json(tweet);
   } catch (error) {
-    console.error('Error posting tweet:', error)
+    logStatus('Error posting tweet', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     return NextResponse.json(
       { error: 'Failed to post tweet' },
       { status: 500 }
-    )
+    );
   }
 } 
