@@ -737,23 +737,24 @@ const BlogSection = () => {
               >
                 <div className="flex flex-col h-full">
                   {/* Header section with fixed height */}
-                  <div className="flex items-start justify-between h-12 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src={profileConfig.profileImage}
-                        alt={profileConfig.username}
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                        unoptimized
-                      />
-                      <div>
-                        <p className="font-medium text-sm leading-tight">{profileConfig.displayName}</p>
-                        <p className="text-xs text-muted-foreground leading-tight">@{profileConfig.username}</p>
+                  <div className="flex items-center justify-between h-10 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-8 h-8 shrink-0">
+                        <Image
+                          src={profileConfig.profileImage}
+                          alt={profileConfig.username}
+                          fill
+                          className="rounded-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center min-w-0">
+                        <p className="font-medium text-sm leading-tight truncate">{profileConfig.displayName}</p>
+                        <p className="text-xs text-muted-foreground leading-tight truncate">@{profileConfig.username}</p>
                       </div>
                     </div>
                     <span 
-                      className="text-primary hover:text-primary/80 transition-colors text-lg font-bold"
+                      className="text-primary hover:text-primary/80 transition-colors text-lg font-bold ml-2 shrink-0"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleCardClick(tweet.id)

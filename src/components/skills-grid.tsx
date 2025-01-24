@@ -127,18 +127,17 @@ const SkillsGrid = () => {
       </div>
 
       <Carousel 
-        className="w-full max-w-[90rem] mx-auto pb-4" 
+        className={cn(
+          "w-full overflow-visible mx-auto pb-4",
+          "overflow-visible [&_.embla__button]:bg-transparent [&_.embla__button]:hover:bg-transparent [&_.embla__button]:static",
+          "[&_.embla__button--prev]:-left-4",
+          "[&_.embla__button--next]:-right-4"
+        )}
         opts={{ 
           loop: true, 
           align: "center",
           containScroll: "trimSnaps",
           dragFree: false
-        }}
-        classNames={{
-          viewport: "overflow-visible",
-          prevNextButton: "bg-transparent hover:bg-transparent static",
-          prevButton: "-left-4",
-          nextButton: "-right-4",
         }}
       >
         {skillCategories.map((category, index) => (

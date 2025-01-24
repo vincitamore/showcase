@@ -18,6 +18,21 @@ interface ProjectDetailsModalProps {
 }
 
 const getTechnicalDetails = (title: string) => {
+  if (title === "Modern Portfolio Showcase") {
+    return {
+      overview: "This showcase platform demonstrates modern full-stack development practices, combining cutting-edge technologies with a focus on performance, accessibility, and user experience.",
+      details: [
+        "Next.js 14 App Router with React Server Components for optimal performance",
+        "TypeScript and Prisma ORM for type-safe database operations",
+        "xAI Grok-2 integration with streaming responses and context awareness",
+        "Twitter API v2 integration with OAuth, rate limiting, and entity processing",
+        "Shadcn UI components with Tailwind CSS for responsive design",
+        "Framer Motion animations and 3D card effects for enhanced interactivity",
+        "Vercel deployment with Edge Functions and Analytics integration",
+        "PostgreSQL database with advanced caching strategies"
+      ]
+    }
+  }
   if (title === "Municipal Outage Management Suite") {
     return {
       overview: "This enterprise solution leverages modern web technologies with a focus on real-time data processing and geospatial integration.",

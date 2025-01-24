@@ -9,6 +9,33 @@ import { cn } from "@/lib/utils"
 
 const projects = [
   {
+    title: "Modern Portfolio Showcase",
+    description: "A cutting-edge portfolio platform built with Next.js 14, featuring AI-powered chat, Twitter integration, and interactive 3D components. Demonstrates modern web development practices with a focus on performance and user experience.",
+    tags: [
+      "Next.js 14",
+      "TypeScript",
+      "Tailwind CSS",
+      "Shadcn UI",
+      "PostgreSQL",
+      "xAI Grok-2"
+    ],
+    highlights: [
+      "AI-powered chat with xAI Grok-2 integration",
+      "Real-time Twitter feed with OAuth and caching",
+      "Interactive 3D card effects and animations",
+      "Theme system with Light/Dark/Dim modes",
+      "Responsive design with mobile-first approach",
+      "PostgreSQL database with Prisma ORM"
+    ],
+    images: [
+      "/images/projects/portfolio/home-dark.png",
+      "/images/projects/portfolio/chat-system.png",
+      "/images/projects/portfolio/blog-section.png",
+      "/images/projects/portfolio/projects-grid.png"
+    ],
+    link: "#"
+  },
+  {
     title: "Municipal Outage Management Suite",
     description: "An enterprise-grade system for real-time utility outage tracking and response coordination. Streamlines emergency response with interactive mapping and crew management capabilities.",
     tags: [
@@ -67,18 +94,17 @@ const ProjectsSection = () => {
         Featured Projects
       </h2>
       <Carousel 
-        className="w-full max-w-[90rem] mx-auto pb-4" 
+        className={cn(
+          "w-full overflow-visible mx-auto pb-4",
+          "overflow-visible [&_.embla__button]:bg-transparent [&_.embla__button]:hover:bg-transparent [&_.embla__button]:static",
+          "[&_.embla__button--prev]:-left-4",
+          "[&_.embla__button--next]:-right-4"
+        )}
         opts={{ 
           loop: true, 
           align: "center",
           containScroll: "trimSnaps",
           dragFree: false
-        }}
-        classNames={{
-          viewport: "overflow-visible",
-          prevNextButton: "bg-transparent hover:bg-transparent static",
-          prevButton: "-left-4",
-          nextButton: "-right-4",
         }}
       >
         {projects.map((project, index) => (
