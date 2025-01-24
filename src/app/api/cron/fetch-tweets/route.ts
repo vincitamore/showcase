@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
-import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEETS_COUNT } from '@/lib/tweet-storage';
+import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2 } from 'twitter-api-v2';
 
@@ -170,28 +170,42 @@ export async function GET(request: Request) {
       return new NextResponse('Failed to verify cached tweets', { status: 500 });
     }
 
-    // Randomly select tweets for display
-    const selectedTweets = tweets.data
-      .sort(() => Math.random() - 0.5)
-      .slice(0, SELECTED_TWEETS_COUNT);
+    // Select random tweets
+    const tweetIds = tweets.data.map((t: TweetV2) => t.id);
+    const selectedCount = Math.min(4, tweetIds.length);
+    const selectedIds: string[] = [];
+    
+    while (selectedIds.length < selectedCount) {
+      const randomIndex = Math.floor(Math.random() * tweetIds.length);
+      const id = tweetIds[randomIndex];
+      if (!selectedIds.includes(id)) {
+        selectedIds.push(id);
+      }
+    }
 
-    console.log('[Cron] Selected tweets for display:', {
-      count: selectedTweets.length,
-      ids: selectedTweets.map((tweet: TweetV2) => tweet.id)
+    console.log('[Cron] Selected random tweets:', {
+      selectedCount,
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-selected'
     });
 
     // Update selected tweets
-    const selectedCache = await updateSelectedTweets(selectedTweets);
-
+    const selectedCache = await updateSelectedTweets(selectedIds);
+    
     console.log('[Cron] Selected tweets updated:', {
       selectedCacheId: selectedCache.id,
-      tweetCount: selectedTweets.length
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'complete'
     });
 
     return NextResponse.json({
       message: 'Tweets fetched and cached successfully',
       tweetCount: tweets.data.length,
-      selectedCount: selectedTweets.length
+      selectedCount: selectedIds.length
     });
   } catch (error) {
     console.error('[Cron] Job failed:', {

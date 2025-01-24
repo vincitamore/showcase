@@ -4,7 +4,6 @@ import { TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000 // 15 minutes in milliseconds
 export const MAX_TWEETS = 100
-export const SELECTED_TWEETS_COUNT = 10 // Number of tweets to display in carousel
 export const CACHE_TYPES = {
   CURRENT: 'current',
   PREVIOUS: 'previous',
@@ -214,17 +213,13 @@ export async function getCachedTweets(type: CacheType = CACHE_TYPES.CURRENT) {
   return { tweets: cache?.tweets || [] }
 }
 
-// Update selected tweets
+const TWEET_LIMIT = 100;
+const CACHE_LIMIT = 1000;
+const SELECTED_TWEET_COUNT = 10;
+
 export async function updateSelectedTweets(tweets: TweetV2[]) {
-  console.log(`[Twitter Storage] Updating selected tweets from ${tweets.length} candidates`);
+  const selectedTweets = tweets.slice(0, SELECTED_TWEET_COUNT);
   
-  // Randomly select SELECTED_TWEETS_COUNT tweets
-  const selectedTweets = tweets
-    .sort(() => Math.random() - 0.5)
-    .slice(0, SELECTED_TWEETS_COUNT);
-
-  console.log(`[Twitter Storage] Selected ${selectedTweets.length} tweets for display`);
-
   // Deactivate previous selected cache
   await (prisma as any).tweetCache.updateMany({
     where: {
@@ -234,7 +229,7 @@ export async function updateSelectedTweets(tweets: TweetV2[]) {
     data: {
       isActive: false
     }
-  });
+  })
 
   // Create new selected cache
   const cache = await (prisma as any).tweetCache.create({
@@ -242,31 +237,25 @@ export async function updateSelectedTweets(tweets: TweetV2[]) {
       type: CACHE_TYPES.SELECTED,
       isActive: true,
       tweets: {
-        connect: selectedTweets.map(tweet => ({ id: tweet.id }))
-      }
-    }
-  });
-
-  return cache;
-}
-
-// Get selected tweets
-export async function getSelectedTweets() {
-  const cache = await (prisma as any).tweetCache.findFirst({
-    where: {
-      type: CACHE_TYPES.SELECTED,
-      isActive: true
-    },
-    include: {
-      tweets: {
-        include: {
-          entities: true
-        }
+        connect: selectedTweets.map(id => ({ id }))
       }
     }
   })
 
-  return { tweets: cache?.tweets || [] }
+  return cache
+}
+
+export async function getSelectedTweets(): Promise<TweetV2[]> {
+  const tweets = await prisma.tweet.findMany({
+    where: { selected: true },
+    take: SELECTED_TWEET_COUNT,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      entities: true
+    }
+  });
+  
+  return tweets;
 }
 
 // Rate limit management

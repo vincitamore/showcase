@@ -345,20 +345,22 @@ const BlogSection = () => {
       const isTweetLink = url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/);
       
       if (isTweetLink) {
+        // Return null here since we'll handle tweet embeds in renderPreviews
         return (
-          <div className="mt-2 rounded-lg border border-border/50 overflow-hidden">
-            <blockquote 
-              className="twitter-tweet" 
-              data-conversation="none"
-              data-theme="dark"
-            >
-              <a href={url}></a>
-            </blockquote>
-          </div>
+          <span
+            className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            {displayText}
+          </span>
         );
       }
 
-      // For non-Twitter links, just render as text link
+      // For non-Twitter links, just render as text link since we'll handle previews separately
       return (
         <span
           className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
@@ -486,7 +488,11 @@ const BlogSection = () => {
         indices: number[]
         render: () => JSX.Element
       }> = [
-        // Only include mentions and hashtags here, URLs are handled separately
+        ...(tweet.entities.urls?.map(url => ({
+          type: 'url' as const,
+          indices: url.indices,
+          render: () => renderLink(url.expanded_url, url.display_url, url)
+        })) || []),
         ...(tweet.entities.mentions?.map(mention => ({
           type: 'mention' as const,
           indices: mention.indices,
@@ -509,13 +515,6 @@ const BlogSection = () => {
       const entityPositions = new Set<number>();
       entities.forEach(entity => {
         for (let i = entity.indices[0]; i < entity.indices[1]; i++) {
-          entityPositions.add(i);
-        }
-      });
-
-      // Also mark URL positions as taken
-      tweet.entities.urls?.forEach(url => {
-        for (let i = url.indices[0]; i < url.indices[1]; i++) {
           entityPositions.add(i);
         }
       });
@@ -555,15 +554,74 @@ const BlogSection = () => {
       return segments;
     };
 
+    // Function to render preview cards for non-Twitter URLs
+    const renderPreviews = () => {
+      const urlsWithPreviews = tweet.entities?.urls?.filter(url => 
+        url.images?.[0] || url.title || url.description
+      );
+
+      if (!urlsWithPreviews?.length) return null;
+
+      return (
+        <div className="mt-3 space-y-3">
+          {urlsWithPreviews.map((url, index) => {
+            // Skip Twitter/X URLs as they're handled by the embed
+            if (url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/)) {
+              return null;
+            }
+
+            return (
+              <div
+                key={`${url.url}-${index}`}
+                className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {url.images?.[0] && (
+                  <div className="relative w-full h-[160px] bg-accent/5">
+                    <Image
+                      src={url.images[0].url}
+                      alt={url.title || 'Link preview'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <div className="p-3">
+                  {url.title && (
+                    <h4 className="font-medium text-sm mb-2 line-clamp-1">
+                      {url.title}
+                    </h4>
+                  )}
+                  {url.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                      {url.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                    <ExternalLink className="h-3 w-3" />
+                    {new URL(url.expanded_url).hostname}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-2">
         <div className="text-sm text-muted-foreground/90 leading-relaxed">
           {processText()}
         </div>
-        {/* Handle URLs separately */}
-        {tweet.entities?.urls?.map((url, index) => renderLink(url.expanded_url, url.display_url, url))}
-        {/* Only render media here */}
+        {/* Only render media and previews here, not in the text processing */}
         {tweet.entities?.media && renderMedia(tweet.entities.media)}
+        {renderPreviews()}
       </div>
     );
   };
@@ -624,90 +682,81 @@ const BlogSection = () => {
               dragFree: false
             }}
           >
-            <div className="flex gap-4 sm:gap-6">
-              {tweets.map((tweet, index) => (
-                <div 
-                  key={tweet.id} 
-                  className={cn(
-                    "flex-[0_0_auto] min-w-0",
-                    "w-[calc(100vw-4rem)] sm:w-[calc(50vw-4rem)] lg:w-[calc(33.333vw-4rem)]",
-                    "max-w-[28rem]"
-                  )}
-                >
-                  <Card3D
-                    onClick={() => handleCardClick(tweet.id)}
-                    className={cn(
-                      "group cursor-pointer",
-                      "p-3 sm:p-6",
-                      "mx-1.5",
-                      "w-full",
-                      "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
-                    )}
-                    containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
-                  >
-                    <div className="flex flex-col h-full">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <Image
-                            src={profileConfig.profileImage}
-                            alt={profileConfig.username}
-                            width={40}
-                            height={40}
-                            className="rounded-full"
-                            unoptimized
-                          />
-                          <div>
-                            <p className="font-medium text-sm">{profileConfig.displayName}</p>
-                            <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
-                          </div>
-                        </div>
-                        <span 
-                          className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCardClick(tweet.id)
-                          }}
-                        >
-                          𝕏
-                        </span>
-                      </div>
-                      {renderTweetText(tweet)}
-                      {tweet.referenced_tweets?.map((ref) => (
-                        <div 
-                          key={ref.id}
-                          className="mb-4 rounded-lg border border-border/50 overflow-hidden"
-                        >
-                          <blockquote 
-                            className="twitter-tweet" 
-                            data-conversation="none"
-                            data-theme="dark"
-                          >
-                            <a href={`https://twitter.com/x/status/${ref.id}`}></a>
-                          </blockquote>
-                        </div>
-                      ))}
-                      <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
-                        </span>
-                        <time className="ml-auto">
-                          {tweet.created_at 
-                            ? new Date(tweet.created_at).toLocaleDateString()
-                            : 'Just now'
-                          }
-                        </time>
+            {tweets.map((tweet, index) => (
+              <Card3D
+                key={tweet.id}
+                onClick={() => handleCardClick(tweet.id)}
+                className={cn(
+                  "group cursor-pointer",
+                  "p-3 sm:p-6",
+                  "mx-1.5",
+                  "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
+                  "max-w-[28rem]",
+                  "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+                )}
+                containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
+              >
+                <div className="flex flex-col h-full">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <Image
+                        src={profileConfig.profileImage}
+                        alt={profileConfig.username}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                        unoptimized
+                      />
+                      <div>
+                        <p className="font-medium text-sm">{profileConfig.displayName}</p>
+                        <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
                       </div>
                     </div>
-                  </Card3D>
+                    <span 
+                      className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCardClick(tweet.id)
+                      }}
+                    >
+                      𝕏
+                    </span>
+                  </div>
+                  {renderTweetText(tweet)}
+                  {tweet.referenced_tweets?.map((ref) => (
+                    <div 
+                      key={ref.id}
+                      className="mb-4 rounded-lg border border-border/50 overflow-hidden"
+                    >
+                      <blockquote 
+                        className="twitter-tweet" 
+                        data-conversation="none"
+                        data-theme="dark"
+                      >
+                        <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                      </blockquote>
+                    </div>
+                  ))}
+                  <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
+                    </span>
+                    <time className="ml-auto">
+                      {tweet.created_at 
+                        ? new Date(tweet.created_at).toLocaleDateString()
+                        : 'Just now'
+                      }
+                    </time>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </Card3D>
+            ))}
           </Carousel>
         </div>
       )}
