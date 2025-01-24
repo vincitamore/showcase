@@ -56,3 +56,58 @@ model RateLimit {
 
   @@index([ipAddress])
 }
+
+// New models for Twitter integration
+model Tweet {
+  id                    String        @id
+  text                  String
+  createdAt            DateTime
+  updatedAt            DateTime      @updatedAt
+  publicMetrics        Json?         // Likes, retweets, etc.
+  entities             TweetEntity[]
+  editHistoryTweetIds  String[]
+  authorId             String
+  cacheEntries         TweetCache[]  @relation("CachedTweets")
+  
+  @@index([createdAt])
+  @@index([authorId])
+}
+
+model TweetEntity {
+  id          String   @id @default(cuid())
+  type        String   // url, mention, hashtag, cashtag, annotation
+  text        String
+  url         String?
+  expandedUrl String?
+  mediaKey    String?
+  tweet       Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  tweetId     String
+  metadata    Json?    // Additional entity-specific data
+
+  @@index([tweetId])
+  @@index([type])
+}
+
+model TweetCache {
+  id          String    @id @default(cuid())
+  type        String    // 'current' | 'previous' | 'selected'
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tweets      Tweet[]   @relation("CachedTweets")
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+
+  @@index([type])
+  @@index([isActive])
+}
+
+model TwitterRateLimit {
+  id          String   @id @default(cuid())
+  endpoint    String
+  resetAt     DateTime
+  remaining   Int
+  lastUpdated DateTime @default(now())
+
+  @@unique([endpoint])
+  @@index([endpoint, resetAt])
+}

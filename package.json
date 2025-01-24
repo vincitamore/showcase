@@ -10,12 +10,12 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "migrate-tweets": "ts-node scripts/migrate-tweets.ts"
   },
   "dependencies": {
     "@ai-sdk/xai": "^1.1.0",
     "@edge-runtime/types": "^4.0.0",
-    "@prisma/client": "^6.2.1",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-dropdown-menu": "^2.0.6",
     "@radix-ui/react-label": "^2.0.2",
@@ -60,8 +60,10 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@prisma/client": "^6.2.1",
     "eslint": "^8",
     "eslint-config-next": "14.0.4",
-    "prisma": "^6.2.1"
+    "prisma": "^6.2.1",
+    "ts-node": "^10.9.2"
   }
 }

@@ -224,6 +224,30 @@
             </related>
             <impact>Improved reliability of rate limit handling and tweet validation</impact>
         </entry>
+
+        <entry id="2024-01-24-01" scope="enhancement" type="infrastructure">
+            <title>Tweet Storage Migration to Prisma</title>
+            <changes>
+                <change>Migrated tweet storage from Vercel Blob to Prisma database</change>
+                <change>Implemented comprehensive tweet entity handling</change>
+                <change>Added database-backed rate limit tracking</change>
+                <change>Enhanced type safety throughout storage operations</change>
+                <change>Improved logging and error handling</change>
+                <change>Updated cron job to use new storage system</change>
+            </changes>
+            <files-affected>
+                <file>src/lib/tweet-storage.ts</file>
+                <file>src/lib/x-api.ts</file>
+                <file>src/lib/db.ts</file>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+                <file>prisma/schema.prisma</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-21-14">Rate limit and tweet validation improvements</entry>
+                <entry ref="2024-01-21-13">Enhanced tweet URL handling</entry>
+            </related-entries>
+            <impact>Major improvement in data persistence, type safety, and maintainability</impact>
+        </entry>
     </history-entries>
 
     <tags>

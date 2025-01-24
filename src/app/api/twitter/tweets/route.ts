@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { TwitterApi, TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
-import { getCachedTweets, getSelectedTweets } from '@/lib/blob-storage'
+import { getCachedTweets, getSelectedTweets } from '@/lib/tweet-storage'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 10
 
 // Helper function to check if a tweet has entities with URLs
 function hasTweetEntities(tweet: TweetV2): boolean {
@@ -261,62 +263,21 @@ function logStatus(message: string, data?: any) {
   console.log(`[API ${timestamp}] ${message}`, data ? JSON.stringify(data) : '');
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    logStatus('Fetching tweets');
-    const cachedData = await getCachedTweets();
+    const selectedTweets = await getSelectedTweets()
     
-    if (!cachedData?.tweets || !Array.isArray(cachedData.tweets) || cachedData.tweets.length === 0) {
-      logStatus('No cached tweets');
-      return NextResponse.json({ tweets: [] });
-    }
+    console.log('[API] Returning tweets:', {
+      count: selectedTweets.tweets.length
+    })
 
-    // Validate tweets before aggregating
-    const validTweets = cachedData.tweets
-      .map(tweet => validateTweet(tweet))
-      .filter((tweet): tweet is TweetV2 => tweet !== null);
-
-    logStatus('Cache status', {
-      total: cachedData.tweets.length,
-      valid: validTweets.length,
-      withEntities: validTweets.filter(t => hasTweetEntities(t)).length
-    });
-    
-    // Get selected tweets with full data
-    const selectedTweets = await getSelectedTweets();
-    
-    if (selectedTweets?.tweets && Array.isArray(selectedTweets.tweets) && selectedTweets.tweets.length > 0) {
-      // Validate and clean selected tweets
-      const validSelectedTweets = selectedTweets.tweets
-        .map(tweet => validateTweet(tweet))
-        .filter((tweet): tweet is TweetV2 => tweet !== null);
-
-      if (validSelectedTweets.length > 0) {
-        logStatus('Using selected tweets', {
-          count: validSelectedTweets.length,
-          withEntities: validSelectedTweets.filter(t => hasTweetEntities(t)).length
-        });
-        return NextResponse.json({ tweets: validSelectedTweets });
-      }
-    }
-
-    // Fallback to random tweets from cache
-    const tweetsToReturn = getRandomItems(validTweets, Math.min(4, validTweets.length));
-    
-    logStatus('Using fallback tweets', {
-      count: tweetsToReturn.length,
-      withEntities: tweetsToReturn.filter(t => hasTweetEntities(t)).length
-    });
-    
-    return NextResponse.json({ tweets: tweetsToReturn });
+    return NextResponse.json({
+      tweets: selectedTweets.tweets,
+      timestamp: new Date().toISOString()
+    })
   } catch (error) {
-    logStatus('Error fetching tweets', { 
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-    return NextResponse.json({ 
-      error: 'Failed to fetch tweets',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('[API] Error getting tweets:', error)
+    return new NextResponse('Internal Server Error', { status: 500 })
   }
 }
 

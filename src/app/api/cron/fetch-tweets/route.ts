@@ -118,7 +118,7 @@ export async function GET(request: Request) {
       .map((tweet: TweetWithEntities) => tweet.id);
 
     await updateSelectedTweets(selectedTweets);
-
+    
     return NextResponse.json({
       success: true,
       tweetsStored: tweets.data.data.length,
