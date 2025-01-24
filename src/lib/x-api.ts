@@ -295,6 +295,14 @@ export async function executeWithRateLimit<T>(
   }
 
   try {
+    // Add validation for search parameters
+    if (endpoint === 'search' && !params['tweet.fields']) {
+      params['tweet.fields'] = ['created_at', 'public_metrics', 'entities', 'author_id'];
+      params['expansions'] = ['author_id', 'attachments.media_keys'];
+      params['user.fields'] = ['name', 'username', 'profile_image_url'];
+      params['media.fields'] = ['url', 'preview_image_url', 'type', 'height', 'width'];
+    }
+
     await logApiRequest(endpoint, params);
     const result = await execute();
     await logApiResponse(endpoint, result);

@@ -295,31 +295,41 @@ async function checkRateLimit() {
 }
 
 async function searchNewBuildTweets(client: TwitterApiv2): Promise<TweetV2[]> {
-  return executeWithRateLimit('search', { query: '(.build) lang:en -is:retweet -is:reply' }, async () => {
+  return executeWithRateLimit('search', {
+    query: '(.build) lang:en -is:retweet -is:reply',
+    'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+    'expansions': ['author_id', 'attachments.media_keys'],
+    'user.fields': ['name', 'username', 'profile_image_url'],
+    'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+    'max_results': 10
+  }, async () => {
     console.log('[Init] Searching for .build tweets...');
     const query = '(.build) lang:en -is:retweet -is:reply';
     console.log('[Init] Using search query:', query);
     
-    const paginator = await client.search(query, {
-      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+    const searchResponse = await client.search(query, {
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+      'expansions': ['author_id', 'attachments.media_keys'],
+      'user.fields': ['name', 'username', 'profile_image_url'],
+      'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
       'max_results': 10
     });
 
-    const page = await paginator.fetchNext();
-    if (!page?.data) {
+    if (!searchResponse?.data) {
       console.log('[Init] No .build tweets found');
       return [];
     }
 
     // Ensure we have an array of TweetV2 objects
-    const tweets = Array.isArray(page.data) ? page.data : [page.data];
+    const tweets = Array.isArray(searchResponse.data) ? searchResponse.data : [searchResponse.data];
     const validTweets = tweets.filter((tweet): tweet is TweetV2 => {
       return tweet && typeof tweet.id === 'string' && typeof tweet.text === 'string' && Array.isArray(tweet.edit_history_tweet_ids);
     });
 
     console.log('[Init] Found .build tweets:', {
       total: tweets.length,
-      valid: validTweets.length
+      valid: validTweets.length,
+      withEntities: validTweets.filter(t => hasTweetEntities(t)).length
     });
     
     return validTweets;
