@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient } from '@/lib/x-api';
-import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEET_COUNT } from '@/lib/tweet-storage';
+import { 
+  cacheTweets, 
+  getCachedTweets, 
+  updateSelectedTweets, 
+  SELECTED_TWEET_COUNT,
+  FIFTEEN_MINUTES,
+  MAX_TWEETS,
+  canMakeRequest,
+  updateRateLimit
+} from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError } from 'twitter-api-v2';
-import { 
-  canMakeRequest, 
-  getRateLimit,
-  updateRateLimit,
-  MAX_TWEETS 
-} from '@/lib/tweet-storage';
 
 type TweetWithEntities = {
   id: string;
@@ -143,25 +146,18 @@ export async function GET(req: Request) {
 
     const query = `from:${username} -is:retweet`;
 
-    // Check if we can make the request
+    // Check if we can make the request based on our 15-min window
     const canMakeReq = await canMakeRequest('tweets/search/recent');
     if (!canMakeReq) {
-      const rateLimit = await getRateLimit('tweets/search/recent');
-      const resetAt = new Date(rateLimit.resetAt);
-      
-      console.log('[Twitter API] Rate limited, returning 429:', {
+      console.log('[Twitter API] Within rate limit window, skipping request:', {
         endpoint: 'tweets/search/recent',
-        resetAt: resetAt.toISOString(),
-        remaining: rateLimit.remaining,
         timestamp: new Date().toISOString(),
-        step: 'rate-limited'
+        step: 'skip-request'
       });
-
       return NextResponse.json({
-        status: 'rate_limited',
-        resetAt: resetAt.toISOString(),
-        message: 'Rate limit exceeded, try again after reset time'
-      }, { status: 429 });
+        status: 'skipped',
+        message: 'Within rate limit window'
+      });
     }
 
     // Make the API request
@@ -208,21 +204,12 @@ export async function GET(req: Request) {
       });
     }
 
-    // Update rate limit after successful request
-    if (response.rateLimit) {
-      const remainingRequests = parseInt(response.rateLimit.remaining.toString());
-      const rateLimitReset = new Date(parseInt(response.rateLimit.reset.toString()) * 1000);
-
-      await updateRateLimit('tweets/search/recent', rateLimitReset, remainingRequests);
-
-      console.log('[Twitter API] Updated rate limits:', {
-        endpoint: 'tweets/search/recent',
-        remaining: remainingRequests,
-        resetAt: rateLimitReset.toISOString(),
-        timestamp: new Date().toISOString(),
-        step: 'rate-limit-update'
-      });
-    }
+    // Update our rate limit window after successful request
+    await updateRateLimit(
+      'tweets/search/recent',
+      new Date(Date.now() + FIFTEEN_MINUTES),
+      1 // We don't track remaining requests anymore
+    );
 
     console.log('[Twitter API] Search complete:', {
       tweetCount: tweets.length,
@@ -245,18 +232,15 @@ export async function GET(req: Request) {
       timestamp: new Date().toISOString()
     });
 
-    // Handle rate limit errors specifically
+    // For rate limit errors (429), just log and return
     if (error instanceof ApiResponseError && error.code === 429) {
-      const resetAt = error.rateLimit?.reset 
-        ? new Date(parseInt(error.rateLimit.reset.toString()) * 1000)
-        : new Date(Date.now() + 15 * 60 * 1000); // Default to 15 minutes if no reset time
-
-      await updateRateLimit('tweets/search/recent', resetAt, 0);
-
+      console.log('[Twitter API] Rate limited by API, will retry next cron run:', {
+        timestamp: new Date().toISOString(),
+        step: 'rate-limited'
+      });
       return NextResponse.json({
         status: 'rate_limited',
-        resetAt: resetAt.toISOString(),
-        message: 'Rate limit exceeded from API response'
+        message: 'Rate limited by API, will retry next cron run'
       }, { status: 429 });
     }
 
