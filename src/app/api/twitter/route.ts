@@ -101,7 +101,7 @@ export async function GET(request: Request) {
 
         // Cache the tweets and update rate limit timestamp
         await cacheTweets([tweet]);
-        await updateRateLimitTimestamp();
+        await updateRateLimitTimestamp(Date.now());
 
         console.log('Tweet fetched and cached successfully');
         return NextResponse.json(tweet);
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
 
     // Update rate limit timestamp if we hit a rate limit error
     if (error instanceof Error && error.message.includes('Rate limit')) {
-      await updateRateLimitTimestamp();
+      await updateRateLimitTimestamp(Date.now());
     }
 
     return NextResponse.json({

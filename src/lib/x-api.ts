@@ -1,4 +1,4 @@
-import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
+import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2 } from 'twitter-api-v2';
 import { 
   canMakeRequest,
   getRateLimitTimestamp,
@@ -31,7 +31,19 @@ interface StoredTweet {
   edit_history_tweet_ids: string[];
   created_at?: string;
   public_metrics?: TweetPublicMetricsV2;
-  entities?: any;
+  entities?: TweetEntitiesV2;
+}
+
+interface TwitterApiResponse<T> {
+  data: T;
+  includes?: {
+    users?: UserV2[];
+    media?: any[];
+  };
+  meta?: {
+    result_count: number;
+    next_token?: string;
+  };
 }
 
 function convertToStoredTweet(tweet: TweetV2): StoredTweet {
@@ -103,19 +115,139 @@ function updateRateLimitInfo(endpoint: string, headers: Record<string, string | 
   });
 }
 
+// Helper to validate API request parameters
+function validateRequestParams(endpoint: string, params: Record<string, any>): boolean {
+  try {
+    // Common validation for all endpoints
+    if (!endpoint) {
+      console.error('[Twitter API] Missing endpoint in request');
+      return false;
+    }
+
+    // Search endpoint validation
+    if (endpoint.includes('search')) {
+      if (!params.query) {
+        console.error('[Twitter API] Missing query parameter for search request', { endpoint });
+        return false;
+      }
+      if (!params['tweet.fields']?.includes('entities')) {
+        console.warn('[Twitter API] Missing entities in tweet.fields for search request', { 
+          endpoint,
+          fields: params['tweet.fields']
+        });
+      }
+    }
+
+    // Timeline endpoint validation
+    if (endpoint.includes('timeline')) {
+      if (!params.userId) {
+        console.error('[Twitter API] Missing userId parameter for timeline request', { endpoint });
+        return false;
+      }
+      if (!params['tweet.fields']?.includes('entities')) {
+        console.warn('[Twitter API] Missing entities in tweet.fields for timeline request', {
+          endpoint,
+          fields: params['tweet.fields']
+        });
+      }
+    }
+
+    // User lookup validation
+    if (endpoint.includes('users') && !params.username) {
+      console.error('[Twitter API] Missing username parameter for user lookup', { endpoint });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('[Twitter API] Error validating request parameters', { endpoint, error });
+    return false;
+  }
+}
+
+// Helper to validate tweet data structure
+function validateTweetResponse(response: { data?: any }, endpoint: string): boolean {
+  if (!response) {
+    console.error('[Twitter API] Empty response from endpoint', { endpoint });
+    return false;
+  }
+
+  // For search endpoints
+  if (endpoint.includes('search')) {
+    if (!response.data || !Array.isArray(response.data)) {
+      console.error('[Twitter API] Invalid search response structure', {
+        endpoint,
+        hasData: !!response.data,
+        dataType: response.data ? typeof response.data : 'undefined',
+        isArray: response.data ? Array.isArray(response.data) : false
+      });
+      return false;
+    }
+    return true;
+  }
+
+  // For timeline endpoints
+  if (endpoint.includes('timeline')) {
+    if (!response.data || !Array.isArray(response.data)) {
+      console.error('[Twitter API] Invalid timeline response structure', {
+        endpoint,
+        hasData: !!response.data,
+        dataType: response.data ? typeof response.data : 'undefined',
+        isArray: response.data ? Array.isArray(response.data) : false
+      });
+      return false;
+    }
+    return true;
+  }
+
+  // For user lookup
+  if (endpoint.includes('users')) {
+    if (!response.data || !response.data.id) {
+      console.error('[Twitter API] Invalid user response structure', {
+        endpoint,
+        hasData: !!response.data,
+        hasId: response.data ? !!response.data.id : false
+      });
+      return false;
+    }
+    return true;
+  }
+
+  return true;
+}
+
 // Helper to safely execute rate-limited API calls with retries
 async function executeWithRateLimit<T>(
   endpoint: string,
   operation: () => Promise<T>,
+  params: Record<string, any> = {},
   retryCount = 0
 ): Promise<T> {
   try {
+    // Log the request attempt
+    console.log('[Twitter API] Attempting request', {
+      endpoint,
+      retryCount,
+      timestamp: new Date().toISOString(),
+      isBuildPhase: process.env.NEXT_PHASE === 'build',
+      params
+    });
+
+    // Validate request parameters
+    if (!validateRequestParams(endpoint, params)) {
+      throw new Error(`Invalid request parameters for ${endpoint}`);
+    }
+
     // During build time, only use cached data
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
       if (endpoint.includes('search') || endpoint.includes('timeline')) {
         const cachedData = await getCachedTweets();
         if (cachedData?.tweets?.length) {
-          console.log(`[Twitter API] Using cached data during build for ${endpoint}`);
+          console.log('[Twitter API] Using cached data during build', {
+            endpoint,
+            tweetCount: cachedData.tweets.length,
+            timestamp: cachedData.timestamp
+          });
           return cachedData as any;
         }
         throw new Error('No cached data available during build');
@@ -123,32 +255,91 @@ async function executeWithRateLimit<T>(
       throw new Error('API calls not allowed during build time');
     }
 
-    if (isRateLimited(endpoint)) {
-      const waitTime = rateLimitCache[endpoint].reset - Date.now();
-      console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
+    // Check both global and endpoint-specific rate limits
+    const now = Date.now();
+    const canMakeGlobalRequest = await canMakeRequest(now);
+    const isEndpointLimited = isRateLimited(endpoint);
+
+    if (!canMakeGlobalRequest || isEndpointLimited) {
+      const reason = !canMakeGlobalRequest ? 'global rate limit' : 'endpoint rate limit';
+      console.log('[Twitter API] Rate limited', {
+        reason,
+        endpoint,
+        globalLimit: !canMakeGlobalRequest,
+        endpointLimit: isEndpointLimited,
+        resetTime: isEndpointLimited ? new Date(rateLimitCache[endpoint].reset).toISOString() : 'unknown'
+      });
       
-      // If we have cached data, use it
+      // Try to use cached data if available
       if (endpoint.includes('search') || endpoint.includes('timeline')) {
         const cachedData = await getCachedTweets();
         if (cachedData?.tweets?.length) {
-          console.log(`[Twitter API] Using cached data for ${endpoint}`);
+          console.log('[Twitter API] Using cached data for rate-limited request', {
+            endpoint,
+            tweetCount: cachedData.tweets.length,
+            timestamp: cachedData.timestamp
+          });
           return cachedData as any;
         }
       }
       
-      throw new Error(`Rate limit exceeded for ${endpoint}`);
+      throw new Error(`Rate limit exceeded for ${endpoint} (${reason})`);
     }
 
+    // Execute the API call
+    console.log('[Twitter API] Executing request', { endpoint, params });
     const result = await operation();
+
+    // Validate the response structure
+    if (!validateTweetResponse({ data: result }, endpoint)) {
+      throw new Error(`Invalid response structure from ${endpoint}`);
+    }
+
+    // Log successful response
+    console.log('[Twitter API] Successful response', {
+      endpoint,
+      timestamp: new Date().toISOString(),
+      hasData: !!result,
+      dataType: typeof result
+    });
+
     return result;
   } catch (error: any) {
-    // Only retry once for rate limit errors
-    if (error?.data?.status === 429 && retryCount < 1) {
-      const delay = BASE_RETRY_DELAY * (0.5 + Math.random());
-      console.log(`[Twitter API] Rate limited, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/1)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return executeWithRateLimit(endpoint, operation, retryCount + 1);
+    // Enhanced error logging
+    const errorDetails = {
+      endpoint,
+      params,
+      retryCount,
+      errorCode: error?.data?.status || error?.status,
+      errorMessage: error?.message || 'Unknown error',
+      timestamp: new Date().toISOString(),
+      stack: error?.stack
+    };
+
+    // Handle different types of errors
+    if (error?.data?.status === 429) {
+      console.error('[Twitter API] Rate limit exceeded', errorDetails);
+      if (retryCount < 1) {
+        const delay = BASE_RETRY_DELAY * (0.5 + Math.random());
+        console.log('[Twitter API] Retrying rate-limited request', {
+          endpoint,
+          delay: Math.round(delay)
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return executeWithRateLimit(endpoint, operation, params, retryCount + 1);
+      }
+    } else if (error?.data?.status === 400) {
+      console.error('[Twitter API] Invalid request', errorDetails);
+    } else if (error?.data?.status === 401) {
+      console.error('[Twitter API] Authentication failed', errorDetails);
+    } else if (error?.data?.status === 403) {
+      console.error('[Twitter API] Forbidden request', errorDetails);
+    } else if (error?.data?.status === 404) {
+      console.error('[Twitter API] Resource not found', errorDetails);
+    } else {
+      console.error('[Twitter API] Unexpected error', errorDetails);
     }
+
     throw error;
   }
 }
@@ -439,11 +630,11 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
         console.log('[Twitter API] Credentials verified successfully');
         
         // Always update timestamp on successful verification
-        await updateRateLimitTimestamp();
+        await updateRateLimitTimestamp(Date.now());
         console.log('[Twitter API] Updated rate limit timestamp after verification');
         
         return response;
-      });
+      }, { username: testUser });
       
       return client.v2;
     } catch (verifyError: any) {
@@ -457,7 +648,7 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
         });
         
         // Update timestamp on rate limit hit to prevent immediate retries
-        await updateRateLimitTimestamp();
+        await updateRateLimitTimestamp(Date.now());
         throw new Error('Twitter API rate limit exceeded during verification');
       }
       

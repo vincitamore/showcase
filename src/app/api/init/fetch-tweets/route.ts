@@ -202,7 +202,7 @@ export async function GET(request: Request) {
 
     // Cache the valid tweets
     await cacheTweets(validTweets);
-    await updateRateLimitTimestamp();
+    await updateRateLimitTimestamp(Date.now());
 
     // Select random tweets for display
     const selectedTweets = getRandomItems(validTweets, 4);
