@@ -7,6 +7,26 @@
     </meta>
 
     <history-entries>
+        <entry id="2024-01-21-06" scope="enhancement" type="bugfix">
+            <title>Rate Limit System Improvements</title>
+            <changes>
+                <change>Fixed timestamp handling in rate limit checks</change>
+                <change>Improved rate limit error responses with timing information</change>
+                <change>Enhanced retry logic with exponential backoff and jitter</change>
+                <change>Added better logging for rate limit status</change>
+                <change>Fixed type safety issues in rate limit handling</change>
+            </changes>
+            <files-affected>
+                <file>src/lib/blob-storage.ts</file>
+                <file>src/lib/x-api.ts</file>
+                <file>src/app/api/twitter/route.ts</file>
+                <file>src/app/api/init/fetch-tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="rate-limiting"/>
+            </related-entries>
+        </entry>
+
         <entry id="2024-01-21-05" scope="enhancement" type="refactor">
             <title>Tweet Cache System Migration</title>
             <changes>

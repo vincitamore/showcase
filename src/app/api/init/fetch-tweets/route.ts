@@ -134,6 +134,38 @@ function getRandomItems<T>(array: T[], count: number): T[] {
 // This route is called during build/deployment to initialize tweets
 export async function GET(request: Request) {
   try {
+    // During build time, only use cached data
+    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+      console.log('[Init] Build phase detected, using cached data only');
+      const cachedData = await getCachedTweets();
+      
+      if (!cachedData?.tweets?.length) {
+        console.log('[Init] No cached tweets available during build');
+        return NextResponse.json({ 
+          success: false,
+          error: 'No cached tweets available',
+          fromCache: true
+        });
+      }
+
+      // Select random tweets from cache for display
+      const selectedTweets = getRandomItems(cachedData.tweets, 4);
+      await updateSelectedTweets(selectedTweets);
+
+      console.log('[Init] Successfully selected tweets from cache:', {
+        cached: cachedData.tweets.length,
+        selected: selectedTweets.length
+      });
+
+      return NextResponse.json({ 
+        success: true,
+        tweetsCount: cachedData.tweets.length,
+        selectedCount: selectedTweets.length,
+        fromCache: true
+      });
+    }
+
+    // For runtime requests, proceed with normal API calls
     const client = await getReadOnlyClient();
     
     // Search for tweets containing ".build"
@@ -180,13 +212,11 @@ export async function GET(request: Request) {
       fromCache: false
     });
   } catch (error) {
-    console.error('[Init] Error during initial tweet fetch:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    console.error('[Init] Error initializing tweets:', error);
     return NextResponse.json({ 
-      error: 'Failed to fetch initial tweets',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      fromCache: false
     }, { status: 500 });
   }
 } 

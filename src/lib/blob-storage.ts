@@ -315,6 +315,12 @@ export async function cacheTweets(tweets: TweetV2[]): Promise<void> {
 
 export async function getRateLimitTimestamp(): Promise<number | null> {
   try {
+    // During build time, return a timestamp that will prevent requests
+    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+      console.log('Build phase detected, returning current timestamp to prevent requests');
+      return Date.now();
+    }
+
     console.log('Getting rate limit timestamp...');
     const { blobs } = await list({ prefix: RATE_LIMIT_FILE });
     
@@ -510,6 +516,12 @@ function getRandomItems<T>(array: T[], count: number): T[] {
 
 export async function canMakeRequest(now: number): Promise<boolean> {
   try {
+    // During build time, prevent API requests
+    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+      console.log('Build phase detected, preventing API requests');
+      return false;
+    }
+
     const lastTimestamp = await getRateLimitTimestamp();
     if (!lastTimestamp) {
       console.log('No previous request timestamp found, allowing request');
@@ -530,7 +542,11 @@ export async function canMakeRequest(now: number): Promise<boolean> {
     return !withinRateLimit;
   } catch (error) {
     console.error('Error checking rate limit:', error);
-    return false;
+    // During build time, prevent API requests on error
+    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+      return false;
+    }
+    return true;
   }
 }
 

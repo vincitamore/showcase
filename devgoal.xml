@@ -71,12 +71,14 @@
                 <req>Entity detection and processing</req>
                 <req>URL metadata preservation</req>
                 <req>Engagement metrics</req>
+                <req>Robust rate limiting</req>
             </requirements>
             <status>In Progress</status>
             <completed>
                 <item>OAuth authentication</item>
                 <item>Entity detection and processing</item>
                 <item>URL metadata preservation</item>
+                <item>Robust rate limiting</item>
             </completed>
             <pending>
                 <item>Real-time composer</item>
@@ -116,6 +118,19 @@
                 <task>Implement content versioning</task>
             </tasks>
             <priority>Low</priority>
+        </enhancement>
+
+        <enhancement id="api-monitoring">
+            <title>API Performance Dashboard</title>
+            <description>Real-time monitoring and analytics for API performance and rate limits</description>
+            <tasks>
+                <task>Create rate limit analytics dashboard</task>
+                <task>Implement predictive rate limit warnings</task>
+                <task>Add performance metrics visualization</task>
+                <task>Set up automated alerts system</task>
+            </tasks>
+            <priority>High</priority>
+            <status>Planned</status>
         </enhancement>
     </future-enhancements>
 

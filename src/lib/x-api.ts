@@ -110,6 +110,19 @@ async function executeWithRateLimit<T>(
   retryCount = 0
 ): Promise<T> {
   try {
+    // During build time, only use cached data
+    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+      if (endpoint.includes('search') || endpoint.includes('timeline')) {
+        const cachedData = await getCachedTweets();
+        if (cachedData?.tweets?.length) {
+          console.log(`[Twitter API] Using cached data during build for ${endpoint}`);
+          return cachedData as any;
+        }
+        throw new Error('No cached data available during build');
+      }
+      throw new Error('API calls not allowed during build time');
+    }
+
     if (isRateLimited(endpoint)) {
       const waitTime = rateLimitCache[endpoint].reset - Date.now();
       console.log(`[Twitter API] Rate limited for ${endpoint}, waiting ${Math.round(waitTime / 1000)}s`);
@@ -129,10 +142,10 @@ async function executeWithRateLimit<T>(
     const result = await operation();
     return result;
   } catch (error: any) {
-    if (error?.data?.status === 429 && retryCount < MAX_RETRIES) {
-      // Exponential backoff with jitter
-      const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount) * (0.5 + Math.random());
-      console.log(`[Twitter API] Rate limited, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+    // Only retry once for rate limit errors
+    if (error?.data?.status === 429 && retryCount < 1) {
+      const delay = BASE_RETRY_DELAY * (0.5 + Math.random());
+      console.log(`[Twitter API] Rate limited, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/1)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return executeWithRateLimit(endpoint, operation, retryCount + 1);
     }
@@ -354,6 +367,12 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<Tw
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
 export async function getReadOnlyClient(): Promise<TwitterApiv2> {
   console.log('[Twitter API] Initializing read-only client...');
+
+  // During build time, only use cached data
+  if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
+    console.log('[Twitter API] Build phase detected, using cached data only');
+    throw new Error('API client initialization not allowed during build time');
+  }
 
   // Check if we can make a request based on rate limit
   const now = Date.now();
