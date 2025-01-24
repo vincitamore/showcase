@@ -12,16 +12,6 @@ const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 15000; // 15 seconds base delay
 
-interface RateLimitInfo {
-  reset: number;
-  remaining: number;
-  lastUpdated: number;
-}
-
-interface RateLimitCache {
-  [key: string]: RateLimitInfo;
-}
-
 // Interface to match TweetV2 structure but only include what we need
 interface StoredTweet {
   id: string;
@@ -68,22 +58,6 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
     public_metrics: tweet.public_metrics,
     entities: tweet.entities
   };
-}
-
-// Helper to check if we're rate limited for a specific endpoint
-function isRateLimited(endpoint: string): boolean {
-  const now = Date.now();
-  const limit = rateLimitCache[endpoint];
-  
-  if (!limit) return false;
-  
-  // If the rate limit info is stale (older than 15 minutes), consider it expired
-  if (now - limit.lastUpdated > RATE_LIMIT_WINDOW) {
-    delete rateLimitCache[endpoint];
-    return false;
-  }
-  
-  return limit.remaining <= 0 && now < limit.reset;
 }
 
 // Helper to update rate limit info from response headers
@@ -211,77 +185,6 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
   return true;
 }
 
-// Add detailed logging for API requests
-async function logApiRequest(endpoint: string, params: Record<string, any>) {
-  console.log('[Twitter API] Making request:', {
-    endpoint,
-    params,
-    timestamp: new Date().toISOString()
-  });
-}
-
-// Add detailed logging for API responses
-async function logApiResponse(endpoint: string, response: any, error?: any) {
-  if (error) {
-    console.error('[Twitter API] Request failed:', {
-      endpoint,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      status: error.status,
-      data: error.data,
-      timestamp: new Date().toISOString()
-    });
-    return;
-  }
-
-  console.log('[Twitter API] Request succeeded:', {
-    endpoint,
-    status: 'success',
-    resultCount: response?.data?.length || 0,
-    includes: {
-      users: response?.includes?.users?.length || 0,
-      media: response?.includes?.media?.length || 0,
-      tweets: response?.includes?.tweets?.length || 0
-    },
-    timestamp: new Date().toISOString()
-  });
-}
-
-// Separate rate limits for different endpoints
-const RATE_LIMITS = {
-  verify: 15 * 60 * 1000,    // 15 minutes
-  search: 15 * 60 * 1000,    // 15 minutes
-  timeline: 15 * 60 * 1000,  // 15 minutes
-  default: 15 * 60 * 1000    // 15 minutes fallback
-};
-
-// Track rate limits per endpoint using RateLimitInfo interface
-const rateLimitCache: RateLimitCache = {};
-
-// Helper functions for rate limit checking
-async function checkEndpointRateLimit(endpoint: string): Promise<boolean> {
-  const now = Date.now();
-  const lastRequest = rateLimitCache[endpoint]?.reset || 0;
-  const limit = RATE_LIMITS[endpoint as keyof typeof RATE_LIMITS] || RATE_LIMITS.default;
-  
-  console.log('[Twitter API] Endpoint rate limit check:', {
-    endpoint,
-    lastRequest: new Date(lastRequest).toISOString(),
-    timeSince: `${Math.floor((now - lastRequest) / 1000)}s`,
-    limit: `${limit / 1000}s`,
-    canRequest: (now - lastRequest) >= limit
-  });
-  
-  return (now - lastRequest) >= limit;
-}
-
-async function updateEndpointRateLimit(endpoint: string): Promise<void> {
-  rateLimitCache[endpoint] = {
-    reset: Date.now() + RATE_LIMIT_WINDOW,
-    remaining: 1,
-    lastUpdated: Date.now()
-  };
-}
-
 // Initialize read-only client for public data
 export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
@@ -305,7 +208,7 @@ export async function executeWithRateLimit<T>(
     if (!canProceed) {
       const rateLimit = await getRateLimit(endpoint);
       const now = new Date();
-      const resetAt = rateLimit?.resetAt ? new Date(rateLimit.resetAt) : new Date(now.getTime() + 15 * 60 * 1000);
+      const resetAt = rateLimit?.resetAt ? new Date(rateLimit.resetAt) : new Date(now.getTime() + RATE_LIMIT_WINDOW);
       const waitTime = Math.ceil((resetAt.getTime() - now.getTime()) / 1000);
       
       console.error('[Twitter API] Rate limit check failed:', {
