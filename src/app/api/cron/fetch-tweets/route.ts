@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
 import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
 import { env } from '@/env';
-import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2 } from 'twitter-api-v2';
+import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError, TweetSearchRecentV2Paginator, TwitterRateLimit } from 'twitter-api-v2';
 
 type TweetWithEntities = {
   id: string;
@@ -22,6 +22,30 @@ type TweetWithEntities = {
     tweetId: string;
     metadata: any;
   }>;
+};
+
+type TwitterSearchResponse = {
+  data: TweetV2[];
+  meta: {
+    result_count: number;
+    newest_id: string;
+    oldest_id: string;
+    next_token?: string;
+  };
+  includes?: {
+    users?: Array<{
+      id: string;
+      name: string;
+      username: string;
+      profile_image_url?: string;
+    }>;
+    media?: Array<{
+      media_key: string;
+      type: 'photo' | 'video' | 'animated_gif';
+      url?: string;
+      preview_image_url?: string;
+    }>;
+  };
 };
 
 // Convert database tweet to TweetV2 format
@@ -109,7 +133,7 @@ export async function GET(request: Request) {
     const query = `from:${username} -is:reply -is:retweet`;
 
     // Fetch tweets with rate limit handling using recent search
-    const tweets = await executeWithRateLimit(
+    const paginator = await executeWithRateLimit<TweetSearchRecentV2Paginator>(
       'tweets/search/recent',
       {
         query,
@@ -119,8 +143,7 @@ export async function GET(request: Request) {
         'media.fields': ['url', 'preview_image_url', 'alt_text'],
         expansions: ['author_id', 'attachments.media_keys']
       },
-      () => client.get('tweets/search/recent', {
-        query,
+      () => client.search(query, {
         max_results: 50,
         'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
         'user.fields': ['profile_image_url', 'username'],
@@ -129,10 +152,16 @@ export async function GET(request: Request) {
       })
     );
 
-    if (!tweets.data?.length) {
+    // Get the first page of tweets
+    const page = await paginator.fetchNext();
+    const tweets: TweetV2[] = Array.isArray(page.data) ? page.data : [];
+    const meta = page.meta;
+
+    if (!tweets?.length) {
       console.error('[Cron] No tweets found:', {
         username,
         query,
+        meta,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
         step: 'no-tweets'
@@ -141,19 +170,20 @@ export async function GET(request: Request) {
     }
 
     console.log('[Cron] Recent tweets fetched:', {
-      count: tweets.data.length,
-      firstTweetId: tweets.data[0].id,
-      lastTweetId: tweets.data[tweets.data.length - 1].id,
+      count: tweets.length,
+      firstTweetId: tweets[0].id,
+      lastTweetId: tweets[tweets.length - 1].id,
+      meta,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
       step: 'tweets-fetched'
     });
 
     // Cache the tweets
-    const cache = await cacheTweets(tweets.data);
+    const cache = await cacheTweets(tweets);
     console.log('[Cron] Tweets cached:', {
       cacheId: cache.id,
-      tweetCount: tweets.data.length,
+      tweetCount: tweets.length,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
       step: 'tweets-cached'
@@ -171,7 +201,7 @@ export async function GET(request: Request) {
     }
 
     // Select random tweets
-    const tweetIds = tweets.data.map((t: TweetV2) => t.id);
+    const tweetIds = tweets.map((t: TweetV2) => t.id);
     const selectedCount = Math.min(4, tweetIds.length);
     const selectedIds: string[] = [];
     
@@ -204,7 +234,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       message: 'Tweets fetched and cached successfully',
-      tweetCount: tweets.data.length,
+      tweetCount: tweets.length,
       selectedCount: selectedIds.length
     });
   } catch (error) {
