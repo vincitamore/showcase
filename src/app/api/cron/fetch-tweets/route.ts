@@ -125,7 +125,7 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
     const timeline = await client.userTimeline(user.data.id, {
       exclude: ['retweets'],  // Allow replies to increase chances of finding tweets
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
-      max_results: 10,
+      max_results: 20, // Increased to get more candidates
     });
 
     if (!timeline?.data?.data) {
@@ -135,12 +135,23 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
 
     const tweets = Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data];
     
+    // Separate tweets with and without entities
+    const tweetsWithEntities = tweets.filter(hasTweetEntities);
+    const tweetsWithoutEntities = tweets.filter(tweet => !hasTweetEntities(tweet));
+    
     logStatus('Timeline results', {
       totalFound: tweets.length,
-      withEntities: tweets.filter(hasTweetEntities).length
+      withEntities: tweetsWithEntities.length,
+      withoutEntities: tweetsWithoutEntities.length
     });
     
-    // Always return at least one tweet
+    // Prefer tweets with entities if available
+    if (tweetsWithEntities.length > 0) {
+      const randomIndex = Math.floor(Math.random() * tweetsWithEntities.length);
+      return [tweetsWithEntities[randomIndex]];
+    }
+    
+    // Fallback to tweets without entities
     const randomIndex = Math.floor(Math.random() * tweets.length);
     return [tweets[randomIndex]];
   } catch (error) {
