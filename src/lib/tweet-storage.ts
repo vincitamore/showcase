@@ -217,8 +217,8 @@ const TWEET_LIMIT = 100;
 const CACHE_LIMIT = 1000;
 const SELECTED_TWEET_COUNT = 10;
 
-export async function updateSelectedTweets(tweets: TweetV2[]) {
-  const selectedTweets = tweets.slice(0, SELECTED_TWEET_COUNT);
+export async function updateSelectedTweets(tweetIds: string[]) {
+  const selectedTweetIds = tweetIds.slice(0, SELECTED_TWEET_COUNT);
   
   // Deactivate previous selected cache
   await (prisma as any).tweetCache.updateMany({
@@ -237,7 +237,7 @@ export async function updateSelectedTweets(tweets: TweetV2[]) {
       type: CACHE_TYPES.SELECTED,
       isActive: true,
       tweets: {
-        connect: selectedTweets.map(id => ({ id }))
+        connect: selectedTweetIds.map(id => ({ id }))
       }
     }
   })
@@ -246,16 +246,25 @@ export async function updateSelectedTweets(tweets: TweetV2[]) {
 }
 
 export async function getSelectedTweets(): Promise<TweetV2[]> {
-  const tweets = await prisma.tweet.findMany({
-    where: { selected: true },
-    take: SELECTED_TWEET_COUNT,
-    orderBy: { createdAt: 'desc' },
+  const cache = await (prisma as any).tweetCache.findFirst({
+    where: {
+      type: CACHE_TYPES.SELECTED,
+      isActive: true
+    },
     include: {
-      entities: true
+      tweets: {
+        include: {
+          entities: true
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: SELECTED_TWEET_COUNT
+      }
     }
   });
   
-  return tweets;
+  return cache?.tweets || [];
 }
 
 // Rate limit management

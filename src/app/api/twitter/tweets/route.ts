@@ -265,16 +265,15 @@ function logStatus(message: string, data?: any) {
 
 export async function GET(request: Request) {
   try {
-    const selectedTweets = await getSelectedTweets()
+    const selectedTweets = await getSelectedTweets();
     
     console.log('[API] Returning tweets:', {
-      count: selectedTweets.tweets.length
+      count: selectedTweets.length
     })
 
     return NextResponse.json({
-      tweets: selectedTweets.tweets,
-      timestamp: new Date().toISOString()
-    })
+      tweets: selectedTweets
+    });
   } catch (error) {
     console.error('[API] Error getting tweets:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
