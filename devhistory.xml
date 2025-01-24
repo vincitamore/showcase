@@ -203,6 +203,27 @@
             </related-entries>
             <impact>Improved URL detection and display variety</impact>
         </entry>
+
+        <entry id="2024-01-21-14" scope="enhancement" type="infrastructure">
+            <title>Rate Limit and Tweet Validation Improvements</title>
+            <changes>
+                <item>Consolidated rate limit handling into a single system</item>
+                <item>Added endpoint-specific rate limit tracking</item>
+                <item>Improved rate limit info storage and reset handling</item>
+                <item>Enhanced tweet validation to ensure proper TweetV2 objects</item>
+                <item>Added detailed logging for tweet validation results</item>
+                <item>Fixed type safety issues in API response handling</item>
+            </changes>
+            <files>
+                <file>src/lib/x-api.ts</file>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files>
+            <related>
+                <entry>rate-limit-handling</entry>
+                <entry>tweet-content-handling</entry>
+            </related>
+            <impact>Improved reliability of rate limit handling and tweet validation</impact>
+        </entry>
     </history-entries>
 
     <tags>

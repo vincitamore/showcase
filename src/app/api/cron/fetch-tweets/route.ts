@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getReadOnlyClient } from '@/lib/x-api';
+import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
 import { 
   cacheTweets,
   getRateLimitTimestamp,
@@ -294,117 +294,71 @@ async function checkRateLimit() {
   }
 }
 
-async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetWithAuthor[]): Promise<TweetWithAuthor[] | null> {
-  try {
-    logStatus('Searching .build tweets');
+async function searchNewBuildTweets(client: TwitterApiv2): Promise<TweetV2[]> {
+  return executeWithRateLimit('search', { query: '(.build) lang:en -is:retweet -is:reply' }, async () => {
+    console.log('[Init] Searching for .build tweets...');
     const query = '(.build) lang:en -is:retweet -is:reply';
+    console.log('[Init] Using search query:', query);
     
-    const searchResults = await client.search(query, {
-      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
-      'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url', 'height', 'width', 'type'],
-      expansions: ['author_id', 'attachments.media_keys'],
-      max_results: 10,
+    const paginator = await client.search(query, {
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'max_results': 10
     });
 
-    if (!searchResults?.data) {
-      logStatus('No .build tweets found');
-      return null;
+    const page = await paginator.fetchNext();
+    if (!page?.data) {
+      console.log('[Init] No .build tweets found');
+      return [];
     }
 
-    // Extract user and media data from includes
-    const userData = extractUserData(searchResults.includes);
-    const mediaData = extractMediaData(searchResults.includes);
-    
-    // Validate tweets with user and media data
-    const tweets = Array.isArray(searchResults.data) ? searchResults.data : [searchResults.data];
-    const validatedTweets = tweets
-      .map(tweet => validateTweet(tweet, userData, mediaData))
-      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
-    
-    logStatus('Search results', {
-      found: tweets.length,
-      valid: validatedTweets.length,
-      withEntities: validatedTweets.filter(t => hasTweetEntities(t)).length
+    // Ensure we have an array of TweetV2 objects
+    const tweets = Array.isArray(page.data) ? page.data : [page.data];
+    const validTweets = tweets.filter((tweet): tweet is TweetV2 => {
+      return tweet && typeof tweet.id === 'string' && typeof tweet.text === 'string' && Array.isArray(tweet.edit_history_tweet_ids);
+    });
+
+    console.log('[Init] Found .build tweets:', {
+      total: tweets.length,
+      valid: validTweets.length
     });
     
-    return validatedTweets;
-  } catch (error) {
-    logStatus('Search failed', { error: error instanceof Error ? error.message : 'Unknown error' });
-    return null;
-  }
+    return validTweets;
+  });
 }
 
-async function getRandomUserTweet(client: TwitterApiv2, username: string): Promise<TweetWithAuthor[] | null> {
-  try {
-    logStatus('Fetching user tweets', { username });
+async function getUserTweets(client: TwitterApiv2, username: string): Promise<TweetV2[]> {
+  return executeWithRateLimit('timeline', { username }, async () => {
+    console.log('[Init] Fetching user tweets...');
     const user = await client.userByUsername(username);
     if (!user?.data) {
-      logStatus('User not found', { username });
       throw new Error('User not found');
     }
 
-    const timeline = await client.userTimeline(user.data.id, {
-      exclude: ['retweets'],  // Allow replies to increase chances of finding tweets
-      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
-      'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url', 'height', 'width', 'type'],
-      expansions: ['author_id', 'attachments.media_keys'],
-      max_results: 20, // Increased to get more candidates
+    const paginator = await client.userTimeline(user.data.id, {
+      'exclude': ['retweets'],
+      'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'max_results': 10
     });
 
-    if (!timeline?.data?.data) {
-      logStatus('No timeline tweets found');
-      return null;
+    const page = await paginator.fetchNext();
+    if (!page?.data) {
+      console.log('[Init] No user tweets found');
+      return [];
     }
 
-    // Extract user and media data from includes
-    const userData = extractUserData(timeline.includes);
-    const mediaData = extractMediaData(timeline.includes);
-    logStatus('Extracted includes data', {
-      userCount: userData.size,
-      userIds: Array.from(userData.keys()),
-      mediaCount: mediaData.size,
-      mediaKeys: Array.from(mediaData.keys())
+    // Ensure we have an array of TweetV2 objects
+    const tweets = Array.isArray(page.data) ? page.data : [page.data];
+    const validTweets = tweets.filter((tweet): tweet is TweetV2 => {
+      return tweet && typeof tweet.id === 'string' && typeof tweet.text === 'string' && Array.isArray(tweet.edit_history_tweet_ids);
     });
 
-    const tweets = Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data];
-    
-    // Validate tweets with user and media data
-    const validTweets = tweets
-      .map(tweet => validateTweet(tweet, userData, mediaData))
-      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
-    
-    // Separate tweets with and without entities
-    const tweetsWithEntities = validTweets.filter(t => hasTweetEntities(t));
-    const tweetsWithoutEntities = validTweets.filter(t => !hasTweetEntities(t));
-    
-    logStatus('Timeline results', {
-      totalFound: tweets.length,
-      validTweets: validTweets.length,
-      withEntities: tweetsWithEntities.length,
-      withoutEntities: tweetsWithoutEntities.length,
-      withAuthorData: validTweets.filter(t => !!t.author).length,
-      withMedia: validTweets.filter(t => !!t.media && t.media.length > 0).length
+    console.log('[Init] Found user tweets:', {
+      total: tweets.length,
+      valid: validTweets.length
     });
     
-    // Prefer tweets with entities if available
-    if (tweetsWithEntities.length > 0) {
-      const randomIndex = Math.floor(Math.random() * tweetsWithEntities.length);
-      return [tweetsWithEntities[randomIndex]];
-    }
-    
-    // Fallback to tweets without entities
-    if (validTweets.length > 0) {
-      const randomIndex = Math.floor(Math.random() * validTweets.length);
-      return [validTweets[randomIndex]];
-    }
-
-    return null;
-  } catch (error) {
-    logStatus('Error fetching random user tweet', { error: error instanceof Error ? error.message : 'Unknown error' });
-    return null;
-  }
+    return validTweets;
+  });
 }
 
 // Add detailed logging for tweet processing
@@ -451,16 +405,13 @@ export async function GET(req: Request) {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    const canRequest = await checkRateLimit();
-    if (!canRequest) {
-      logStatus('Rate limited, skipping fetch');
-      return new Response('Rate limited', { status: 429 });
+    // Initialize client without verification
+    const client = await getReadOnlyClient();
+    const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
+    if (!username) {
+      throw new Error('Twitter username not configured');
     }
 
-    // Update rate limit timestamp before making requests
-    const now = Date.now();
-    await updateRateLimitTimestamp(now);
-    
     // Get currently cached tweets
     const cachedData = await getCachedTweets();
     const currentTweets = (cachedData?.tweets || []) as TweetWithAuthor[];
@@ -469,20 +420,13 @@ export async function GET(req: Request) {
       withEntities: currentTweets.filter(hasTweetEntities).length
     });
 
-    // Initialize client
-    const client = await getReadOnlyClient();
-    const username = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
-    if (!username) {
-      throw new Error('Twitter username not configured');
-    }
-
     // Fetch new tweets
-    const newBuildTweets = await searchNewBuildTweets(client, currentTweets);
-    const userTweets = await getRandomUserTweet(client, username);
+    const newBuildTweets = await searchNewBuildTweets(client);
+    const userTweets = await getUserTweets(client, username);
 
     const newTweets = [
-      ...(newBuildTweets || []),
-      ...(userTweets || [])
+      ...newBuildTweets,
+      ...userTweets
     ];
 
     if (newTweets.length === 0) {
