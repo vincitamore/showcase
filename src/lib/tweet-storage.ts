@@ -135,23 +135,30 @@ async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) 
       const media = mediaArray.find((m: MediaObjectV2) => m.media_key === key);
       if (!media) return null;
       
+      // Enhanced media metadata handling
+      const mediaMetadata = {
+        type: media.type,
+        url: media.url || media.preview_image_url, // Fallback to preview_image_url
+        preview_image_url: media.preview_image_url,
+        width: media.width,
+        height: media.height,
+        alt_text: media.alt_text,
+        variants: media.variants,
+        // Store the direct image URL for photos
+        direct_url: media.type === 'photo' ? 
+          `https://pbs.twimg.com/media/${media.media_key}?format=jpg&name=large` : 
+          null
+      };
+
       return {
         type: 'media',
-        text: media.url || '',
-        url: media.url || '',
-        expandedUrl: media.url || '',
-        displayUrl: media.url || '',
+        text: media.url || media.preview_image_url || '',
+        url: mediaMetadata.direct_url || media.url || media.preview_image_url || '',
+        expandedUrl: mediaMetadata.direct_url || media.url || media.preview_image_url || '',
+        displayUrl: media.url || media.preview_image_url || '',
         mediaKey: media.media_key,
         tweet: { connect: { id: tweet.id } },
-        metadata: toPrismaJson({
-          type: media.type,
-          url: media.url,
-          preview_image_url: media.preview_image_url,
-          width: media.width,
-          height: media.height,
-          alt_text: media.alt_text,
-          variants: media.variants
-        })
+        metadata: toPrismaJson(mediaMetadata)
       } as EntityCreateInput;
     }).filter((item): item is EntityCreateInput => item !== null);
 

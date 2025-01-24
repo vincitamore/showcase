@@ -444,7 +444,9 @@ const BlogSection = () => {
       entities: mediaEntities.map(e => ({
         type: e.type,
         mediaKey: e.mediaKey,
-        metadata: e.metadata
+        metadata: e.metadata,
+        url: e.url,
+        expandedUrl: e.expandedUrl
       }))
     });
 
@@ -458,15 +460,23 @@ const BlogSection = () => {
           console.log('[Tweet Rendering] Processing media item:', {
             index,
             mediaKey: entity.mediaKey,
-            metadata
+            metadata,
+            url: entity.url,
+            expandedUrl: entity.expandedUrl
           });
 
-          // Try different paths for the image URL
-          const imageUrl = metadata?.preview_image_url || metadata?.url || entity.url;
+          // Try different paths for the image URL in order of preference
+          const imageUrl = entity.expandedUrl || // Direct image URL
+                          metadata?.direct_url || // Fallback to stored direct URL
+                          metadata?.preview_image_url || // Then preview image
+                          metadata?.url || // Then regular URL
+                          entity.url; // Finally entity URL
+
           if (!imageUrl) {
             console.warn('[Tweet Rendering] No image URL found for media entity:', {
               mediaKey: entity.mediaKey,
-              metadata
+              metadata,
+              entity
             });
             return null;
           }
@@ -478,18 +488,23 @@ const BlogSection = () => {
           return (
             <div 
               key={entity.mediaKey || index}
-              className="relative overflow-hidden rounded-lg"
+              className="relative overflow-hidden rounded-lg cursor-pointer"
               style={{
                 width: '100%',
                 maxWidth: '400px',
                 aspectRatio: String(aspectRatio)
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(imageUrl, '_blank', 'noopener,noreferrer');
               }}
             >
               <Image
                 src={imageUrl}
                 alt={metadata?.alt_text || 'Tweet media'}
                 fill
-                className="object-cover"
+                className="object-cover hover:opacity-90 transition-opacity"
                 sizes="(max-width: 400px) 100vw, 400px"
               />
             </div>
