@@ -202,9 +202,27 @@ export async function executeWithRateLimit<T>(
   params: Record<string, any>,
   apiCall: () => Promise<T>
 ): Promise<T> {
+  const startTime = Date.now();
+  
   try {
+    console.log('[Twitter API] Starting rate limit check:', {
+      endpoint,
+      params,
+      timestamp: new Date().toISOString(),
+      step: 'pre-check'
+    });
+
     // Check if we can make the request
     const canProceed = await canMakeRequest(endpoint);
+    
+    console.log('[Twitter API] Rate limit check result:', {
+      endpoint,
+      canProceed,
+      checkDurationMs: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+      step: 'post-check'
+    });
+
     if (!canProceed) {
       const rateLimit = await getRateLimit(endpoint);
       const now = new Date();
@@ -216,7 +234,9 @@ export async function executeWithRateLimit<T>(
         remaining: rateLimit?.remaining ?? 'unknown',
         resetAt: resetAt.toISOString(),
         waitTime: `${waitTime}s`,
-        params
+        params,
+        checkDurationMs: Date.now() - startTime,
+        step: 'rate-limited'
       });
       
       throw new Error(`Rate limit exceeded for ${endpoint}. Reset in ${waitTime} seconds.`);
@@ -226,25 +246,37 @@ export async function executeWithRateLimit<T>(
     console.log('[Twitter API] Making request:', {
       endpoint,
       params,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      checkDurationMs: Date.now() - startTime,
+      step: 'pre-request'
     });
 
     // Make the API call
     const response = await apiCall();
+
+    console.log('[Twitter API] Request completed:', {
+      endpoint,
+      success: true,
+      totalDurationMs: Date.now() - startTime,
+      step: 'post-request'
+    });
 
     // Handle rate limit headers if response is from Twitter API
     if (response && typeof response === 'object' && '_headers' in response) {
       const headers = (response as any)._headers;
       const rateLimitRemaining = headers?.['x-rate-limit-remaining'];
       const rateLimitReset = headers?.['x-rate-limit-reset'];
+      const rateLimitLimit = headers?.['x-rate-limit-limit'];
 
       console.log('[Twitter API] Response headers:', {
         endpoint,
         headers: {
           remaining: rateLimitRemaining,
           reset: rateLimitReset,
-          limit: headers?.['x-rate-limit-limit']
-        }
+          limit: rateLimitLimit
+        },
+        totalDurationMs: Date.now() - startTime,
+        step: 'headers-check'
       });
 
       if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
@@ -254,7 +286,9 @@ export async function executeWithRateLimit<T>(
         console.log('[Twitter API] Updating rate limit:', {
           endpoint,
           remaining,
-          resetTime: resetTime.toISOString()
+          resetTime: resetTime.toISOString(),
+          totalDurationMs: Date.now() - startTime,
+          step: 'rate-limit-update'
         });
 
         await updateRateLimit(endpoint, resetTime, remaining);
@@ -263,6 +297,8 @@ export async function executeWithRateLimit<T>(
 
     return response;
   } catch (error) {
+    const errorTime = Date.now();
+    
     // Handle Twitter API errors
     if (error instanceof ApiResponseError) {
       // Extract rate limit info from error response if available
@@ -270,6 +306,7 @@ export async function executeWithRateLimit<T>(
       if (response?._headers) {
         const rateLimitRemaining = response._headers['x-rate-limit-remaining'];
         const rateLimitReset = response._headers['x-rate-limit-reset'];
+        const rateLimitLimit = response._headers['x-rate-limit-limit'];
 
         console.error('[Twitter API] Rate limit error details:', {
           endpoint,
@@ -277,14 +314,25 @@ export async function executeWithRateLimit<T>(
           headers: {
             remaining: rateLimitRemaining,
             reset: rateLimitReset,
-            limit: response._headers['x-rate-limit-limit']
+            limit: rateLimitLimit
           },
-          data: response.data
+          data: response.data,
+          errorDurationMs: errorTime - startTime,
+          step: 'api-error'
         });
 
         if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
           const remaining = parseInt(rateLimitRemaining);
           const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+          
+          console.log('[Twitter API] Updating rate limit from error:', {
+            endpoint,
+            remaining,
+            resetTime: resetTime.toISOString(),
+            errorDurationMs: errorTime - startTime,
+            step: 'error-rate-limit-update'
+          });
+          
           await updateRateLimit(endpoint, resetTime, remaining);
         }
       } else {
@@ -292,14 +340,18 @@ export async function executeWithRateLimit<T>(
           endpoint,
           status: error.code,
           message: error.message,
-          data: error.data
+          data: error.data,
+          errorDurationMs: errorTime - startTime,
+          step: 'error-no-headers'
         });
       }
     } else {
       console.error('[Twitter API] Non-API error:', {
         endpoint,
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
+        errorDurationMs: errorTime - startTime,
+        step: 'non-api-error'
       });
     }
 

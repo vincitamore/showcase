@@ -243,16 +243,18 @@ export async function getSelectedTweets() {
 
 // Rate limit management
 export async function updateRateLimit(endpoint: string, resetAt: Date, remaining: number) {
+  const startTime = Date.now();
   const validResetAt = toValidDate(resetAt);
   
   console.log('[Twitter Storage] Updating rate limit:', {
     endpoint,
     resetAt: validResetAt.toISOString(),
     remaining,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    step: 'pre-update'
   });
 
-  return (prisma as any).twitterRateLimit.upsert({
+  const result = await (prisma as any).twitterRateLimit.upsert({
     where: {
       endpoint
     },
@@ -265,11 +267,29 @@ export async function updateRateLimit(endpoint: string, resetAt: Date, remaining
       resetAt: validResetAt,
       remaining
     }
-  })
+  });
+
+  console.log('[Twitter Storage] Rate limit updated:', {
+    endpoint,
+    resetAt: validResetAt.toISOString(),
+    remaining,
+    durationMs: Date.now() - startTime,
+    step: 'post-update'
+  });
+
+  return result;
 }
 
 // Get rate limit info
 export async function getRateLimit(endpoint: string) {
+  const startTime = Date.now();
+  
+  console.log('[Twitter Storage] Fetching rate limit:', {
+    endpoint,
+    timestamp: new Date().toISOString(),
+    step: 'pre-fetch'
+  });
+
   const rateLimit = await (prisma as any).twitterRateLimit.findUnique({
     where: {
       endpoint
@@ -281,12 +301,16 @@ export async function getRateLimit(endpoint: string) {
       endpoint,
       resetAt: toSafeISOString(rateLimit.resetAt),
       remaining: rateLimit.remaining,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'post-fetch-found'
     });
   } else {
     console.log('[Twitter Storage] No rate limit found:', {
       endpoint,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'post-fetch-empty'
     });
   }
 
@@ -294,6 +318,14 @@ export async function getRateLimit(endpoint: string) {
 }
 
 export async function canMakeRequest(endpoint: string): Promise<boolean> {
+  const startTime = Date.now();
+  
+  console.log('[Twitter Storage] Checking if request can be made:', {
+    endpoint,
+    timestamp: new Date().toISOString(),
+    step: 'start-check'
+  });
+
   const rateLimit = await getRateLimit(endpoint);
   const now = new Date();
   
@@ -301,7 +333,9 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
   if (!rateLimit) {
     console.log('[Twitter Storage] No rate limit found, allowing request:', {
       endpoint,
-      timestamp: now.toISOString()
+      timestamp: now.toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'check-no-limit'
     });
     return true;
   }
@@ -315,7 +349,9 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
       endpoint,
       resetAt: resetAt.toISOString(),
       now: now.toISOString(),
-      remaining: rateLimit.remaining
+      remaining: rateLimit.remaining,
+      durationMs: Date.now() - startTime,
+      step: 'check-reset-passed'
     });
     return true;
   }
@@ -326,7 +362,9 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
       endpoint,
       remaining: rateLimit.remaining,
       resetAt: resetAt.toISOString(),
-      timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
+      timeUntilReset: Math.floor(timeUntilReset / 1000) + 's',
+      durationMs: Date.now() - startTime,
+      step: 'check-has-remaining'
     });
     return true;
   }
@@ -336,7 +374,9 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
     endpoint,
     resetAt: resetAt.toISOString(),
     remaining: rateLimit.remaining,
-    timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
+    timeUntilReset: Math.floor(timeUntilReset / 1000) + 's',
+    durationMs: Date.now() - startTime,
+    step: 'check-rate-limited'
   });
   return false;
 } 

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
 import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
 import { env } from '@/env';
@@ -94,130 +94,147 @@ export const runtime = 'nodejs';
 export const maxDuration = 10; // 10 seconds timeout
 
 // This route is called during build/deployment to initialize tweets
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   const startTime = Date.now();
   
   try {
-    // During build time, return empty success to prevent API calls
-    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      console.log('[Init] Build phase detected, skipping initialization');
-      return NextResponse.json({ 
-        success: true,
-        message: 'Skipped during build phase',
-        fromCache: false
-      });
-    }
-
-    // Verify the request is from Vercel Cron
-    const authHeader = request.headers.get('authorization');
+    // Ensure this is only called by Vercel cron
+    const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      console.error('[Init] Invalid authorization');
+      console.error('[Init] Unauthorized request:', {
+        hasAuth: !!authHeader,
+        timestamp: new Date().toISOString(),
+        step: 'auth-check'
+      });
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    console.log('[Init] Starting tweet initialization...', {
-      timestamp: new Date().toISOString()
+    console.log('[Init] Starting tweet fetch...', {
+      timestamp: new Date().toISOString(),
+      step: 'start'
     });
 
-    // Get Twitter client
+    // Initialize Twitter client
     const client = await getReadOnlyClient();
     
-    // Get user info
-    const username = env.TWITTER_USERNAME?.replace('@', '');
-    if (!username) {
-      console.error('[Init] Twitter username not configured');
-      return new NextResponse('Twitter username not configured', { status: 500 });
-    }
+    console.log('[Init] Client initialized, fetching user...', {
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'client-ready'
+    });
 
-    const user = await client.userByUsername(username);
+    // Get user data
+    const user = await executeWithRateLimit(
+      'users/by/username',
+      { username: env.TWITTER_USERNAME },
+      () => client.userByUsername(env.TWITTER_USERNAME)
+    );
+
     if (!user.data) {
-      console.error('[Init] User not found:', { username });
+      console.error('[Init] User not found:', {
+        username: env.TWITTER_USERNAME,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'user-not-found'
+      });
       return new NextResponse('User not found', { status: 404 });
     }
 
-    console.log('[Init] Found user:', {
-      id: user.data.id,
-      username: user.data.username
+    console.log('[Init] User found, fetching timeline...', {
+      userId: user.data.id,
+      username: user.data.username,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'user-found'
     });
 
-    // Fetch tweets with proper parameters
+    // Get tweets
     const tweets = await executeWithRateLimit(
-      'userTimeline',
+      'users/:id/tweets',
       {
         userId: user.data.id,
-        exclude: ['replies', 'retweets'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
-        'user.fields': ['name', 'username', 'profile_image_url'],
-        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        exclude: ['retweets', 'replies'],
         expansions: ['author_id', 'attachments.media_keys'],
-        max_results: 40
+        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+        'user.fields': ['profile_image_url', 'username'],
+        'media.fields': ['url', 'preview_image_url', 'alt_text'],
+        max_results: 100
       },
       () => client.userTimeline(user.data.id, {
-        exclude: ['replies', 'retweets'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
-        'user.fields': ['name', 'username', 'profile_image_url'],
-        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        exclude: ['retweets', 'replies'],
         expansions: ['author_id', 'attachments.media_keys'],
-        max_results: 40
+        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+        'user.fields': ['profile_image_url', 'username'],
+        'media.fields': ['url', 'preview_image_url', 'alt_text'],
+        max_results: 100
       })
     );
 
-    if (!tweets.data?.data?.length) {
-      console.error('[Init] No tweets found for user:', { username });
-      return new NextResponse('No tweets found', { status: 404 });
-    }
-
-    console.log('[Init] Retrieved tweets:', {
-      count: tweets.data.data.length,
-      firstTweetId: tweets.data.data[0].id,
-      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id
+    console.log('[Init] Timeline fetched:', {
+      tweetCount: tweets.data.data.length,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-fetched'
     });
 
-    // Cache the tweets
+    // Cache tweets
     const cache = await cacheTweets(tweets.data.data);
-    console.log('[Init] Cached tweets:', {
+    
+    console.log('[Init] Tweets cached:', {
       cacheId: cache.id,
-      tweetCount: tweets.data.data.length
+      tweetCount: tweets.data.data.length,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-cached'
     });
 
-    // Get current cached tweets
-    const cachedTweets = await getCachedTweets();
-    if (!cachedTweets?.tweets?.length) {
-      console.error('[Init] Failed to verify cached tweets');
-      return new NextResponse('Failed to verify cached tweets', { status: 500 });
+    // Select random tweets
+    const tweetIds = tweets.data.data.map(t => t.id);
+    const selectedCount = Math.min(3, tweetIds.length);
+    const selectedIds: string[] = [];
+    
+    while (selectedIds.length < selectedCount) {
+      const randomIndex = Math.floor(Math.random() * tweetIds.length);
+      const id = tweetIds[randomIndex];
+      if (!selectedIds.includes(id)) {
+        selectedIds.push(id);
+      }
     }
 
-    // Convert and update selected tweets
-    const selectedTweets = cachedTweets.tweets
-      .slice(0, 7) // Get first 7 tweets
-      .sort(() => 0.5 - Math.random()) // Randomize order
-      .map((tweet: TweetWithEntities) => tweet.id);
+    console.log('[Init] Selected random tweets:', {
+      selectedCount,
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'tweets-selected'
+    });
 
-    await updateSelectedTweets(selectedTweets);
+    // Update selected tweets
+    const selectedCache = await updateSelectedTweets(selectedIds);
     
-    const executionTime = Date.now() - startTime;
-    console.log('[Init] Job completed successfully:', {
-      tweetsStored: tweets.data.data.length,
-      selectedTweets: selectedTweets.length,
-      executionTimeMs: executionTime
+    console.log('[Init] Selected tweets updated:', {
+      selectedCacheId: selectedCache.id,
+      selectedIds,
+      timestamp: new Date().toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'complete'
     });
 
     return NextResponse.json({
-      success: true,
-      tweetsStored: tweets.data.data.length,
-      selectedTweets: selectedTweets.length,
-      executionTimeMs: executionTime
+      message: 'Tweets fetched and cached successfully',
+      tweetCount: tweets.data.data.length,
+      selectedCount: selectedIds.length
     });
   } catch (error) {
-    const executionTime = Date.now() - startTime;
     console.error('[Init] Job failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      executionTimeMs: executionTime
+      executionTimeMs: Date.now() - startTime,
+      step: 'error'
     });
-
+    
     return new NextResponse(
-      error instanceof Error ? error.message : 'Internal Server Error', 
+      error instanceof Error ? error.message : 'Internal Server Error',
       { status: 500 }
     );
   }
