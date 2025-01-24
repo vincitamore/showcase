@@ -133,7 +133,10 @@ function getRandomItems<T>(array: T[], count: number): T[] {
 
 // Mark route as dynamic to prevent static generation
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+// Use Node.js runtime instead of Edge
+export const runtime = 'nodejs';
+// Increase timeout for API operations
+export const maxDuration = 10; // 10 seconds timeout
 
 // This route is called during build/deployment to initialize tweets
 export async function GET(request: Request) {

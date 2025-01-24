@@ -326,7 +326,8 @@ function getRandomItems(array: TweetWithAuthor[], count: number): TweetWithAutho
 
 // Vercel Cron Job - runs every 5 minutes but respects 15-minute rate limit
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300; // 5 minutes timeout
+export const runtime = 'nodejs';
+export const maxDuration = 10; // 10 seconds timeout
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 

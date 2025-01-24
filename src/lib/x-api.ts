@@ -438,12 +438,13 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
         const response = await client.v2.userByUsername(testUser);
         console.log('[Twitter API] Credentials verified successfully');
         
-        // Only update timestamp on successful request
-        if (response?.data) {
-          await updateRateLimitTimestamp();
-          console.log('[Twitter API] Updated rate limit timestamp after successful verification');
-        }
+        // Always update timestamp on successful verification
+        await updateRateLimitTimestamp();
+        console.log('[Twitter API] Updated rate limit timestamp after verification');
+        
+        return response;
       });
+      
       return client.v2;
     } catch (verifyError: any) {
       // Check if this is a Twitter API rate limit response
@@ -454,6 +455,9 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
           retryAfter: verifyError.data?.headers?.['retry-after'],
           rateLimitReset: verifyError.data?.headers?.['x-rate-limit-reset']
         });
+        
+        // Update timestamp on rate limit hit to prevent immediate retries
+        await updateRateLimitTimestamp();
         throw new Error('Twitter API rate limit exceeded during verification');
       }
       

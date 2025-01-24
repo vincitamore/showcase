@@ -11,7 +11,7 @@ export const CACHE_KEY_PREFIX = 'tweets';
 export const CURRENT_CACHE_FILE = 'tweets/current.json';
 export const PREVIOUS_CACHE_FILE = 'tweets/previous.json';
 export const RATE_LIMIT_PREFIX = 'rate-limit';
-export const RATE_LIMIT_FILE = 'rate-limit/timestamp.txt';
+export const RATE_LIMIT_FILE = 'rate-limit/current.txt';
 export const SELECTED_TWEETS_FILE = 'tweets/selected.json';
 
 // Constants
@@ -317,44 +317,43 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
   try {
     // During build time, return a timestamp that will prevent requests
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      console.log('Build phase detected, returning current timestamp to prevent requests');
+      console.log('[Rate Limit] Build phase detected, returning current timestamp');
       return Date.now();
     }
 
-    console.log('Getting rate limit timestamp...');
+    console.log('[Rate Limit] Getting timestamp...');
     const { blobs } = await list({ prefix: RATE_LIMIT_FILE });
     
     if (blobs.length === 0) {
-      console.log('No rate limit timestamp found');
+      console.log('[Rate Limit] No timestamp found');
       return null;
     }
     
     const response = await fetch(blobs[0].url);
-    console.log('Rate limit fetch response status:', response.status);
-    
     if (!response.ok) {
-      console.error('Failed to fetch rate limit timestamp:', response.statusText);
+      console.error('[Rate Limit] Failed to fetch timestamp:', response.statusText);
       return null;
     }
     
     const text = await response.text();
-    console.log('Received rate limit timestamp:', text);
+    const timestamp = parseInt(text.trim());
     
-    const timestamp = parseInt(text);
     if (isNaN(timestamp)) {
-      console.error('Invalid timestamp format:', text);
+      console.error('[Rate Limit] Invalid timestamp format:', text);
       return null;
     }
     
-    console.log('Parsed rate limit timestamp:', {
+    const age = Math.round((Date.now() - timestamp) / 1000);
+    console.log('[Rate Limit] Retrieved timestamp:', {
       timestamp,
       date: new Date(timestamp).toISOString(),
-      age: Math.round((Date.now() - timestamp) / 1000) + 's'
+      age: `${age}s ago`,
+      file: blobs[0].pathname
     });
     
     return timestamp;
   } catch (error) {
-    console.error('Error getting rate limit timestamp:', error);
+    console.error('[Rate Limit] Error getting timestamp:', error);
     return null;
   }
 }
@@ -362,11 +361,15 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
 export async function updateRateLimitTimestamp(): Promise<void> {
   try {
     const now = Date.now();
+    console.log('[Rate Limit] Updating timestamp...');
+
+    // List existing timestamps
+    const { blobs } = await list({ prefix: RATE_LIMIT_PREFIX });
     
-    // Delete any existing timestamp file
-    const { blobs } = await list({ prefix: RATE_LIMIT_FILE });
-    if (blobs.length > 0) {
-      await del(blobs[0].url);
+    // Delete all existing rate limit files to prevent stale data
+    for (const blob of blobs) {
+      console.log('[Rate Limit] Deleting old timestamp file:', blob.pathname);
+      await del(blob.url);
     }
     
     // Store new timestamp
@@ -376,12 +379,13 @@ export async function updateRateLimitTimestamp(): Promise<void> {
       addRandomSuffix: false
     });
     
-    console.log('Updated rate limit timestamp:', {
+    console.log('[Rate Limit] Updated timestamp:', {
       timestamp: now,
-      date: new Date(now).toISOString()
+      date: new Date(now).toISOString(),
+      file: RATE_LIMIT_FILE
     });
   } catch (error) {
-    console.error('Error updating rate limit timestamp:', error);
+    console.error('[Rate Limit] Error updating timestamp:', error);
     throw error;
   }
 }
@@ -416,28 +420,46 @@ export async function updateSelectedTweets(tweets: TweetV2[]): Promise<void> {
   }
 }
 
-// Helper function to get random items ensuring at least one has entities
+// Helper function to get random tweets ensuring at least one has entities
 function getRandomTweetsWithOneEntity(tweets: TweetV2[], count: number): TweetV2[] {
   // First, separate tweets with and without entities
   const tweetsWithEntities = tweets.filter(hasTweetEntities);
   const tweetsWithoutEntities = tweets.filter(t => !hasTweetEntities(t));
   
+  console.log('[API] Tweet pool stats:', {
+    total: tweets.length,
+    withEntities: tweetsWithEntities.length,
+    withoutEntities: tweetsWithoutEntities.length
+  });
+  
   // If no tweets with entities, just return random selection
   if (tweetsWithEntities.length === 0) {
-    console.log('No tweets with entities available');
+    console.log('[API] No tweets with entities available, using random selection');
     return getRandomItems(tweets, count);
   }
   
-  // Get one random tweet with entities
-  const selectedEntityTweet = getRandomItems(tweetsWithEntities, 1)[0];
+  // Try to get up to half the tweets with entities if possible
+  const desiredEntityCount = Math.min(Math.ceil(count / 2), tweetsWithEntities.length);
+  const selectedEntityTweets = getRandomItems(tweetsWithEntities, desiredEntityCount);
   
-  // Combine remaining tweets and get random selection
-  const remainingTweets = tweets.filter(t => t.id !== selectedEntityTweet.id);
-  const additionalTweets = getRandomItems(remainingTweets, count - 1);
+  // Fill remaining slots with non-entity tweets
+  const remainingCount = count - selectedEntityTweets.length;
+  const remainingPool = tweets.filter(t => 
+    !selectedEntityTweets.some(selected => selected.id === t.id)
+  );
+  const additionalTweets = getRandomItems(remainingPool, remainingCount);
   
   // Combine and shuffle the final selection
-  const finalSelection = [selectedEntityTweet, ...additionalTweets];
-  return getRandomItems(finalSelection, finalSelection.length);
+  const finalSelection = getRandomItems([...selectedEntityTweets, ...additionalTweets], count);
+  
+  console.log('[API] Selected tweets composition:', {
+    total: finalSelection.length,
+    withEntities: finalSelection.filter(hasTweetEntities).length,
+    entityTweetsSelected: selectedEntityTweets.length,
+    nonEntityTweetsSelected: additionalTweets.length
+  });
+  
+  return finalSelection;
 }
 
 export async function getSelectedTweets(): Promise<SelectedTweets | null> {
@@ -550,30 +572,32 @@ export async function canMakeRequest(now: number): Promise<boolean> {
   try {
     // During build time, prevent API requests
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      console.log('Build phase detected, preventing API requests');
+      console.log('[Rate Limit] Build phase detected, preventing requests');
       return false;
     }
 
     const lastTimestamp = await getRateLimitTimestamp();
     if (!lastTimestamp) {
-      console.log('No previous request timestamp found, allowing request');
+      console.log('[Rate Limit] No previous timestamp found, allowing request');
       return true;
     }
     
     const minutesSinceLastRequest = Math.floor((now - lastTimestamp) / (60 * 1000));
     const withinRateLimit = (now - lastTimestamp) < FIFTEEN_MINUTES;
+    const timeUntilReset = Math.max(0, Math.round((lastTimestamp + FIFTEEN_MINUTES - now) / 1000));
     
-    console.log('Rate limit check:', {
+    console.log('[Rate Limit] Check result:', {
       lastTimestamp,
       lastRequestDate: new Date(lastTimestamp).toISOString(),
       minutesSinceLastRequest,
       withinRateLimit,
-      timeUntilReset: Math.max(0, Math.round((lastTimestamp + FIFTEEN_MINUTES - now) / 1000)) + 's'
+      timeUntilReset: `${timeUntilReset}s`,
+      canRequest: !withinRateLimit
     });
     
     return !withinRateLimit;
   } catch (error) {
-    console.error('Error checking rate limit:', error);
+    console.error('[Rate Limit] Error checking rate limit:', error);
     // During build time, prevent API requests on error
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
       return false;
