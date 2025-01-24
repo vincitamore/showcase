@@ -442,68 +442,100 @@ function getRandomTweetsWithOneEntity(tweets: TweetV2[], count: number): TweetV2
 
 export async function getSelectedTweets(): Promise<SelectedTweets | null> {
   try {
-    console.log('Getting selected tweets...');
+    console.log('[API] Getting selected tweets...');
     const { blobs } = await list({ prefix: SELECTED_TWEETS_FILE });
     
+    // Get current cache for potential new selections
+    const currentCache = await getCachedTweets();
+    if (!currentCache?.tweets?.length) {
+      console.log('[API] No tweets available in cache');
+      return null;
+    }
+
+    // If no selected tweets exist, select new ones
     if (blobs.length === 0) {
-      // If no selected tweets, try to get from current cache
-      console.log('No selected tweets found, checking current cache...');
-      const currentCache = await getCachedTweets();
-      if (currentCache?.tweets.length) {
-        // Select tweets ensuring at least one has entities
-        const selectedTweets = getRandomTweetsWithOneEntity(currentCache.tweets, 4);
-        if (selectedTweets.length) {
-          await updateSelectedTweets(selectedTweets);
-          return {
-            tweets: selectedTweets,
-            timestamp: Date.now().toString()
-          };
-        }
+      console.log('[API] No selected tweets found, selecting from cache...');
+      const selectedTweets = getRandomTweetsWithOneEntity(currentCache.tweets, 4);
+      if (selectedTweets.length) {
+        await updateSelectedTweets(selectedTweets);
+        console.log('[API] Selected new tweets:', {
+          count: selectedTweets.length,
+          withEntities: selectedTweets.filter(hasTweetEntities).length
+        });
+        return {
+          tweets: selectedTweets,
+          timestamp: Date.now().toString()
+        };
       }
       return null;
     }
     
+    // Get existing selected tweets
     const response = await fetch(blobs[0].url);
     if (!response.ok) {
-      console.error('Failed to fetch selected tweets:', response.statusText);
+      console.error('[API] Failed to fetch selected tweets:', response.statusText);
       return null;
     }
     
     const data = await response.json() as SelectedTweets;
-    
-    // Check if selected tweets are older than 15 minutes
     const timestamp = parseInt(data.timestamp);
-    if (!isNaN(timestamp) && Date.now() - timestamp >= FIFTEEN_MINUTES) {
-      console.log('Selected tweets are older than 15 minutes, selecting new ones...');
-      const currentCache = await getCachedTweets();
-      if (currentCache?.tweets.length) {
-        // Filter out currently selected tweets to ensure rotation
-        const availableTweets = currentCache.tweets.filter(tweet => 
-          !data.tweets.some(selected => selected.id === tweet.id)
-        );
-        if (availableTweets.length) {
-          const selectedTweets = getRandomTweetsWithOneEntity(availableTweets, 4);
-          if (selectedTweets.length) {
-            await updateSelectedTweets(selectedTweets);
-            return {
-              tweets: selectedTweets,
-              timestamp: Date.now().toString()
-            };
-          }
-        }
+    
+    // Check if selected tweets are older than 15 minutes or if we should rotate
+    const shouldRotate = isNaN(timestamp) || 
+      Date.now() - timestamp >= FIFTEEN_MINUTES || 
+      Math.random() < 0.2; // 20% chance to rotate even if not expired
+    
+    if (shouldRotate) {
+      console.log('[API] Rotating tweets...', {
+        reason: isNaN(timestamp) ? 'invalid timestamp' : 
+          Date.now() - timestamp >= FIFTEEN_MINUTES ? 'expired' : 'random rotation',
+        age: isNaN(timestamp) ? 'unknown' : Math.round((Date.now() - timestamp) / 1000) + 's'
+      });
+
+      // Filter out currently selected tweets to ensure rotation
+      const availableTweets = currentCache.tweets.filter(tweet => 
+        !data.tweets.some(selected => selected.id === tweet.id)
+      );
+
+      if (availableTweets.length >= 2) { // Ensure we have enough tweets for rotation
+        // Keep some existing tweets for continuity
+        const keepCount = Math.min(2, data.tweets.length);
+        const tweetsToKeep = getRandomItems(data.tweets, keepCount);
+        
+        // Select new tweets from available pool
+        const newTweetsCount = 4 - keepCount;
+        const newTweets = getRandomTweetsWithOneEntity(availableTweets, newTweetsCount);
+        
+        // Combine and shuffle
+        const selectedTweets = getRandomItems([...tweetsToKeep, ...newTweets], 4);
+        
+        console.log('[API] Selected new tweets:', {
+          kept: keepCount,
+          new: newTweetsCount,
+          total: selectedTweets.length,
+          withEntities: selectedTweets.filter(hasTweetEntities).length
+        });
+
+        await updateSelectedTweets(selectedTweets);
+        return {
+          tweets: selectedTweets,
+          timestamp: Date.now().toString()
+        };
+      } else {
+        console.log('[API] Not enough tweets for rotation, using fallback');
       }
     }
     
-    console.log('Retrieved selected tweets:', {
+    // If we can't rotate or don't need to, return current selection
+    console.log('[API] Using current selection:', {
       count: data.tweets.length,
-      timestamp: new Date(data.timestamp).toISOString(),
       withEntities: data.tweets.filter(hasTweetEntities).length,
-      tweetIds: data.tweets.map(t => t.id)
+      age: isNaN(timestamp) ? 'unknown' : Math.round((Date.now() - timestamp) / 1000) + 's'
     });
     
     return data;
   } catch (error) {
-    console.error('Error getting selected tweets:', error);
+    console.error('[API] Error getting selected tweets:', error);
     return null;
   }
 }

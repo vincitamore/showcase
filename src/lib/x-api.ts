@@ -366,13 +366,12 @@ async function getUserTweets(client: TwitterApiv2, username: string): Promise<Tw
 
 // Initialize the read-only client for public tweet fetching using OAuth 1.0a
 export async function getReadOnlyClient(): Promise<TwitterApiv2> {
-  console.log('[Twitter API] Initializing read-only client...');
-
-  // During build time, only use cached data
+  // During build time, return null client to prevent API calls
   if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-    console.log('[Twitter API] Build phase detected, using cached data only');
-    throw new Error('API client initialization not allowed during build time');
+    throw new Error('API client not available during build phase');
   }
+
+  console.log('[Twitter API] Initializing read-only client...');
 
   // Check if we can make a request based on rate limit
   const now = Date.now();
@@ -431,7 +430,7 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
     // Verify credentials with a test request
     const testUser = process.env.NEXT_PUBLIC_TWITTER_USERNAME;
     if (!testUser) {
-      throw new Error('Twitter username not configured for verification');
+      throw new Error('Twitter username not configured');
     }
 
     try {

@@ -131,24 +131,34 @@ function getRandomItems<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
+// Mark route as dynamic to prevent static generation
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
+
 // This route is called during build/deployment to initialize tweets
 export async function GET(request: Request) {
   try {
-    // During build time, only use cached data
+    // During build time, return empty success to prevent API calls
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      console.log('[Init] Build phase detected, using cached data only');
-      const cachedData = await getCachedTweets();
-      
-      if (!cachedData?.tweets?.length) {
-        console.log('[Init] No cached tweets available during build');
-        return NextResponse.json({ 
-          success: false,
-          error: 'No cached tweets available',
-          fromCache: true
-        });
-      }
+      console.log('[Init] Build phase detected, skipping initialization');
+      return NextResponse.json({ 
+        success: true,
+        message: 'Skipped during build phase',
+        fromCache: false
+      });
+    }
 
-      // Select random tweets from cache for display
+    // Verify the request is from Vercel Cron
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      console.log('[Init] Unauthorized request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get currently cached tweets
+    const cachedData = await getCachedTweets();
+    if (cachedData?.tweets?.length) {
+      // Select random tweets from cache
       const selectedTweets = getRandomItems(cachedData.tweets, 4);
       await updateSelectedTweets(selectedTweets);
 
@@ -165,7 +175,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // For runtime requests, proceed with normal API calls
+    // Only proceed with API call if no cached data
     const client = await getReadOnlyClient();
     
     // Search for tweets containing ".build"
@@ -187,11 +197,6 @@ export async function GET(request: Request) {
       .map(tweet => validateTweet(tweet, userData, mediaData))
       .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
 
-    console.log('[Init] Validated tweets:', {
-      total: tweets.length,
-      valid: validTweets.length
-    });
-
     // Cache the valid tweets
     await cacheTweets(validTweets);
     await updateRateLimitTimestamp();
@@ -199,11 +204,6 @@ export async function GET(request: Request) {
     // Select random tweets for display
     const selectedTweets = getRandomItems(validTweets, 4);
     await updateSelectedTweets(selectedTweets);
-
-    console.log('[Init] Successfully cached and selected tweets:', {
-      cached: validTweets.length,
-      selected: selectedTweets.length
-    });
 
     return NextResponse.json({ 
       success: true,
