@@ -248,6 +248,45 @@
             </related-entries>
             <impact>Major improvement in data persistence, type safety, and maintainability</impact>
         </entry>
+
+        <entry id="2024-01-24-02" scope="enhancement" type="feature">
+            <title>Tweet Entity Handling and Media Support</title>
+            <changes>
+                <change>Enhanced tweet entity processing with proper media handling</change>
+                <change>Added support for images, GIFs, and other media types</change>
+                <change>Improved entity metadata storage and retrieval</change>
+                <change>Enhanced type safety in entity processing</change>
+                <change>Added detailed logging for entity handling</change>
+            </changes>
+            <files-affected>
+                <file>src/lib/tweet-storage.ts</file>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+                <file>src/app/api/twitter/tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-24-01">Tweet storage migration to Prisma</entry>
+            </related-entries>
+            <impact>Improved handling of rich media content in tweets</impact>
+        </entry>
+
+        <entry id="2024-01-24-03" scope="enhancement" type="feature">
+            <title>Tweet Selection and Display Improvements</title>
+            <changes>
+                <change>Enhanced tweet selection algorithm with entity prioritization</change>
+                <change>Improved random selection with proper distribution</change>
+                <change>Added detailed logging for selection process</change>
+                <change>Enhanced tweet validation and cleaning</change>
+                <change>Improved error handling in tweet processing</change>
+            </changes>
+            <files-affected>
+                <file>src/app/api/twitter/tweets/route.ts</file>
+                <file>src/components/blog-section.tsx</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-24-02">Tweet entity handling and media support</entry>
+            </related-entries>
+            <impact>Improved quality and variety of displayed tweets</impact>
+        </entry>
     </history-entries>
 
     <tags>

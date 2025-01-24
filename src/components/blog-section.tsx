@@ -709,10 +709,9 @@ const BlogSection = () => {
             className="w-full overflow-visible mx-auto pb-4" 
             opts={{ 
               loop: true, 
-              align: "start",
-              containScroll: false,
-              dragFree: true,
-              slidesToScroll: 1
+              align: "center",
+              containScroll: "trimSnaps",
+              dragFree: false
             }}
           >
             {tweets.map((tweet, index) => (
@@ -723,8 +722,8 @@ const BlogSection = () => {
                   "group cursor-pointer",
                   "p-3 sm:p-6",
                   "mx-1.5",
-                  "w-[calc(100vw-3rem)] sm:w-[calc(50vw-3rem)] md:w-[calc(33vw-3rem)] lg:w-[28rem]",
-                  "min-w-[280px] max-w-[28rem]",
+                  "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
+                  "max-w-[28rem]",
                   "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
                 )}
                 containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
@@ -756,6 +755,20 @@ const BlogSection = () => {
                     </span>
                   </div>
                   {renderTweetText(tweet)}
+                  {tweet.referenced_tweets?.map((ref) => (
+                    <div 
+                      key={ref.id}
+                      className="mb-4 rounded-lg border border-border/50 overflow-hidden"
+                    >
+                      <blockquote 
+                        className="twitter-tweet" 
+                        data-conversation="none"
+                        data-theme="dark"
+                      >
+                        <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                      </blockquote>
+                    </div>
+                  ))}
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}

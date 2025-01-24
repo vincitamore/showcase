@@ -138,151 +138,187 @@ export async function GET(request: Request) {
     }
 
     // Construct search query for user's tweets, excluding replies and retweets
-    const query = `from:${username} -is:reply -is:retweet`;
+    const query = `from:${username} -is:reply -is:retweet has:links`;
 
-    // Fetch tweets with rate limit handling using recent search
-    const paginator = await executeWithRateLimit<TweetSearchRecentV2Paginator>(
-      'tweets/search/recent',
-      {
-        query,
-        max_results: 50,
-        'tweet.fields': [
-          'created_at',
-          'public_metrics',
-          'entities',
-          'author_id',
-          'attachments'
-        ],
-        'user.fields': ['profile_image_url', 'username'],
-        'media.fields': [
-          'url',
-          'preview_image_url',
-          'alt_text',
-          'type',
-          'width',
-          'height',
-          'duration_ms',
-          'variants'
-        ],
-        expansions: [
-          'author_id',
-          'attachments.media_keys',
-          'attachments.poll_ids'
-        ]
-      },
-      () => client.search(query, {
-        max_results: 50,
-        'tweet.fields': [
-          'created_at',
-          'public_metrics',
-          'entities',
-          'author_id',
-          'attachments'
-        ],
-        'user.fields': ['profile_image_url', 'username'],
-        'media.fields': [
-          'url',
-          'preview_image_url',
-          'alt_text',
-          'type',
-          'width',
-          'height',
-          'duration_ms',
-          'variants'
-        ],
-        expansions: [
-          'author_id',
-          'attachments.media_keys',
-          'attachments.poll_ids'
-        ]
-      })
-    );
+    try {
+      // Fetch tweets with rate limit handling using recent search
+      const paginator = await executeWithRateLimit<TweetSearchRecentV2Paginator>(
+        'tweets/search/recent',
+        {
+          query,
+          max_results: 50,
+          'tweet.fields': [
+            'created_at',
+            'public_metrics',
+            'entities',
+            'author_id',
+            'attachments'
+          ],
+          'user.fields': ['profile_image_url', 'username'],
+          'media.fields': [
+            'url',
+            'preview_image_url',
+            'alt_text',
+            'type',
+            'width',
+            'height',
+            'duration_ms',
+            'variants'
+          ],
+          expansions: [
+            'author_id',
+            'attachments.media_keys',
+            'attachments.poll_ids',
+            'entities.mentions.username',
+            'referenced_tweets.id',
+            'referenced_tweets.id.author_id'
+          ]
+        },
+        () => client.search(query, {
+          max_results: 50,
+          'tweet.fields': [
+            'created_at',
+            'public_metrics',
+            'entities',
+            'author_id',
+            'attachments'
+          ],
+          'user.fields': ['profile_image_url', 'username'],
+          'media.fields': [
+            'url',
+            'preview_image_url',
+            'alt_text',
+            'type',
+            'width',
+            'height',
+            'duration_ms',
+            'variants'
+          ],
+          expansions: [
+            'author_id',
+            'attachments.media_keys',
+            'attachments.poll_ids',
+            'entities.mentions.username',
+            'referenced_tweets.id',
+            'referenced_tweets.id.author_id'
+          ]
+        })
+      );
 
-    // Get the first page of tweets
-    const page = await paginator.fetchNext();
-    const tweets: TweetV2[] = Array.isArray(page.data) ? page.data : [];
-    const meta = page.meta;
+      // Get the first page of tweets
+      const page = await paginator.fetchNext();
+      const tweets: TweetV2[] = Array.isArray(page.data) ? page.data : [];
+      const meta = page.meta;
 
-    if (!tweets?.length) {
-      console.error('[Cron] No tweets found:', {
-        username,
-        query,
+      if (!tweets?.length) {
+        console.error('[Cron] No tweets found:', {
+          username,
+          query,
+          meta,
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - startTime,
+          step: 'no-tweets'
+        });
+        return new NextResponse('No tweets found', { status: 404 });
+      }
+
+      console.log('[Cron] Recent tweets fetched:', {
+        count: tweets.length,
+        firstTweetId: tweets[0]?.id,
+        lastTweetId: tweets[tweets.length - 1]?.id,
         meta,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
-        step: 'no-tweets'
+        step: 'tweets-fetched'
       });
-      return new NextResponse('No tweets found', { status: 404 });
-    }
 
-    console.log('[Cron] Recent tweets fetched:', {
-      count: tweets.length,
-      firstTweetId: tweets[0]?.id,
-      lastTweetId: tweets[tweets.length - 1]?.id,
-      meta,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'tweets-fetched'
-    });
-
-    // Cache the tweets
-    const cache = await cacheTweets(tweets);
-    console.log('[Cron] Tweets cached:', {
-      cacheId: cache.id,
-      tweetCount: tweets.length,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'tweets-cached'
-    });
-
-    // Get cached tweets
-    const cachedTweets = await getCachedTweets();
-    if (!cachedTweets.tweets?.length) {
-      console.error('[Cron] Failed to verify cached tweets:', {
+      // Cache the tweets
+      const cache = await cacheTweets(tweets);
+      console.log('[Cron] Tweets cached:', {
+        cacheId: cache.id,
+        tweetCount: tweets.length,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
-        step: 'verify-cached'
+        step: 'tweets-cached'
       });
-      return new Response('Failed to verify cached tweets', { status: 500 });
-    }
 
-    // Select random tweets
-    const tweetIds = tweets.map((t: TweetV2) => t.id);
-    const selectedCount = Math.min(10, tweetIds.length);
-    const selectedIds: string[] = [];
-    
-    while (selectedIds.length < selectedCount) {
-      const randomIndex = Math.floor(Math.random() * tweetIds.length);
-      const id = tweetIds[randomIndex];
-      if (!selectedIds.includes(id)) {
-        selectedIds.push(id);
+      // Get cached tweets to verify
+      const cachedTweets = await getCachedTweets();
+      if (!cachedTweets.tweets?.length) {
+        console.error('[Cron] Failed to verify cached tweets:', {
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - startTime,
+          step: 'verify-cached'
+        });
+        return new Response('Failed to verify cached tweets', { status: 500 });
       }
+
+      // Select random tweets with improved entity handling
+      const tweetIds = tweets
+        .filter(tweet => 
+          tweet.entities?.urls?.length || 
+          tweet.attachments?.media_keys?.length
+        )
+        .map(t => t.id);
+      
+      const selectedCount = Math.min(10, tweetIds.length);
+      const selectedIds: string[] = [];
+      
+      while (selectedIds.length < selectedCount) {
+        const randomIndex = Math.floor(Math.random() * tweetIds.length);
+        const id = tweetIds[randomIndex];
+        if (!selectedIds.includes(id)) {
+          selectedIds.push(id);
+        }
+      }
+
+      console.log('[Cron] Selected random tweets:', {
+        selectedCount,
+        selectedIds,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'tweets-selected'
+      });
+
+      // Update selected tweets
+      const selectedCache = await updateSelectedTweets(selectedIds);
+      
+      console.log('[Cron] Selected tweets updated:', {
+        selectedCacheId: selectedCache.id,
+        selectedIds,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'complete'
+      });
+      
+      return NextResponse.json({
+        message: 'Tweets fetched and cached successfully',
+        tweetCount: tweets.length,
+        selectedCount: selectedIds.length
+      });
+
+    } catch (searchError) {
+      console.error('[Cron] Search error:', {
+        error: searchError instanceof Error ? searchError.message : 'Unknown error',
+        stack: searchError instanceof Error ? searchError.stack : undefined,
+        query,
+        username,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'search-error'
+      });
+      
+      if (searchError instanceof ApiResponseError) {
+        console.error('[Cron] Twitter API error details:', {
+          code: searchError.code,
+          data: searchError.data,
+          rateLimit: searchError.rateLimit,
+          headers: searchError.headers
+        });
+      }
+      
+      throw searchError;
     }
-
-    console.log('[Cron] Selected random tweets:', {
-      selectedCount,
-      selectedIds,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'tweets-selected'
-    });
-
-    // Update selected tweets
-    const selectedCache = await updateSelectedTweets(selectedIds);
-    
-    console.log('[Cron] Selected tweets updated:', {
-      selectedCacheId: selectedCache.id,
-      selectedIds,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'complete'
-    });
-
-    return NextResponse.json({
-      message: 'Tweets fetched and cached successfully',
-      tweetCount: tweets.length,
-      selectedCount: selectedIds.length
-    });
   } catch (error) {
     console.error('[Cron] Job failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
