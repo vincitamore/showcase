@@ -60,21 +60,36 @@ interface TweetMetrics {
   retweet_count?: number
 }
 
+interface TweetEntity {
+  id: string;
+  type: string;
+  text: string;
+  url?: string;
+  expandedUrl?: string;
+  displayUrl?: string;
+  mediaKey?: string;
+  metadata: any;
+}
+
 interface Tweet {
-  id: string
-  text: string
-  created_at?: string
-  public_metrics?: TweetMetrics
+  id: string;
+  text: string;
+  created_at?: string;
+  public_metrics?: {
+    like_count: number;
+    reply_count: number;
+    retweet_count: number;
+  };
   author?: {
-    profile_image_url?: string
-    username?: string
-    name?: string
-  }
-  entities?: TweetEntities
+    profile_image_url?: string;
+    username?: string;
+    name?: string;
+  };
+  entities?: TweetEntity[];
   referenced_tweets?: {
-    type: 'quoted' | 'replied_to'
-    id: string
-  }[]
+    type: 'quoted' | 'replied_to';
+    id: string;
+  }[];
 }
 
 const DEFAULT_PROFILE_IMAGE = "https://abs.twimg.com/sticky/default_profile_images/default_profile_normal.png"
@@ -217,10 +232,19 @@ const BlogSection = () => {
                   acc.media.push({
                     media_key: entity.mediaKey || '',
                     type: entityData.type || 'photo',
-                    url: entityData.url || entity.url,
-                    preview_image_url: entityData.preview_image_url || entityData.url || entity.url,
-                    width: entityData.width,
-                    height: entityData.height
+                    url: entityData.url || '',
+                    preview_image_url: entityData.preview_image_url || entityData.url || '',
+                    width: entityData.width || 0,
+                    height: entityData.height || 0
+                  });
+                  
+                  // Log media entity processing
+                  console.log('[Tweet Processing] Media entity:', {
+                    mediaKey: entity.mediaKey,
+                    type: entityData.type,
+                    url: entityData.url,
+                    preview_url: entityData.preview_image_url,
+                    metadata: entityData
                   });
                   break;
               }
@@ -230,6 +254,18 @@ const BlogSection = () => {
               return acc;
             }
           }, {} as TweetEntities);
+
+          // Log processed entities
+          console.log('[Tweet Processing] Processed entities:', {
+            tweetId: dbTweet.id,
+            entityCounts: {
+              urls: entities?.urls?.length || 0,
+              mentions: entities?.mentions?.length || 0,
+              hashtags: entities?.hashtags?.length || 0,
+              media: entities?.media?.length || 0
+            },
+            mediaEntities: entities?.media || []
+          });
 
           return {
             id: dbTweet.id,
@@ -255,10 +291,10 @@ const BlogSection = () => {
         created_at: t.created_at,
         metrics: t.public_metrics,
         entityCounts: {
-          urls: t.entities?.urls?.length || 0,
-          mentions: t.entities?.mentions?.length || 0,
-          hashtags: t.entities?.hashtags?.length || 0,
-          media: t.entities?.media?.length || 0
+          urls: t.entities?.filter(e => e.type === 'url').length || 0,
+          mentions: t.entities?.filter(e => e.type === 'mention').length || 0,
+          hashtags: t.entities?.filter(e => e.type === 'hashtag').length || 0,
+          media: t.entities?.filter(e => e.type === 'media').length || 0
         }
       })));
       
@@ -324,336 +360,279 @@ const BlogSection = () => {
     window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
-  const renderTweetText = (tweet: Tweet) => {
-    if (!tweet.text) {
-      console.log('Tweet has no text, skipping render');
-      return null;
-    }
+  const renderTweetText = (text: string, entities: any[]) => {
+    if (!text) return null;
 
-    // Log entity processing
-    if (tweet.entities) {
-      console.log('Processing entities:', {
-        urls: tweet.entities.urls?.length || 0,
-        mentions: tweet.entities.mentions?.length || 0,
-        hashtags: tweet.entities.hashtags?.length || 0,
-        media: tweet.entities.media?.length || 0
+    console.log('[Tweet Rendering] Processing tweet text:', {
+      textLength: text.length,
+      entities: entities.map(e => ({
+        type: e.type,
+        text: e.text,
+        indices: e.metadata?.indices
+      }))
+    });
+
+    // Sort entities by their position in the text
+    const sortedEntities = entities
+      .filter(e => e.metadata?.indices)
+      .sort((a, b) => {
+        const aIndices = JSON.parse(typeof a.metadata === 'string' ? a.metadata : JSON.stringify(a.metadata)).indices;
+        const bIndices = JSON.parse(typeof b.metadata === 'string' ? b.metadata : JSON.stringify(b.metadata)).indices;
+        return aIndices[0] - bIndices[0];
       });
-    }
 
-    const renderLink = (url: string, displayText: string, urlEntity: UrlEntity) => {
-      // Check if it's a Twitter/X link
-      const isTweetLink = url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/);
-      
-      if (isTweetLink) {
-        // Return null here since we'll handle tweet embeds in renderPreviews
-        return (
-          <span
-            className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-          >
-            {displayText}
+    // Create segments of text and entities
+    const segments: JSX.Element[] = [];
+    let lastIndex = 0;
+
+    sortedEntities.forEach((entity, index) => {
+      const metadata = typeof entity.metadata === 'string'
+        ? JSON.parse(entity.metadata)
+        : entity.metadata;
+
+      const [start, end] = metadata.indices;
+
+      // Add text before entity
+      if (start > lastIndex) {
+        segments.push(
+          <span key={`text-${index}`}>
+            {text.slice(lastIndex, start)}
           </span>
         );
       }
 
-      // For non-Twitter links, just render as text link since we'll handle previews separately
-      return (
-        <span
-          className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }}
-        >
-          {displayText}
-        </span>
-      );
-    };
-
-    const renderMention = (username: string) => (
-      <span
-        className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.open(`https://twitter.com/${username}`, '_blank', 'noopener,noreferrer');
-        }}
-      >
-        @{username}
-      </span>
-    );
-
-    const renderHashtag = (tag: string) => (
-      <span
-        className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          window.open(`https://twitter.com/hashtag/${tag}`, '_blank', 'noopener,noreferrer');
-        }}
-      >
-        #{tag}
-      </span>
-    );
-
-    const renderMedia = (media: MediaEntity[]) => {
-      if (!media.length) return null;
-
-      // If there's only one media item
-      if (media.length === 1) {
-        const item = media[0];
-        return (
-          <div className="mt-3 rounded-lg overflow-hidden bg-accent/5">
-            {item.type === 'photo' && (
-              <div className="relative w-full aspect-[16/9]">
-                <Image
-                  src={item.url || item.preview_image_url || ''}
-                  alt="Tweet media"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            )}
-            {(item.type === 'video' || item.type === 'animated_gif') && item.preview_image_url && (
-              <div className="relative w-full aspect-[16/9] group/media">
-                <Image
-                  src={item.preview_image_url}
-                  alt="Tweet media preview"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/media:opacity-100 transition-opacity">
-                  <span className="text-white text-sm">
-                    {item.type === 'video' ? 'Play Video' : 'View GIF'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      // If there are multiple media items
-      return (
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg overflow-hidden">
-          {media.map((item, index) => {
-            if (index > 3) return null; // Only show up to 4 items
-            return (
-              <div 
-                key={item.media_key}
-                className={cn(
-                  "relative bg-accent/5",
-                  "aspect-square",
-                  media.length === 3 && index === 0 && "col-span-2", // First item spans full width in 3-item layout
-                  media.length === 1 && "col-span-2" // Single item spans full width
-                )}
-              >
-                <Image
-                  src={item.type === 'photo' ? (item.url || '') : (item.preview_image_url || '')}
-                  alt="Tweet media"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-                {(item.type === 'video' || item.type === 'animated_gif') && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-white text-sm">
-                      {item.type === 'video' ? 'Play Video' : 'View GIF'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    };
-
-    // Function to process text and replace entities with clickable elements
-    const processText = () => {
-      if (!tweet.entities) {
-        return <span>{tweet.text}</span>;
-      }
-
-      // Collect all entities and sort by their position
-      const entities: Array<{
-        type: 'url' | 'mention' | 'hashtag'
-        indices: number[]
-        render: () => JSX.Element
-      }> = [
-        ...(tweet.entities.urls?.map(url => ({
-          type: 'url' as const,
-          indices: url.indices,
-          render: () => renderLink(url.expanded_url, url.display_url, url)
-        })) || []),
-        ...(tweet.entities.mentions?.map(mention => ({
-          type: 'mention' as const,
-          indices: mention.indices,
-          render: () => renderMention(mention.username)
-        })) || []),
-        ...(tweet.entities.hashtags?.map(hashtag => ({
-          type: 'hashtag' as const,
-          indices: hashtag.indices,
-          render: () => renderHashtag(hashtag.tag)
-        })) || [])
-      ].sort((a, b) => {
-        // Sort by start index, if equal sort by end index
-        if (a.indices[0] === b.indices[0]) {
-          return b.indices[1] - a.indices[1]; // Longer entities first
-        }
-        return a.indices[0] - b.indices[0];
-      });
-
-      // Create a map of positions that are part of entities
-      const entityPositions = new Set<number>();
-      entities.forEach(entity => {
-        for (let i = entity.indices[0]; i < entity.indices[1]; i++) {
-          entityPositions.add(i);
-        }
-      });
-
-      const segments: Array<JSX.Element | string> = [];
-      let lastIndex = 0;
-
-      entities.forEach((entity, index) => {
-        const [start, end] = entity.indices;
-
-        // Only add text before entity if it's not part of a previous entity
-        if (start > lastIndex) {
-          const textSegment = tweet.text.slice(lastIndex, start);
-          if (textSegment.trim() && !Array.from(textSegment).some((_c, i) => entityPositions.has(lastIndex + i))) {
-            segments.push(textSegment);
-          }
-        }
-
-        // Only render mentions and hashtags in text, URLs will be rendered as previews
-        if (entity.type !== 'url') {
+      // Add entity
+      switch (entity.type) {
+        case 'mention':
           segments.push(
-            <span key={`entity-${index}`} className="mx-0.5">
-              {entity.render()}
+            <span
+              key={`entity-${index}`}
+              className="text-primary hover:underline cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(`https://twitter.com/${entity.text}`, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              @{entity.text}
             </span>
           );
-        }
-
-        lastIndex = end;
-      });
-
-      // Add any remaining text that's not part of any entity
-      if (lastIndex < tweet.text.length) {
-        const remainingText = tweet.text.slice(lastIndex);
-        if (remainingText.trim() && !Array.from(remainingText).some((_c, i) => entityPositions.has(lastIndex + i))) {
-          segments.push(remainingText);
-        }
+          break;
+        case 'hashtag':
+          segments.push(
+            <span
+              key={`entity-${index}`}
+              className="text-primary hover:underline cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(`https://twitter.com/hashtag/${entity.text}`, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              #{entity.text}
+            </span>
+          );
+          break;
+        case 'url':
+          // Skip URLs as they'll be rendered as previews
+          break;
       }
 
-      return segments;
-    };
+      lastIndex = end;
+    });
 
-    // Function to render preview cards for non-Twitter URLs
-    const renderPreviews = () => {
-      if (!tweet.entities?.urls?.length) return null;
-
-      // Track rendered URLs to prevent duplicates
-      const renderedUrls = new Set<string>();
-
-      // Separate Twitter/X links and other URLs
-      const twitterLinks: UrlEntity[] = [];
-      const otherLinks: UrlEntity[] = [];
-
-      tweet.entities.urls.forEach(url => {
-        // Skip if we've already rendered this URL
-        if (renderedUrls.has(url.expanded_url)) return;
-        renderedUrls.add(url.expanded_url);
-
-        if (url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/)) {
-          twitterLinks.push(url);
-        } else if (url.images?.[0] || url.title || url.description) {
-          otherLinks.push(url);
-        }
-      });
-
-      return (
-        <>
-          {/* Render Twitter embeds first */}
-          {twitterLinks.map((url, index) => (
-            <div 
-              key={`twitter-${url.expanded_url}-${index}`}
-              className="mt-3 rounded-lg border border-border/50 overflow-hidden"
-            >
-              <blockquote 
-                className="twitter-tweet" 
-                data-conversation="none"
-                data-theme="dark"
-              >
-                <a href={url.expanded_url}></a>
-              </blockquote>
-            </div>
-          ))}
-
-          {/* Then render other URL previews */}
-          {otherLinks.length > 0 && (
-            <div className="mt-3 space-y-3">
-              {otherLinks.map((url, index) => (
-                <div
-                  key={`preview-${url.expanded_url}-${index}`}
-                  className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
-                  }}
-                >
-                  {url.images?.[0] && (
-                    <div className="relative w-full h-[160px] bg-accent/5">
-                      <Image
-                        src={url.images[0].url}
-                        alt={url.title || 'Link preview'}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  )}
-                  <div className="p-3">
-                    {url.title && (
-                      <h4 className="font-medium text-sm mb-2 line-clamp-1">
-                        {url.title}
-                      </h4>
-                    )}
-                    {url.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                        {url.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                      <ExternalLink className="h-3 w-3" />
-                      {new URL(url.expanded_url).hostname}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+    // Add remaining text
+    if (lastIndex < text.length) {
+      segments.push(
+        <span key="text-end">
+          {text.slice(lastIndex)}
+        </span>
       );
-    };
+    }
 
     return (
-      <div className="space-y-2">
-        <div className="text-sm text-muted-foreground/90 leading-relaxed">
-          {processText()}
+      <div className="whitespace-pre-wrap break-words">
+        {segments}
+      </div>
+    );
+  }
+
+  function formatDate(date: string | undefined) {
+    if (!date) return 'Just now';
+    return new Date(date).toLocaleDateString();
+  }
+
+  function formatNumber(num: number | undefined) {
+    if (typeof num !== 'number') return '0';
+    return new Intl.NumberFormat('en-US', { notation: 'compact' }).format(num);
+  }
+
+  function renderMedia(entities: TweetEntity[]) {
+    const mediaEntities = entities.filter(e => e.type === 'media');
+    if (!mediaEntities?.length) return null;
+
+    console.log('[Tweet Rendering] Processing media entities:', {
+      count: mediaEntities.length,
+      entities: mediaEntities.map(e => ({
+        type: e.type,
+        mediaKey: e.mediaKey,
+        metadata: e.metadata
+      }))
+    });
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {mediaEntities.map((entity, index) => {
+          const metadata = typeof entity.metadata === 'string' 
+            ? JSON.parse(entity.metadata) 
+            : entity.metadata;
+
+          console.log('[Tweet Rendering] Processing media item:', {
+            index,
+            mediaKey: entity.mediaKey,
+            metadata
+          });
+
+          const imageUrl = metadata?.preview_image_url || metadata?.url;
+          if (!imageUrl) return null;
+
+          const width = metadata?.width || 0;
+          const height = metadata?.height || 0;
+          const aspectRatio = width && height ? width / height : 16 / 9;
+
+          return (
+            <div 
+              key={entity.mediaKey || index}
+              className="relative overflow-hidden rounded-lg"
+              style={{
+                width: '100%',
+                maxWidth: '400px',
+                aspectRatio: String(aspectRatio)
+              }}
+            >
+              <Image
+                src={imageUrl}
+                alt={metadata?.alt_text || 'Tweet media'}
+                fill
+                className="object-cover"
+                sizes="(max-width: 400px) 100vw, 400px"
+              />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderUrlPreviews(entities: TweetEntity[]) {
+    const urlEntities = entities.filter(e => e.type === 'url');
+    if (!urlEntities?.length) return null;
+
+    console.log('[Tweet Rendering] Processing URL entities:', {
+      count: urlEntities.length,
+      entities: urlEntities.map(e => ({
+        type: e.type,
+        url: e.url,
+        expandedUrl: e.expandedUrl,
+        metadata: e.metadata
+      }))
+    });
+
+    return (
+      <div className="mt-2 space-y-2">
+        {urlEntities.map((entity, index) => {
+          const metadata = typeof entity.metadata === 'string'
+            ? JSON.parse(entity.metadata)
+            : entity.metadata;
+
+          // Skip if no preview data
+          if (!metadata?.title && !metadata?.description && !metadata?.images?.length) {
+            return null;
+          }
+
+          return (
+            <div
+              key={entity.url || index}
+              className="rounded-lg border overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(entity.expandedUrl || entity.url, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              {metadata.images?.[0]?.url && (
+                <div className="relative w-full h-[160px] bg-accent/5">
+                  <Image
+                    src={metadata.images[0].url}
+                    alt={metadata.title || 'Link preview'}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 400px) 100vw, 400px"
+                  />
+                </div>
+              )}
+              <div className="p-3">
+                {metadata.title && (
+                  <h4 className="font-medium text-sm mb-2 line-clamp-1">
+                    {metadata.title}
+                  </h4>
+                )}
+                {metadata.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                    {metadata.description}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                  <ExternalLink className="h-3 w-3" />
+                  {new URL(entity.expandedUrl || entity.url || '').hostname}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const renderTweet = (tweet: Tweet) => {
+    const entities = tweet.entities || [];
+    
+    // Log entity processing
+    console.log('[Tweet Rendering] Processing tweet:', {
+      tweetId: tweet.id,
+      totalEntities: entities.length,
+      entityTypes: entities.map(e => e.type),
+      mediaEntities: entities.filter(e => e.type === 'media'),
+      urlEntities: entities.filter(e => e.type === 'url')
+    });
+
+    return (
+      <div className="flex h-full flex-col justify-between gap-4">
+        <div className="space-y-4">
+          <div className="text-sm">
+            {renderTweetText(tweet.text, entities)}
+            {renderMedia(entities)}
+            {renderUrlPreviews(entities)}
+          </div>
         </div>
-        {/* Render media first if present */}
-        {tweet.entities?.media && renderMedia(tweet.entities.media)}
-        {/* Then render URL previews and embeds */}
-        {renderPreviews()}
+
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div>{formatDate(tweet.created_at)}</div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Heart className="h-4 w-4" />
+              <span>{formatNumber(tweet.public_metrics?.like_count)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Repeat2 className="h-4 w-4" />
+              <span>{formatNumber(tweet.public_metrics?.retweet_count)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MessageCircle className="h-4 w-4" />
+              <span>{formatNumber(tweet.public_metrics?.reply_count)}</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -759,7 +738,7 @@ const BlogSection = () => {
 
                   {/* Content section with dynamic height */}
                   <div className="flex-1 overflow-hidden">
-                    {renderTweetText(tweet)}
+                    {renderTweet(tweet)}
                     {tweet.referenced_tweets?.map((ref) => (
                       <div 
                         key={ref.id}

@@ -144,12 +144,13 @@ async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) 
         mediaKey: media.media_key,
         tweet: { connect: { id: tweet.id } },
         metadata: toPrismaJson({
-          media_key: media.media_key,
           type: media.type,
           url: media.url,
           preview_image_url: media.preview_image_url,
           width: media.width,
-          height: media.height
+          height: media.height,
+          alt_text: media.alt_text,
+          variants: media.variants
         })
       } as EntityCreateInput;
     }).filter((item): item is EntityCreateInput => item !== null);
