@@ -127,10 +127,10 @@ const SkillsGrid = () => {
       </div>
 
       <Carousel 
-        className="w-full max-w-[100rem] mx-auto pb-4" 
+        className="w-full max-w-[90rem] mx-auto pb-4" 
         opts={{ 
           loop: true, 
-          align: "start",
+          align: "center",
           containScroll: "trimSnaps",
           dragFree: false
         }}
@@ -140,29 +140,29 @@ const SkillsGrid = () => {
             key={index}
             className={cn(
               "group cursor-pointer",
-              "p-3 sm:p-4",
-              "mx-1.5",
-              "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[28rem]",
-              "max-w-[28rem]",
+              "p-4 sm:p-5",
+              "mx-2 sm:mx-3",
+              "w-[calc(100vw-3rem)] sm:w-[calc(50vw-3rem)] md:w-[calc(33vw-3rem)] lg:w-[24rem]",
+              "max-w-[24rem]",
               "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
             )}
-            containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
+            containerClassName="min-h-[16rem] rounded-lg sm:rounded-xl"
           >
             <div className="flex flex-col h-full">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-primary/5 ring-1 ring-inset ring-primary/10 group-hover:bg-primary/10 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 rounded-lg bg-primary/5 ring-1 ring-inset ring-primary/10 group-hover:bg-primary/10 transition-all duration-300">
                   {category.icon}
                 </div>
                 <h3 className="text-lg sm:text-xl font-semibold">{category.title}</h3>
               </div>
-              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+              <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
                 {category.description}
               </p>
               <div className="mt-auto flex flex-wrap gap-1.5">
                 {category.highlights.map((highlight, tagIndex) => (
                   <span
                     key={tagIndex}
-                    className="rounded-full bg-primary/5 px-2 py-0.5 text-xs font-medium text-primary ring-1 ring-inset ring-primary/10 transition-colors group-hover:bg-primary/10"
+                    className="rounded-full bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary ring-1 ring-inset ring-primary/10 transition-colors group-hover:bg-primary/10"
                   >
                     {highlight}
                   </span>
