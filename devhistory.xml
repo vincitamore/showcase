@@ -150,6 +150,41 @@
             </related-entries>
             <impact>Improved visibility into API operations and tweet processing</impact>
         </entry>
+
+        <entry id="2024-01-21-11" scope="bugfix" type="feature">
+            <title>Tweet Rotation System Fix</title>
+            <changes>
+                <change>Fixed tweet rotation logic to properly prioritize new tweets</change>
+                <change>Implemented date-based sorting for tweet selection</change>
+                <change>Added 3:1 ratio for tweets with entities</change>
+                <change>Enhanced cache handling with proper tweet ordering</change>
+                <change>Improved fallback behavior when fetching fails</change>
+            </changes>
+            <files-affected>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-21-05">Tweet cache system migration</entry>
+                <entry ref="2024-01-21-04">Tweet content processing</entry>
+            </related-entries>
+            <impact>Improved tweet rotation reliability and content freshness</impact>
+        </entry>
+
+        <entry id="2024-01-21-12" scope="enhancement" type="feature">
+            <title>Increased Tweet Selection Pool</title>
+            <changes>
+                <change>Increased tweet selection pool from 20 to 40 tweets</change>
+                <change>Enhanced variety in tweet rotation</change>
+                <change>Maintained sorting and entity ratio logic</change>
+            </changes>
+            <files-affected>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-21-11">Tweet rotation system fix</entry>
+            </related-entries>
+            <impact>Improved tweet variety while maintaining quality standards</impact>
+        </entry>
     </history-entries>
 
     <tags>

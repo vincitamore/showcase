@@ -296,32 +296,54 @@ function getRandomItems(array: TweetWithAuthor[], count: number): TweetWithAutho
     return [];
   }
 
+  // Sort tweets by created_at to prioritize newer tweets
+  const sortedTweets = [...validTweets].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA; // Newest first
+  });
+
+  // Take the newest 40 tweets to select from
+  const recentTweets = sortedTweets.slice(0, 40);
+  
   // Separate tweets with and without entities
-  const tweetsWithEntities = validTweets.filter(t => hasTweetEntities(t));
-  const tweetsWithoutEntities = validTweets.filter(t => !hasTweetEntities(t));
+  const tweetsWithEntities = recentTweets.filter(t => hasTweetEntities(t));
+  const tweetsWithoutEntities = recentTweets.filter(t => !hasTweetEntities(t));
   
   logStatus('Tweet selection stats', {
     totalTweets: validTweets.length,
+    recentTweets: recentTweets.length,
     withEntities: tweetsWithEntities.length,
     withoutEntities: tweetsWithoutEntities.length,
-    validDates: validTweets.filter(t => !!t.created_at).length
+    validDates: recentTweets.filter(t => !!t.created_at).length
   });
   
-  // If we have enough tweets with entities, use those first
-  if (tweetsWithEntities.length >= count) {
-    const shuffled = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  }
+  // Try to maintain a ratio of 3:1 for tweets with entities
+  const targetWithEntities = Math.min(Math.ceil(count * 0.75), tweetsWithEntities.length);
+  const remainingCount = count - targetWithEntities;
   
-  // Otherwise, fill remaining slots with tweets without entities
-  const shuffledWithEntities = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
-  const shuffledWithoutEntities = [...tweetsWithoutEntities].sort(() => 0.5 - Math.random());
-  const remaining = count - shuffledWithEntities.length;
+  // Randomly select tweets with entities
+  const selectedWithEntities = [...tweetsWithEntities]
+    .sort(() => 0.5 - Math.random())
+    .slice(0, targetWithEntities);
   
-  return [
-    ...shuffledWithEntities,
-    ...shuffledWithoutEntities.slice(0, remaining)
-  ];
+  // Fill remaining slots with tweets without entities
+  const selectedWithoutEntities = [...tweetsWithoutEntities]
+    .sort(() => 0.5 - Math.random())
+    .slice(0, remainingCount);
+  
+  // Combine and shuffle the final selection
+  const selected = [...selectedWithEntities, ...selectedWithoutEntities]
+    .sort(() => 0.5 - Math.random());
+  
+  logStatus('Selected tweets', {
+    total: selected.length,
+    withEntities: selected.filter(t => hasTweetEntities(t)).length,
+    withoutEntities: selected.filter(t => !hasTweetEntities(t)).length,
+    dates: selected.map(t => t.created_at)
+  });
+  
+  return selected;
 }
 
 // Vercel Cron Job - runs every 5 minutes but respects 15-minute rate limit
@@ -512,8 +534,8 @@ export async function GET(req: Request) {
 
     const canRequest = await checkRateLimit();
     if (!canRequest) {
-      console.log('[CRON] Rate limited, using cached tweets');
-      return new Response('Rate limited, using cached tweets', { status: 429 });
+      logStatus('Rate limited, skipping fetch');
+      return new Response('Rate limited', { status: 429 });
     }
 
     // Update rate limit timestamp before making requests
@@ -545,7 +567,16 @@ export async function GET(req: Request) {
     ];
 
     if (newTweets.length === 0) {
-      throw new Error('No new tweets fetched');
+      logStatus('No new tweets fetched, using cache for rotation');
+      const selectedTweets = getRandomItems(currentTweets, 4);
+      await updateSelectedTweets(selectedTweets);
+      
+      return NextResponse.json({
+        message: 'Used cached tweets',
+        selectedTweets: selectedTweets.length,
+        withEntities: selectedTweets.filter(hasTweetEntities).length,
+        executionTimeMs: Date.now() - startTime
+      });
     }
 
     // Validate and update cache
@@ -553,13 +584,13 @@ export async function GET(req: Request) {
       .map(tweet => validateTweet(tweet))
       .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
 
-    if (validNewTweets.length === 0) {
-      throw new Error('No valid tweets after validation');
-    }
-
-    // Update cache with new tweets
+    // Update cache with new tweets while maintaining uniqueness
     const tweetMap = new Map<string, TweetWithAuthor>();
+    
+    // Add new tweets first to prioritize them
     validNewTweets.forEach(tweet => tweetMap.set(tweet.id, tweet));
+    
+    // Add existing tweets that aren't duplicates
     currentTweets.forEach(tweet => {
       if (!tweetMap.has(tweet.id)) {
         const validTweet = validateTweet(tweet);
@@ -569,7 +600,14 @@ export async function GET(req: Request) {
       }
     });
 
-    const updatedTweets = Array.from(tweetMap.values()).slice(0, 100);
+    const updatedTweets = Array.from(tweetMap.values())
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA; // Newest first
+      })
+      .slice(0, 100); // Keep only the 100 newest tweets
+
     await cacheTweets(updatedTweets);
     
     logStatus('Cache updated', {
@@ -578,13 +616,16 @@ export async function GET(req: Request) {
       withEntities: updatedTweets.filter(hasTweetEntities).length
     });
 
-    // Select new display tweets
-    const selectedTweets = getRandomItems(updatedTweets, 4);
+    // Select new display tweets, prioritizing new tweets
+    const selectedTweets = getRandomItems([...validNewTweets, ...updatedTweets], 4);
     await updateSelectedTweets(selectedTweets);
     
     logStatus('Display tweets updated', {
       selected: selectedTweets.length,
-      withEntities: selectedTweets.filter(hasTweetEntities).length
+      withEntities: selectedTweets.filter(hasTweetEntities).length,
+      newTweetsSelected: selectedTweets.filter(t => 
+        validNewTweets.some(newT => newT.id === t.id)
+      ).length
     });
 
     const executionTime = Date.now() - startTime;
