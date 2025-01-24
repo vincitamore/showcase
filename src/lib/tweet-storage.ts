@@ -4,6 +4,7 @@ import { TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000 // 15 minutes in milliseconds
 export const MAX_TWEETS = 100
+export const SELECTED_TWEETS_COUNT = 10 // Number of tweets to display in carousel
 export const CACHE_TYPES = {
   CURRENT: 'current',
   PREVIOUS: 'previous',
@@ -214,7 +215,16 @@ export async function getCachedTweets(type: CacheType = CACHE_TYPES.CURRENT) {
 }
 
 // Update selected tweets
-export async function updateSelectedTweets(selected: string[]) {
+export async function updateSelectedTweets(tweets: TweetV2[]) {
+  console.log(`[Twitter Storage] Updating selected tweets from ${tweets.length} candidates`);
+  
+  // Randomly select SELECTED_TWEETS_COUNT tweets
+  const selectedTweets = tweets
+    .sort(() => Math.random() - 0.5)
+    .slice(0, SELECTED_TWEETS_COUNT);
+
+  console.log(`[Twitter Storage] Selected ${selectedTweets.length} tweets for display`);
+
   // Deactivate previous selected cache
   await (prisma as any).tweetCache.updateMany({
     where: {
@@ -224,7 +234,7 @@ export async function updateSelectedTweets(selected: string[]) {
     data: {
       isActive: false
     }
-  })
+  });
 
   // Create new selected cache
   const cache = await (prisma as any).tweetCache.create({
@@ -232,12 +242,12 @@ export async function updateSelectedTweets(selected: string[]) {
       type: CACHE_TYPES.SELECTED,
       isActive: true,
       tweets: {
-        connect: selected.map(id => ({ id }))
+        connect: selectedTweets.map(tweet => ({ id: tweet.id }))
       }
     }
-  })
+  });
 
-  return cache
+  return cache;
 }
 
 // Get selected tweets
