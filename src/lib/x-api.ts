@@ -300,24 +300,31 @@ export async function executeWithRateLimit<T>(
   apiCall: () => Promise<T>
 ): Promise<T> {
   try {
-    // Get current rate limit info
-    const rateLimit = await getRateLimit(endpoint);
-    const now = new Date();
-    
-    console.log('[Twitter API] Rate limit status:', {
-      endpoint,
-      remaining: rateLimit?.remaining ?? 'unknown',
-      resetTime: rateLimit?.resetAt?.toISOString() ?? 'unknown',
-      currentTime: now.toISOString(),
-      timeUntilReset: rateLimit?.resetAt ? Math.floor((rateLimit.resetAt.getTime() - now.getTime()) / 1000) : 'unknown',
-      params
-    });
-
-    // Check if we're rate limited
-    if (rateLimit?.resetAt && rateLimit.resetAt > now && rateLimit.remaining <= 0) {
-      const waitTime = Math.ceil((rateLimit.resetAt.getTime() - now.getTime()) / 1000);
+    // Check if we can make the request
+    const canProceed = await canMakeRequest(endpoint);
+    if (!canProceed) {
+      const rateLimit = await getRateLimit(endpoint);
+      const now = new Date();
+      const resetAt = rateLimit?.resetAt ? new Date(rateLimit.resetAt) : new Date(now.getTime() + 15 * 60 * 1000);
+      const waitTime = Math.ceil((resetAt.getTime() - now.getTime()) / 1000);
+      
+      console.error('[Twitter API] Rate limit check failed:', {
+        endpoint,
+        remaining: rateLimit?.remaining ?? 'unknown',
+        resetAt: resetAt.toISOString(),
+        waitTime: `${waitTime}s`,
+        params
+      });
+      
       throw new Error(`Rate limit exceeded for ${endpoint}. Reset in ${waitTime} seconds.`);
     }
+
+    // Log request attempt
+    console.log('[Twitter API] Making request:', {
+      endpoint,
+      params,
+      timestamp: new Date().toISOString()
+    });
 
     // Make the API call
     const response = await apiCall();
@@ -328,6 +335,15 @@ export async function executeWithRateLimit<T>(
       const rateLimitRemaining = headers?.['x-rate-limit-remaining'];
       const rateLimitReset = headers?.['x-rate-limit-reset'];
 
+      console.log('[Twitter API] Response headers:', {
+        endpoint,
+        headers: {
+          remaining: rateLimitRemaining,
+          reset: rateLimitReset,
+          limit: headers?.['x-rate-limit-limit']
+        }
+      });
+
       if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
         const remaining = parseInt(rateLimitRemaining);
         const resetTime = new Date(parseInt(rateLimitReset) * 1000);
@@ -335,8 +351,7 @@ export async function executeWithRateLimit<T>(
         console.log('[Twitter API] Updating rate limit:', {
           endpoint,
           remaining,
-          resetTime: resetTime.toISOString(),
-          headers
+          resetTime: resetTime.toISOString()
         });
 
         await updateRateLimit(endpoint, resetTime, remaining);
@@ -353,22 +368,36 @@ export async function executeWithRateLimit<T>(
         const rateLimitRemaining = response._headers['x-rate-limit-remaining'];
         const rateLimitReset = response._headers['x-rate-limit-reset'];
 
+        console.error('[Twitter API] Rate limit error details:', {
+          endpoint,
+          status: response.status,
+          headers: {
+            remaining: rateLimitRemaining,
+            reset: rateLimitReset,
+            limit: response._headers['x-rate-limit-limit']
+          },
+          data: response.data
+        });
+
         if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
           const remaining = parseInt(rateLimitRemaining);
           const resetTime = new Date(parseInt(rateLimitReset) * 1000);
-
-          console.error('[Twitter API] Rate limit error details:', {
-            endpoint,
-            remaining,
-            resetTime: resetTime.toISOString(),
-            headers: response._headers,
-            status: response.status,
-            data: response.data
-          });
-
           await updateRateLimit(endpoint, resetTime, remaining);
         }
+      } else {
+        console.error('[Twitter API] Error response without headers:', {
+          endpoint,
+          status: error.code,
+          message: error.message,
+          data: error.data
+        });
       }
+    } else {
+      console.error('[Twitter API] Non-API error:', {
+        endpoint,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
 
     throw error;

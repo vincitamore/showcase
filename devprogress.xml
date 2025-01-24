@@ -54,6 +54,7 @@
                 <file>src/lib/x-api.ts</file>
                 <file>src/lib/db.ts</file>
                 <file>src/app/api/cron/fetch-tweets/route.ts</file>
+                <file>src/app/api/init/fetch-tweets/route.ts</file>
             </files>
         </item>
     </completed-items>

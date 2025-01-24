@@ -243,9 +243,11 @@ export async function getSelectedTweets() {
 
 // Rate limit management
 export async function updateRateLimit(endpoint: string, resetAt: Date, remaining: number) {
+  const validResetAt = toValidDate(resetAt);
+  
   console.log('[Twitter Storage] Updating rate limit:', {
     endpoint,
-    resetAt: toSafeISOString(resetAt),
+    resetAt: validResetAt.toISOString(),
     remaining,
     timestamp: new Date().toISOString()
   });
@@ -256,11 +258,11 @@ export async function updateRateLimit(endpoint: string, resetAt: Date, remaining
     },
     create: {
       endpoint,
-      resetAt: toValidDate(resetAt),
+      resetAt: validResetAt,
       remaining
     },
     update: {
-      resetAt: toValidDate(resetAt),
+      resetAt: validResetAt,
       remaining
     }
   })
@@ -272,48 +274,68 @@ export async function getRateLimit(endpoint: string) {
     where: {
       endpoint
     }
-  })
+  });
 
-  return rateLimit
+  if (rateLimit) {
+    console.log('[Twitter Storage] Retrieved rate limit:', {
+      endpoint,
+      resetAt: toSafeISOString(rateLimit.resetAt),
+      remaining: rateLimit.remaining,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    console.log('[Twitter Storage] No rate limit found:', {
+      endpoint,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return rateLimit;
 }
 
 export async function canMakeRequest(endpoint: string): Promise<boolean> {
   const rateLimit = await getRateLimit(endpoint);
+  const now = new Date();
   
   // If no rate limit info exists, allow the request
   if (!rateLimit) {
-    console.log('[Twitter Storage] No rate limit found for endpoint:', endpoint);
+    console.log('[Twitter Storage] No rate limit found, allowing request:', {
+      endpoint,
+      timestamp: now.toISOString()
+    });
     return true;
   }
 
-  const now = new Date();
-  const resetAt = new Date(rateLimit.resetAt);
+  const resetAt = toValidDate(rateLimit.resetAt);
   const timeUntilReset = resetAt.getTime() - now.getTime();
   
   // If we're past the reset time, allow the request
   if (now > resetAt) {
-    console.log('[Twitter Storage] Rate limit reset time passed for endpoint:', {
+    console.log('[Twitter Storage] Rate limit reset time passed:', {
       endpoint,
       resetAt: resetAt.toISOString(),
-      now: now.toISOString()
+      now: now.toISOString(),
+      remaining: rateLimit.remaining
     });
     return true;
   }
 
   // If we still have remaining requests, allow the request
   if (rateLimit.remaining > 0) {
-    console.log('[Twitter Storage] Requests remaining for endpoint:', {
+    console.log('[Twitter Storage] Requests remaining:', {
       endpoint,
       remaining: rateLimit.remaining,
-      resetIn: Math.floor(timeUntilReset / 1000) + 's'
+      resetAt: resetAt.toISOString(),
+      timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
     });
     return true;
   }
 
   // We're rate limited
-  console.log('[Twitter Storage] Rate limited for endpoint:', {
+  console.error('[Twitter Storage] Rate limited:', {
     endpoint,
     resetAt: resetAt.toISOString(),
+    remaining: rateLimit.remaining,
     timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
   });
   return false;
