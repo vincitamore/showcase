@@ -238,24 +238,30 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
     totalTweets: validTweets.length,
     withEntities: tweetsWithEntities.length,
     withoutEntities: tweetsWithoutEntities.length,
-    validDates: validTweets.filter(t => !!t.created_at).length
+    validDates: validTweets.filter(t => !!t.created_at).length,
+    requestedCount: count
   });
   
-  // If we have enough tweets with entities, use those first
-  if (tweetsWithEntities.length >= count) {
-    const shuffled = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  }
-  
-  // Otherwise, fill remaining slots with tweets without entities
+  // Shuffle both arrays
   const shuffledWithEntities = [...tweetsWithEntities].sort(() => 0.5 - Math.random());
   const shuffledWithoutEntities = [...tweetsWithoutEntities].sort(() => 0.5 - Math.random());
-  const remaining = count - shuffledWithEntities.length;
   
-  return [
-    ...shuffledWithEntities,
-    ...shuffledWithoutEntities.slice(0, remaining)
-  ];
+  // Take as many tweets with entities as we can
+  const result = shuffledWithEntities.slice(0, count);
+  
+  // If we need more tweets, fill with tweets without entities
+  if (result.length < count) {
+    const remaining = count - result.length;
+    result.push(...shuffledWithoutEntities.slice(0, remaining));
+  }
+  
+  console.log('Final tweet selection:', {
+    selectedCount: result.length,
+    withEntities: result.filter(hasTweetEntities).length,
+    withoutEntities: result.filter(t => !hasTweetEntities(t)).length
+  });
+  
+  return result;
 }
 
 function logStatus(message: string, data?: any) {
@@ -263,20 +269,37 @@ function logStatus(message: string, data?: any) {
   console.log(`[API ${timestamp}] ${message}`, data ? JSON.stringify(data) : '');
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
+    // First try to get selected tweets
     const selectedTweets = await getSelectedTweets();
-    
-    console.log('[API] Returning tweets:', {
-      count: selectedTweets.length
-    })
+    if (selectedTweets?.length) {
+      console.log('[Twitter] Using selected tweets:', {
+        count: selectedTweets.length,
+        ids: selectedTweets.map(t => t.id)
+      });
+      return NextResponse.json({ tweets: selectedTweets });
+    }
 
-    return NextResponse.json({
-      tweets: selectedTweets
+    // If no selected tweets, get cached tweets
+    const cachedTweets = await getCachedTweets();
+    if (!cachedTweets?.tweets?.length) {
+      console.warn('[Twitter] No cached tweets found');
+      return NextResponse.json({ tweets: [] });
+    }
+
+    // Get 10 random tweets from the cache, prioritizing those with entities
+    const selectedFromCache = getRandomItems(cachedTweets.tweets, 10);
+    console.log('[Twitter] Selected tweets from cache:', {
+      totalCached: cachedTweets.tweets.length,
+      selected: selectedFromCache.length,
+      ids: selectedFromCache.map(t => t.id)
     });
+
+    return NextResponse.json({ tweets: selectedFromCache });
   } catch (error) {
-    console.error('[API] Error getting tweets:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    console.error('[Twitter] Error getting tweets:', error);
+    return NextResponse.json({ tweets: [] });
   }
 }
 
