@@ -383,7 +383,7 @@ export async function getSelectedTweets(): Promise<TweetV2[]> {
   
   console.log('[Tweet Storage] Returning selected tweets:', {
     count: tweets.length,
-    ids: tweets.map(t => t.id),
+    ids: tweets.map((t: TweetV2) => t.id),
     timestamp: new Date().toISOString(),
     step: 'complete'
   });
