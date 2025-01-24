@@ -130,6 +130,73 @@ async function cleanupOldCachedTweets(): Promise<void> {
   }
 }
 
+// Migration function to handle transition from old to new cache files
+async function migrateOldCacheFiles(): Promise<void> {
+  try {
+    console.log('Checking for old cache files...');
+    const { blobs: oldBlobs } = await list({ prefix: 'cached-tweets' });
+    
+    if (oldBlobs.length === 0) {
+      console.log('No old cache files found');
+      return;
+    }
+    
+    // Sort by date, newest first
+    const sortedBlobs = oldBlobs
+      .map(blob => ({
+        ...blob,
+        uploadedAt: new Date(blob.uploadedAt || Date.now())
+      }))
+      .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime());
+    
+    // Get the two most recent files
+    const [newest, secondNewest] = sortedBlobs;
+    
+    if (newest) {
+      console.log('Migrating newest cache file:', newest.pathname);
+      const response = await fetch(newest.url);
+      if (response.ok) {
+        const data = await response.text();
+        await put(CURRENT_CACHE_FILE, data, {
+          contentType: 'application/json',
+          access: 'public',
+          addRandomSuffix: false
+        });
+        await del(newest.url);
+      }
+    }
+    
+    if (secondNewest) {
+      console.log('Migrating second newest cache file:', secondNewest.pathname);
+      const response = await fetch(secondNewest.url);
+      if (response.ok) {
+        const data = await response.text();
+        await put(PREVIOUS_CACHE_FILE, data, {
+          contentType: 'application/json',
+          access: 'public',
+          addRandomSuffix: false
+        });
+        await del(secondNewest.url);
+      }
+    }
+    
+    // Delete any remaining old cache files
+    const remainingBlobs = sortedBlobs.slice(2);
+    for (const blob of remainingBlobs) {
+      console.log('Deleting old cache file:', blob.pathname);
+      await del(blob.url);
+    }
+    
+    console.log('Cache migration completed:', {
+      migratedCurrent: !!newest,
+      migratedPrevious: !!secondNewest,
+      deletedOld: remainingBlobs.length
+    });
+  } catch (error) {
+    console.error('Error during cache migration:', error);
+  }
+}
+
 export async function getCachedTweets(): Promise<CachedTweets | null> {
   try {
     // First try to get current cache
@@ -140,6 +207,14 @@ export async function getCachedTweets(): Promise<CachedTweets | null> {
     if (!cacheBlob) {
       const { blobs: previousBlobs } = await list({ prefix: PREVIOUS_CACHE_FILE });
       cacheBlob = previousBlobs[0];
+      
+      // If still no cache found, try migrating old cache files
+      if (!cacheBlob) {
+        await migrateOldCacheFiles();
+        // Try again after migration
+        const { blobs: migratedBlobs } = await list({ prefix: CURRENT_CACHE_FILE });
+        cacheBlob = migratedBlobs[0];
+      }
     }
     
     // If no cache found at all
