@@ -252,11 +252,27 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
 
   for (const tweet of tweets) {
     try {
+      // First, delete any existing entities for this tweet to prevent duplicates
+      await (prisma as any).tweetEntity.deleteMany({
+        where: { tweetId: tweet.id }
+      });
+
       const tweetData = await convertTweetForStorage(tweet, includes);
       const createdTweet = await (prisma as any).tweet.upsert({
         where: { id: tweet.id },
-        create: tweetData,
-        update: tweetData
+        create: {
+          ...tweetData,
+          entities: {
+            create: tweetData.entities.create
+          }
+        },
+        update: {
+          ...tweetData,
+          entities: {
+            deleteMany: {},
+            create: tweetData.entities.create
+          }
+        }
       });
 
       await (prisma as any).tweetCache.update({
@@ -268,11 +284,12 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
         }
       });
 
-      if (hasTweetEntities(tweet) && tweet.entities) {
-        await storeTweetEntities(tweet.id, tweet.entities);
-      }
     } catch (error) {
-      console.error('[Twitter Storage] Error caching tweet:', tweet.id, error);
+      console.error('[Twitter Storage] Error caching tweet:', {
+        id: tweet.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
     }
   }
 

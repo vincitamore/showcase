@@ -138,7 +138,7 @@ export async function GET(request: Request) {
     }
 
     // Construct search query for user's tweets, excluding replies and retweets
-    const query = `from:${username} -is:reply -is:retweet has:links`;
+    const query = `from:${username} -is:retweet`;  // Removed -is:reply and has:links to get more tweets
 
     try {
       // Fetch tweets with rate limit handling using recent search
@@ -146,7 +146,7 @@ export async function GET(request: Request) {
         'tweets/search/recent',
         {
           query,
-          max_results: 50,
+          max_results: 100,
           'tweet.fields': [
             'created_at',
             'public_metrics',
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
           ]
         },
         () => client.search(query, {
-          max_results: 50,
+          max_results: 100,
           'tweet.fields': [
             'created_at',
             'public_metrics',

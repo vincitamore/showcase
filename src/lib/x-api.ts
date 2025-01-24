@@ -198,11 +198,9 @@ export async function getReadOnlyClient() {
 // Execute a Twitter API request with rate limit handling
 export async function executeWithRateLimit<T>(
   endpoint: string,
-  params: Record<string, any>,
-  request: () => Promise<T>
+  params: any,
+  apiCall: () => Promise<T>
 ): Promise<T> {
-  const startTime = Date.now();
-
   console.log('[Twitter API] Starting rate limit check:', {
     endpoint,
     params,
@@ -210,96 +208,81 @@ export async function executeWithRateLimit<T>(
     step: 'pre-check'
   });
 
-  // Check if we can make the request
   const rateLimit = await getRateLimit(endpoint);
   const now = new Date();
+  const resetAt = rateLimit ? new Date(rateLimit.resetAt) : null;
 
-  if (rateLimit) {
-    const resetTime = new Date(rateLimit.resetAt);
-    const timeUntilReset = resetTime.getTime() - now.getTime();
-    
-    if (now < resetTime && rateLimit.remaining <= 0) {
-      const error = new Error(`Rate limit exceeded for ${endpoint}. Resets in ${Math.ceil(timeUntilReset / 1000)}s`);
-      console.error('[Twitter API] Rate limit exceeded:', {
+  // If we have rate limit info and we're still within the window
+  if (rateLimit && resetAt && now < resetAt) {
+    // If we have no remaining requests, wait until reset
+    if (rateLimit.remaining <= 0) {
+      const waitTime = resetAt.getTime() - now.getTime();
+      console.log('[Twitter API] Rate limit exceeded, waiting:', {
         endpoint,
-        resetTime: resetTime.toISOString(),
-        remaining: rateLimit.remaining,
-        timeUntilReset: Math.ceil(timeUntilReset / 1000) + 's',
+        resetAt: resetAt.toISOString(),
+        waitTimeMs: waitTime,
         timestamp: now.toISOString(),
-        step: 'rate-limited'
+        step: 'waiting'
       });
-      throw error;
+
+      // Wait until reset time plus 1 second buffer
+      await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+      
+      // Clear rate limit after waiting
+      await updateRateLimit(endpoint, new Date(Date.now() + RATE_LIMIT_WINDOW), 0);
     }
   }
 
+  console.log('[Twitter API] Making request:', {
+    endpoint,
+    params,
+    timestamp: new Date().toISOString(),
+    checkDurationMs: Date.now() - now.getTime(),
+    step: 'pre-request'
+  });
+
   try {
-    console.log('[Twitter API] Making request:', {
-      endpoint,
-      params,
-      timestamp: new Date().toISOString(),
-      checkDurationMs: Date.now() - startTime,
-      step: 'pre-request'
-    });
-
-    const response = await request();
-
-    // Update rate limit info from response headers
-    // Twitter API v2 client returns headers in response._headers or response.rateLimit
+    const response = await apiCall();
+    
+    // Update rate limit from response headers if available
     const rateLimitInfo = (response as any).rateLimit;
     if (rateLimitInfo) {
-      const remaining = rateLimitInfo.remaining || 0;
-      const resetTime = rateLimitInfo.reset || Math.floor(Date.now() / 1000) + 900; // Default to 15 minutes
+      const resetTime = new Date(rateLimitInfo.reset * 1000);
+      await updateRateLimit(endpoint, resetTime, rateLimitInfo.remaining);
       
-      await updateRateLimit(endpoint, new Date(resetTime * 1000), remaining);
-
       console.log('[Twitter API] Rate limit updated:', {
         endpoint,
-        remaining,
-        resetTime: new Date(resetTime * 1000).toISOString(),
+        remaining: rateLimitInfo.remaining,
+        resetTime: resetTime.toISOString(),
         timestamp: new Date().toISOString(),
-        requestDurationMs: Date.now() - startTime,
+        requestDurationMs: Date.now() - now.getTime(),
         step: 'rate-limit-updated'
       });
     }
 
     return response;
   } catch (error) {
-    // Handle rate limit errors
-    if (error instanceof ApiResponseError) {
-      const rateLimitInfo = error.rateLimit;
+    if (error instanceof Error && error.message.includes('429')) {
+      // Get rate limit info from error response
+      const rateLimitInfo = (error as any).rateLimit;
       if (rateLimitInfo) {
-        const remaining = rateLimitInfo.remaining || 0;
-        const resetTime = rateLimitInfo.reset || Math.floor(Date.now() / 1000) + 900; // Default to 15 minutes
+        const resetTime = new Date(rateLimitInfo.reset * 1000);
+        await updateRateLimit(endpoint, resetTime, 0);
         
-        await updateRateLimit(endpoint, new Date(resetTime * 1000), remaining);
-
-        console.log('[Twitter API] Rate limit updated from error:', {
+        // Wait and retry once
+        const waitTime = resetTime.getTime() - Date.now();
+        console.log('[Twitter API] Rate limit hit, waiting to retry:', {
           endpoint,
-          remaining,
-          resetTime: new Date(resetTime * 1000).toISOString(),
+          resetTime: resetTime.toISOString(),
+          waitTimeMs: waitTime,
           timestamp: new Date().toISOString(),
-          errorDurationMs: Date.now() - startTime,
-          step: 'rate-limit-error'
+          step: 'retry-wait'
         });
-
-        // If it's a rate limit error, add more context
-        if (error.code === 429) {
-          const timeUntilReset = resetTime * 1000 - Date.now();
-          error.message = `Rate limit exceeded. Resets in ${Math.ceil(timeUntilReset / 1000)}s`;
-        }
+        
+        await new Promise(resolve => setTimeout(resolve, waitTime + 1000));
+        return executeWithRateLimit(endpoint, params, apiCall);
       }
     }
-    
-    console.error('[Twitter API] Request failed:', {
-      endpoint,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      code: error instanceof ApiResponseError ? error.code : undefined,
-      data: error instanceof ApiResponseError ? error.data : undefined,
-      timestamp: new Date().toISOString(),
-      errorDurationMs: Date.now() - startTime,
-      step: 'request-error'
-    });
-    
     throw error;
   }
 }
