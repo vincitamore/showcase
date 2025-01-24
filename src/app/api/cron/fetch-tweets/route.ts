@@ -338,19 +338,12 @@ function logStatus(message: string, data?: any) {
 
 async function checkRateLimit() {
   try {
-    const lastTimestamp = await getRateLimitTimestamp();
-    if (!lastTimestamp) {
-      logStatus('No previous request, allowing');
-      return true;
-    }
-    
     const now = Date.now();
-    const minutesSince = Math.round((now - lastTimestamp) / (60 * 1000));
-    const canRequest = minutesSince >= 15;
+    const canRequest = await canMakeRequest(now);
     
     logStatus('Rate limit check', {
-      minutesSince,
-      canRequest
+      canRequest,
+      timestamp: new Date(now).toISOString()
     });
     
     return canRequest;
@@ -473,18 +466,28 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string): Promi
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   const startTime = Date.now();
   logStatus('Starting cron job');
   
   try {
-    // Verify the request is from Vercel Cron
-    const authHeader = request.headers.get('authorization');
+    // Verify this is a Vercel cron invocation
+    const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      logStatus('Unauthorized request');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('[CRON] Unauthorized request');
+      return new Response('Unauthorized', { status: 401 });
     }
 
+    const canRequest = await checkRateLimit();
+    if (!canRequest) {
+      logStatus('Rate limited, using cached tweets');
+      return new Response('Rate limited, using cached tweets', { status: 429 });
+    }
+
+    // Update rate limit timestamp before making requests
+    const now = Date.now();
+    await updateRateLimitTimestamp(now);
+    
     // Get currently cached tweets
     const cachedData = await getCachedTweets();
     const currentTweets = (cachedData?.tweets || []) as TweetWithAuthor[];
@@ -492,32 +495,6 @@ export async function GET(request: Request) {
       tweets: currentTweets.length,
       withEntities: currentTweets.filter(hasTweetEntities).length
     });
-
-    // Check rate limit
-    const canRequest = await checkRateLimit();
-    if (!canRequest) {
-      logStatus('Rate limited, using cache');
-      
-      if (currentTweets.length > 0) {
-        const selectedTweets = getRandomItems(currentTweets, 4);
-        await updateSelectedTweets(selectedTweets);
-        logStatus('Updated from cache', {
-          selected: selectedTweets.length,
-          withEntities: selectedTweets.filter(hasTweetEntities).length
-        });
-        
-        return NextResponse.json({ 
-          message: 'Rate limited, updated from cache',
-          selectedCount: selectedTweets.length,
-          nextRequest: await getRateLimitTimestamp()
-        });
-      }
-      
-      return NextResponse.json({ 
-        error: 'Rate limited, no cache available',
-        nextRequest: await getRateLimitTimestamp()
-      }, { status: 429 });
-    }
 
     // Initialize client
     const client = await getReadOnlyClient();
@@ -562,7 +539,6 @@ export async function GET(request: Request) {
 
     const updatedTweets = Array.from(tweetMap.values()).slice(0, 100);
     await cacheTweets(updatedTweets);
-    await updateRateLimitTimestamp();
     
     logStatus('Cache updated', {
       new: validNewTweets.length,

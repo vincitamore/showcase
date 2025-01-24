@@ -75,6 +75,27 @@
                 <file>components.json</file>
             </files>
         </item>
+
+        <item id="runtime-configuration">
+            <title>API Runtime Configuration</title>
+            <description>Updated API routes to use Node.js runtime for proper module support</description>
+            <completion-date>2024-01-21</completion-date>
+            <details>
+                <detail>Switched API routes from Edge to Node.js runtime</detail>
+                <detail>Fixed module resolution for Node.js built-in modules</detail>
+                <detail>Added proper timeout configurations</detail>
+                <detail>Maintained dynamic route behavior</detail>
+                <detail>Enhanced build-time handling</detail>
+            </details>
+            <files>
+                <file>src/app/api/init/fetch-tweets/route.ts</file>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files>
+            <related-items>
+                <item ref="rate-limit-handling"/>
+                <item ref="tweet-content-handling"/>
+            </related-items>
+        </item>
     </completed-items>
 
     <in-progress-items>

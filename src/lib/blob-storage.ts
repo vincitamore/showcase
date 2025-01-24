@@ -358,34 +358,16 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
   }
 }
 
-export async function updateRateLimitTimestamp(): Promise<void> {
+export async function updateRateLimitTimestamp(timestamp: number): Promise<void> {
   try {
-    const now = Date.now();
-    console.log('[Rate Limit] Updating timestamp...');
-
-    // List existing timestamps
-    const { blobs } = await list({ prefix: RATE_LIMIT_PREFIX });
-    
-    // Delete all existing rate limit files to prevent stale data
-    for (const blob of blobs) {
-      console.log('[Rate Limit] Deleting old timestamp file:', blob.pathname);
-      await del(blob.url);
-    }
-    
-    // Store new timestamp
-    await put(RATE_LIMIT_FILE, now.toString(), {
+    await put(RATE_LIMIT_FILE, timestamp.toString(), {
       contentType: 'text/plain',
       access: 'public',
       addRandomSuffix: false
     });
-    
-    console.log('[Rate Limit] Updated timestamp:', {
-      timestamp: now,
-      date: new Date(now).toISOString(),
-      file: RATE_LIMIT_FILE
-    });
+    console.log('[Twitter Rate Limit] Updated timestamp:', new Date(timestamp).toISOString());
   } catch (error) {
-    console.error('[Rate Limit] Error updating timestamp:', error);
+    console.error('[Twitter Rate Limit] Error updating timestamp:', error);
     throw error;
   }
 }
@@ -572,37 +554,32 @@ export async function canMakeRequest(now: number): Promise<boolean> {
   try {
     // During build time, prevent API requests
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      console.log('[Rate Limit] Build phase detected, preventing requests');
+      console.log('[Twitter Rate Limit] Build phase detected, preventing requests');
       return false;
     }
 
     const lastTimestamp = await getRateLimitTimestamp();
     if (!lastTimestamp) {
-      console.log('[Rate Limit] No previous timestamp found, allowing request');
+      console.log('[Twitter Rate Limit] No previous timestamp found, allowing request');
       return true;
     }
     
-    const minutesSinceLastRequest = Math.floor((now - lastTimestamp) / (60 * 1000));
-    const withinRateLimit = (now - lastTimestamp) < FIFTEEN_MINUTES;
-    const timeUntilReset = Math.max(0, Math.round((lastTimestamp + FIFTEEN_MINUTES - now) / 1000));
+    const timeSinceLastRequest = now - lastTimestamp;
+    const canRequest = timeSinceLastRequest >= FIFTEEN_MINUTES;
+    const timeUntilReset = canRequest ? 0 : Math.ceil((FIFTEEN_MINUTES - timeSinceLastRequest) / 1000);
     
-    console.log('[Rate Limit] Check result:', {
-      lastTimestamp,
-      lastRequestDate: new Date(lastTimestamp).toISOString(),
-      minutesSinceLastRequest,
-      withinRateLimit,
-      timeUntilReset: `${timeUntilReset}s`,
-      canRequest: !withinRateLimit
+    console.log('[Twitter Rate Limit] Check result:', {
+      lastTimestamp: new Date(lastTimestamp).toISOString(),
+      timeSinceLastRequest: Math.floor(timeSinceLastRequest / 1000) + 's',
+      timeUntilReset: timeUntilReset + 's',
+      canRequest
     });
     
-    return !withinRateLimit;
+    return canRequest;
   } catch (error) {
-    console.error('[Rate Limit] Error checking rate limit:', error);
-    // During build time, prevent API requests on error
-    if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
-      return false;
-    }
-    return true;
+    console.error('[Twitter Rate Limit] Error checking rate limit:', error);
+    // If we can't check the rate limit, prevent requests to be safe
+    return false;
   }
 }
 

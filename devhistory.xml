@@ -7,6 +7,25 @@
     </meta>
 
     <history-entries>
+        <entry id="2024-01-21-07" scope="infrastructure" type="bugfix">
+            <title>API Runtime Configuration Update</title>
+            <changes>
+                <change>Switched API routes from Edge to Node.js runtime</change>
+                <change>Fixed module resolution for Node.js built-in modules</change>
+                <change>Added proper timeout configurations</change>
+                <change>Maintained dynamic route behavior</change>
+                <change>Enhanced build-time handling</change>
+            </changes>
+            <files-affected>
+                <file>src/app/api/init/fetch-tweets/route.ts</file>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="rate-limit-handling"/>
+                <entry ref="tweet-content-handling"/>
+            </related-entries>
+        </entry>
+
         <entry id="2024-01-21-06" scope="enhancement" type="bugfix">
             <title>Rate Limit System Improvements</title>
             <changes>
