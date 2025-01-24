@@ -59,22 +59,6 @@ function convertToStoredTweet(tweet: TweetV2): StoredTweet {
   };
 }
 
-// Helper to get rate limit values from headers
-function getRateLimitValues(headers: IncomingHttpHeaders | Headers) {
-  let remaining = 0;
-  let resetTime = 0;
-
-  if (headers instanceof Headers) {
-    remaining = parseInt(headers.get('x-rate-limit-remaining') || '0');
-    resetTime = parseInt(headers.get('x-rate-limit-reset') || '0');
-  } else {
-    remaining = parseInt(String(headers['x-rate-limit-remaining']) || '0');
-    resetTime = parseInt(String(headers['x-rate-limit-reset']) || '0');
-  }
-
-  return { remaining, resetTime };
-}
-
 // Helper to update rate limit info from response headers
 async function updateRateLimitInfo(endpoint: string, headers: Record<string, string | string[]>) {
   const now = Date.now();
@@ -260,9 +244,11 @@ export async function executeWithRateLimit<T>(
     const response = await request();
 
     // Update rate limit info from response headers
-    const headers = (response as any)._headers;
-    if (headers) {
-      const { remaining, resetTime } = getRateLimitValues(headers);
+    // Twitter API v2 client returns headers in response._headers or response.rateLimit
+    const rateLimitInfo = (response as any).rateLimit;
+    if (rateLimitInfo) {
+      const remaining = rateLimitInfo.remaining || 0;
+      const resetTime = rateLimitInfo.reset || Math.floor(Date.now() / 1000) + 900; // Default to 15 minutes
       
       await updateRateLimit(endpoint, new Date(resetTime * 1000), remaining);
 
@@ -280,9 +266,10 @@ export async function executeWithRateLimit<T>(
   } catch (error) {
     // Handle rate limit errors
     if (error instanceof ApiResponseError) {
-      const headers = error.response?.headers;
-      if (headers) {
-        const { remaining, resetTime } = getRateLimitValues(headers);
+      const rateLimitInfo = error.rateLimit;
+      if (rateLimitInfo) {
+        const remaining = rateLimitInfo.remaining || 0;
+        const resetTime = rateLimitInfo.reset || Math.floor(Date.now() / 1000) + 900; // Default to 15 minutes
         
         await updateRateLimit(endpoint, new Date(resetTime * 1000), remaining);
 
