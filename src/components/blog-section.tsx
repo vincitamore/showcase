@@ -399,7 +399,7 @@ const BlogSection = () => {
       </div>
 
       {/* Message Composer */}
-/*
+      {/*
       <Card3D className="mb-8 mx-auto max-w-2xl p-6">
         <div className="space-y-4">
           {isAuthenticated ? (
@@ -430,7 +430,7 @@ const BlogSection = () => {
           )}
         </div>
       </Card3D>
-*/
+      */}
       {/* Tweets Display */}
       {tweets && tweets.length > 0 && (
         <div className="mt-8">
