@@ -11,6 +11,7 @@ import { Carousel } from "@/components/ui/carousel"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
+import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 
 interface UrlEntity {
   url: string
@@ -25,6 +26,22 @@ interface UrlEntity {
     width: number
     height: number
   }>
+}
+
+interface MentionEntity {
+  username: string
+  indices: number[]
+}
+
+interface HashtagEntity {
+  tag: string
+  indices: number[]
+}
+
+interface TweetEntities {
+  urls?: UrlEntity[]
+  mentions?: MentionEntity[]
+  hashtags?: HashtagEntity[]
 }
 
 interface TweetMetrics {
@@ -43,9 +60,7 @@ interface Tweet {
     username?: string
     name?: string
   }
-  entities?: {
-    urls?: UrlEntity[]
-  }
+  entities?: TweetEntities
   referenced_tweets?: {
     type: 'quoted' | 'replied_to'
     id: string
@@ -60,6 +75,9 @@ const BlogSection = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { toast } = useToast()
+
+  // Initialize Twitter embed script
+  useTwitterEmbed()
 
   useEffect(() => {
     fetchCachedTweets()
@@ -122,44 +140,69 @@ const BlogSection = () => {
       // Enhanced debug logging
       console.log('Raw tweet response:', JSON.stringify(data, null, 2));
       
-      // Log each tweet's structure
-      data?.tweets?.forEach((tweet: Tweet, index: number) => {
-        console.log(`Tweet ${index + 1} Structure:`, {
-          id: tweet.id,
-          text: tweet.text,
-          hasEntities: !!tweet.entities,
-          entitiesType: tweet.entities ? typeof tweet.entities : 'undefined',
-          urlsCount: tweet.entities?.urls?.length || 0,
-          rawEntities: tweet.entities,
-          rawUrls: tweet.entities?.urls,
-          created_at: tweet.created_at,
-          metrics: tweet.public_metrics,
-          author: tweet.author
-        });
-      });
+      // Convert database tweets to TweetV2 format
+      const processedTweets = data.tweets.map((dbTweet: any) => ({
+        id: dbTweet.id,
+        text: dbTweet.text,
+        created_at: dbTweet.createdAt,
+        public_metrics: dbTweet.publicMetrics ? JSON.parse(dbTweet.publicMetrics) : {
+          like_count: 0,
+          reply_count: 0,
+          retweet_count: 0
+        },
+        author: {
+          profile_image_url: profileConfig.profileImage,
+          username: profileConfig.username,
+          name: profileConfig.displayName
+        },
+        entities: dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
+          const entityData = entity.metadata ? JSON.parse(entity.metadata) : {};
+          
+          switch (entity.type) {
+            case 'url':
+              if (!acc.urls) acc.urls = [];
+              acc.urls.push({
+                url: entity.url,
+                expanded_url: entity.expandedUrl,
+                display_url: entity.text,
+                indices: entityData.indices || [0, 0],
+                title: entityData.title,
+                description: entityData.description,
+                images: entityData.images
+              });
+              break;
+            case 'mention':
+              if (!acc.mentions) acc.mentions = [];
+              acc.mentions.push({
+                username: entity.text,
+                indices: entityData.indices || [0, 0]
+              });
+              break;
+            case 'hashtag':
+              if (!acc.hashtags) acc.hashtags = [];
+              acc.hashtags.push({
+                tag: entity.text,
+                indices: entityData.indices || [0, 0]
+              });
+              break;
+          }
+          return acc;
+        }, {} as TweetEntities)
+      }));
       
-      if (!data.tweets || !Array.isArray(data.tweets)) {
-        console.error('Invalid tweets data received:', data);
-        toast({
-          title: "Error",
-          description: "Received invalid tweet data. Please try again later.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Log the processed tweets
+      console.log('Processed tweets:', processedTweets.map((t: Tweet) => ({
+        id: t.id,
+        created_at: t.created_at,
+        metrics: t.public_metrics,
+        entityCounts: {
+          urls: t.entities?.urls?.length || 0,
+          mentions: t.entities?.mentions?.length || 0,
+          hashtags: t.entities?.hashtags?.length || 0
+        }
+      })));
       
-      // Log the final processed tweets
-      console.log('Setting tweets state with:', {
-        count: data.tweets.length,
-        tweets: data.tweets.map((t: Tweet) => ({
-          id: t.id,
-          textPreview: t.text.substring(0, 50) + '...',
-          hasEntities: !!t.entities,
-          urlsCount: t.entities?.urls?.length || 0
-        }))
-      });
-      
-      setTweets(data.tweets);
+      setTweets(processedTweets);
     } catch (error) {
       console.error('Error fetching cached tweets:', error);
       toast({
@@ -224,91 +267,172 @@ const BlogSection = () => {
   }
 
   const renderTweetText = (tweet: Tweet) => {
-    // Enhanced debug logging for tweet rendering
-    console.log('Rendering tweet - Full structure:', {
-      id: tweet.id,
-      text: tweet.text,
-      hasEntities: !!tweet.entities,
-      entitiesType: tweet.entities ? typeof tweet.entities : 'undefined',
-      urlCount: tweet.entities?.urls?.length || 0,
-      entities: tweet.entities,
-      rawUrls: tweet.entities?.urls,
-      created_at: tweet.created_at,
-      metrics: tweet.public_metrics,
-      author: tweet.author
-    });
-
     if (!tweet.text) {
       console.log('Tweet has no text, skipping render');
       return null;
     }
 
-    // Log URL processing
-    if (tweet.entities?.urls?.length) {
-      console.log('Processing URLs:', tweet.entities.urls.map(url => ({
-        original: url.url,
-        expanded: url.expanded_url,
-        display: url.display_url,
-        indices: url.indices,
-        hasTitle: !!url.title,
-        hasDescription: !!url.description,
-        hasImages: !!url.images?.length
-      })));
+    // Log entity processing
+    if (tweet.entities) {
+      console.log('Processing entities:', {
+        urls: tweet.entities.urls?.length || 0,
+        mentions: tweet.entities.mentions?.length || 0,
+        hashtags: tweet.entities.hashtags?.length || 0
+      });
     }
 
-    const renderLink = (url: string, displayText: string) => (
+    const renderLink = (url: string, displayText: string, urlEntity: UrlEntity) => {
+      // Check if it's a Twitter/X link
+      const isTweetLink = url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/);
+      
+      if (isTweetLink) {
+        return (
+          <div className="mt-2 rounded-lg border border-border/50 overflow-hidden">
+            <blockquote 
+              className="twitter-tweet" 
+              data-conversation="none"
+              data-theme="dark"
+            >
+              <a href={url}></a>
+            </blockquote>
+          </div>
+        );
+      }
+
+      // For non-Twitter links, show preview if available
+      const hasPreview = urlEntity.images?.[0] || urlEntity.title;
+      
+      if (hasPreview) {
+        return (
+          <div
+            className="mt-2 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            {urlEntity.images?.[0] && (
+              <div className="relative w-full h-[160px] bg-accent/5">
+                <Image
+                  src={urlEntity.images[0].url}
+                  alt={urlEntity.title || 'Link preview'}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            )}
+            <div className="p-3">
+              {urlEntity.title && (
+                <h4 className="font-medium text-sm mb-2 line-clamp-1">
+                  {urlEntity.title}
+                </h4>
+              )}
+              {urlEntity.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                  {urlEntity.description}
+                </p>
+              )}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                <ExternalLink className="h-3 w-3" />
+                {new URL(url).hostname}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Default link rendering for links without previews
+      return (
+        <span
+          className="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline cursor-pointer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }}
+        >
+          {displayText}
+          <ExternalLink className="h-3 w-3 inline-block" />
+        </span>
+      );
+    };
+
+    const renderMention = (username: string) => (
       <span
-        className="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline cursor-pointer"
+        className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          window.open(url, '_blank', 'noopener,noreferrer');
+          window.open(`https://twitter.com/${username}`, '_blank', 'noopener,noreferrer');
         }}
       >
-        {displayText}
-        <ExternalLink className="h-3 w-3 inline-block" />
+        @{username}
       </span>
     );
 
-    // Function to process text and replace URLs with clickable links
+    const renderHashtag = (tag: string) => (
+      <span
+        className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.open(`https://twitter.com/hashtag/${tag}`, '_blank', 'noopener,noreferrer');
+        }}
+      >
+        #{tag}
+      </span>
+    );
+
+    // Function to process text and replace entities with clickable elements
     const processText = () => {
-      if (!tweet.entities?.urls?.length) {
-        console.log('No URLs to process in tweet');
+      if (!tweet.entities) {
         return <span>{tweet.text}</span>;
       }
 
-      console.log('Processing URLs in tweet:', {
-        urlCount: tweet.entities.urls.length,
-        urls: tweet.entities.urls.map(u => u.expanded_url)
-      });
+      // Collect all entities and sort by their position
+      const entities: Array<{
+        type: 'url' | 'mention' | 'hashtag'
+        indices: number[]
+        render: () => JSX.Element
+      }> = [
+        ...(tweet.entities.urls?.map(url => ({
+          type: 'url' as const,
+          indices: url.indices,
+          render: () => renderLink(url.expanded_url, url.display_url, url)
+        })) || []),
+        ...(tweet.entities.mentions?.map(mention => ({
+          type: 'mention' as const,
+          indices: mention.indices,
+          render: () => renderMention(mention.username)
+        })) || []),
+        ...(tweet.entities.hashtags?.map(hashtag => ({
+          type: 'hashtag' as const,
+          indices: hashtag.indices,
+          render: () => renderHashtag(hashtag.tag)
+        })) || [])
+      ].sort((a, b) => a.indices[0] - b.indices[0]);
 
       const segments: Array<JSX.Element | string> = [];
       let lastIndex = 0;
 
-      // Sort URLs by their position in the text
-      const sortedUrls = [...tweet.entities.urls].sort(
-        (a, b) => (a.indices[0] || 0) - (b.indices[0] || 0)
-      );
+      entities.forEach((entity, index) => {
+        const [start, end] = entity.indices;
 
-      sortedUrls.forEach((urlEntity, index) => {
-        const start = urlEntity.indices[0];
-        const end = urlEntity.indices[1];
-
-        if (typeof start === 'number' && typeof end === 'number') {
-          // Add text before the URL
-          if (start > lastIndex) {
-            segments.push(tweet.text.slice(lastIndex, start));
-          }
-
-          // Add the URL as a clickable link
-          segments.push(
-            <span key={`link-${index}`} className="mx-1">
-              {renderLink(urlEntity.expanded_url, urlEntity.display_url)}
-            </span>
-          );
-
-          lastIndex = end;
+        // Add text before the entity
+        if (start > lastIndex) {
+          segments.push(tweet.text.slice(lastIndex, start));
         }
+
+        // Add the entity
+        segments.push(
+          <span key={`entity-${index}`} className="mx-0.5">
+            {entity.render()}
+          </span>
+        );
+
+        lastIndex = end;
       });
 
       // Add any remaining text
