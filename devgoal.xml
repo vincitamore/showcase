@@ -68,9 +68,20 @@
             <requirements>
                 <req>OAuth authentication</req>
                 <req>Real-time composer</req>
+                <req>Entity detection and processing</req>
+                <req>URL metadata preservation</req>
                 <req>Engagement metrics</req>
             </requirements>
             <status>In Progress</status>
+            <completed>
+                <item>OAuth authentication</item>
+                <item>Entity detection and processing</item>
+                <item>URL metadata preservation</item>
+            </completed>
+            <pending>
+                <item>Real-time composer</item>
+                <item>Engagement metrics</item>
+            </pending>
         </feature>
 
         <feature id="ai-chat">

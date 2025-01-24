@@ -10,21 +10,222 @@ import {
 } from '@/lib/blob-storage';
 import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
 
-// Helper function to check if a tweet has entities with URLs
+// Helper function to check if a tweet has any type of entity
 function hasTweetEntities(tweet: TweetV2): boolean {
-  return !!tweet.entities?.urls && tweet.entities.urls.length > 0;
+  // Log the full entities structure for debugging
+  logStatus('Checking entities for tweet', {
+    id: tweet.id,
+    hasEntities: !!tweet.entities,
+    entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+    urlCount: tweet.entities?.urls?.length || 0,
+    fullEntities: tweet.entities
+  });
+
+  // Check for any type of entity, not just URLs
+  if (!tweet.entities) return false;
+
+  // Check for various entity types
+  const hasUrls = !!tweet.entities.urls?.length;
+  const hasMentions = !!tweet.entities.mentions?.length;
+  const hasHashtags = !!tweet.entities.hashtags?.length;
+  const hasAnnotations = !!tweet.entities.annotations?.length;
+  const hasCashtags = !!tweet.entities.cashtags?.length;
+
+  const hasAnyEntity = hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
+
+  // Log detailed entity presence
+  logStatus('Entity detection result', {
+    id: tweet.id,
+    hasUrls,
+    hasMentions,
+    hasHashtags,
+    hasAnnotations,
+    hasCashtags,
+    hasAnyEntity
+  });
+
+  return hasAnyEntity;
+}
+
+// Helper function to validate and clean tweet data
+function validateTweet(tweet: TweetV2): TweetV2 | null {
+  try {
+    // Handle null/undefined
+    if (!tweet) {
+      logStatus('Null or undefined tweet');
+      return null;
+    }
+
+    // Create a clean copy of the tweet with empty entities
+    const cleanTweet: TweetV2 = {
+      id: tweet.id,
+      text: tweet.text,
+      edit_history_tweet_ids: tweet.edit_history_tweet_ids,
+      public_metrics: tweet.public_metrics,
+      entities: {
+        urls: [],
+        mentions: [],
+        hashtags: [],
+        cashtags: [],
+        annotations: []
+      } as TweetEntitiesV2
+    };
+
+    // Log the full tweet structure for debugging
+    logStatus('Validating tweet', {
+      id: tweet.id,
+      hasEntities: !!tweet.entities,
+      entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+      fullTweet: tweet
+    });
+
+    // Ensure required fields exist
+    if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
+      logStatus('Invalid tweet structure', {
+        id: tweet.id,
+        hasText: !!tweet.text,
+        hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids)
+      });
+      return null;
+    }
+
+    // Handle created_at separately
+    if (tweet.created_at) {
+      try {
+        const date = new Date(tweet.created_at);
+        if (!isNaN(date.getTime())) {
+          cleanTweet.created_at = date.toISOString();
+        } else {
+          logStatus('Invalid date found in tweet', {
+            id: tweet.id,
+            date: tweet.created_at
+          });
+        }
+      } catch (error) {
+        logStatus('Error parsing date for tweet', {
+          id: tweet.id,
+          date: tweet.created_at,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    // Handle entities
+    if (tweet.entities) {
+      try {
+        // Deep clone entities to avoid reference issues
+        const clonedEntities = JSON.parse(JSON.stringify(tweet.entities));
+        const entities = cleanTweet.entities as TweetEntitiesV2;
+        
+        // Validate and clean URLs
+        if (Array.isArray(clonedEntities.urls)) {
+          entities.urls = clonedEntities.urls.map((url: any) => ({
+            start: url.start || url.indices?.[0] || 0,
+            end: url.end || url.indices?.[1] || 0,
+            url: url.url || '',
+            expanded_url: url.expanded_url || url.url || '',
+            display_url: url.display_url || url.expanded_url || url.url || '',
+            title: url.title,
+            description: url.description,
+            unwound_url: url.unwound_url,
+            images: url.images?.map((img: any) => ({
+              url: img.url,
+              width: img.width || 0,
+              height: img.height || 0
+            }))
+          }));
+        }
+
+        // Copy other entity types if they exist
+        if (Array.isArray(clonedEntities.mentions)) {
+          entities.mentions = clonedEntities.mentions.map((mention: any) => ({
+            start: mention.start || mention.indices?.[0] || 0,
+            end: mention.end || mention.indices?.[1] || 0,
+            username: mention.username || '',
+            id: mention.id || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.hashtags)) {
+          entities.hashtags = clonedEntities.hashtags.map((hashtag: any) => ({
+            start: hashtag.start || hashtag.indices?.[0] || 0,
+            end: hashtag.end || hashtag.indices?.[1] || 0,
+            tag: hashtag.tag || hashtag.text || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.cashtags)) {
+          entities.cashtags = clonedEntities.cashtags.map((cashtag: any) => ({
+            start: cashtag.start || cashtag.indices?.[0] || 0,
+            end: cashtag.end || cashtag.indices?.[1] || 0,
+            tag: cashtag.tag || cashtag.text || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.annotations)) {
+          entities.annotations = clonedEntities.annotations.map((annotation: any) => ({
+            start: annotation.start || annotation.indices?.[0] || 0,
+            end: annotation.end || annotation.indices?.[1] || 0,
+            probability: annotation.probability || 0,
+            type: annotation.type || '',
+            normalized_text: annotation.normalized_text || ''
+          }));
+        }
+
+        // Log entity processing results
+        logStatus('Processed entities', {
+          id: tweet.id,
+          entityTypes: Object.keys(entities),
+          urlCount: entities.urls.length,
+          mentionCount: entities.mentions.length,
+          hashtagCount: entities.hashtags.length,
+          annotationCount: entities.annotations.length,
+          cashtagCount: entities.cashtags.length
+        });
+      } catch (error) {
+        logStatus('Error processing entities', {
+          id: tweet.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    return cleanTweet;
+  } catch (error) {
+    logStatus('Error validating tweet', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      tweet: tweet?.id
+    });
+    return null;
+  }
 }
 
 // Helper function to get random items from array with priority for tweets with entities
 function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
+  if (!array?.length || count <= 0) {
+    logStatus('Invalid input for getRandomItems', {
+      arrayLength: array?.length,
+      requestedCount: count
+    });
+    return [];
+  }
+
+  // Validate and clean tweets before processing
+  const validTweets = array
+    .map(tweet => validateTweet(tweet))
+    .filter((tweet): tweet is TweetV2 => tweet !== null);
+
+  if (validTweets.length === 0) {
+    logStatus('No valid tweets found');
+    return [];
+  }
+
   // Separate tweets with and without entities
-  const tweetsWithEntities = array.filter(hasTweetEntities);
-  const tweetsWithoutEntities = array.filter(tweet => !hasTweetEntities(tweet));
+  const tweetsWithEntities = validTweets.filter(hasTweetEntities);
+  const tweetsWithoutEntities = validTweets.filter(tweet => !hasTweetEntities(tweet));
   
   logStatus('Tweet selection stats', {
-    totalTweets: array.length,
+    totalTweets: validTweets.length,
     withEntities: tweetsWithEntities.length,
-    withoutEntities: tweetsWithoutEntities.length
+    withoutEntities: tweetsWithoutEntities.length,
+    validDates: validTweets.filter(t => !!t.created_at).length
   });
   
   // If we have enough tweets with entities, use those first
@@ -90,6 +291,9 @@ async function searchNewBuildTweets(client: TwitterApiv2, cachedTweets: TweetV2[
     
     const searchResults = await client.search(query, {
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'user.fields': ['profile_image_url', 'username', 'name'],
+      'media.fields': ['url', 'preview_image_url'],
+      expansions: ['author_id', 'attachments.media_keys'],
       max_results: 10,
     });
 
@@ -125,6 +329,9 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
     const timeline = await client.userTimeline(user.data.id, {
       exclude: ['retweets'],  // Allow replies to increase chances of finding tweets
       'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      'user.fields': ['profile_image_url', 'username', 'name'],
+      'media.fields': ['url', 'preview_image_url'],
+      expansions: ['author_id', 'attachments.media_keys'],
       max_results: 20, // Increased to get more candidates
     });
 
@@ -135,12 +342,18 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
 
     const tweets = Array.isArray(timeline.data.data) ? timeline.data.data : [timeline.data.data];
     
+    // Validate tweets before selection
+    const validTweets = tweets
+      .map(tweet => validateTweet(tweet))
+      .filter((tweet): tweet is TweetV2 => tweet !== null);
+    
     // Separate tweets with and without entities
-    const tweetsWithEntities = tweets.filter(hasTweetEntities);
-    const tweetsWithoutEntities = tweets.filter(tweet => !hasTweetEntities(tweet));
+    const tweetsWithEntities = validTweets.filter(hasTweetEntities);
+    const tweetsWithoutEntities = validTweets.filter(tweet => !hasTweetEntities(tweet));
     
     logStatus('Timeline results', {
       totalFound: tweets.length,
+      validTweets: validTweets.length,
       withEntities: tweetsWithEntities.length,
       withoutEntities: tweetsWithoutEntities.length
     });
@@ -152,8 +365,12 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string) {
     }
     
     // Fallback to tweets without entities
-    const randomIndex = Math.floor(Math.random() * tweets.length);
-    return [tweets[randomIndex]];
+    if (validTweets.length > 0) {
+      const randomIndex = Math.floor(Math.random() * validTweets.length);
+      return [validTweets[randomIndex]];
+    }
+
+    return null;
   } catch (error) {
     logStatus('Error fetching random user tweet', { error: error instanceof Error ? error.message : 'Unknown error' });
     return null;
@@ -230,16 +447,28 @@ export async function GET(request: Request) {
       throw new Error('Failed to fetch any new tweets');
     }
 
+    // Validate all tweets before caching
+    const validNewTweets = newTweets
+      .map(tweet => validateTweet(tweet))
+      .filter((tweet): tweet is TweetV2 => tweet !== null);
+
+    if (validNewTweets.length === 0) {
+      throw new Error('No valid tweets found after validation');
+    }
+
     // Update cache with new tweets, replacing any duplicates
     const tweetMap = new Map<string, TweetV2>();
     
     // Add new tweets first (so they take precedence over old ones)
-    newTweets.forEach(tweet => tweetMap.set(tweet.id, tweet));
+    validNewTweets.forEach(tweet => tweetMap.set(tweet.id, tweet));
     
     // Add existing tweets that aren't being replaced
     currentTweets.forEach(tweet => {
       if (!tweetMap.has(tweet.id)) {
-        tweetMap.set(tweet.id, tweet);
+        const validTweet = validateTweet(tweet);
+        if (validTweet) {
+          tweetMap.set(tweet.id, validTweet);
+        }
       }
     });
 
@@ -251,7 +480,7 @@ export async function GET(request: Request) {
     await updateRateLimitTimestamp();
     
     logStatus('Cache updated', {
-      newTweetsAdded: newTweets.length,
+      newTweetsAdded: validNewTweets.length,
       totalTweets: updatedTweets.length,
       withEntities: updatedTweets.filter(hasTweetEntities).length
     });
@@ -269,7 +498,7 @@ export async function GET(request: Request) {
     const executionTime = Date.now() - startTime;
     return NextResponse.json({
       message: 'Successfully updated tweets',
-      newTweetsAdded: newTweets.length,
+      newTweetsAdded: validNewTweets.length,
       totalTweets: updatedTweets.length,
       selectedTweets: selectedTweets.length,
       executionTimeMs: executionTime
