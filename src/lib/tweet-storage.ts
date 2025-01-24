@@ -337,6 +337,11 @@ export async function updateSelectedTweets(tweetIds: string[]) {
 }
 
 export async function getSelectedTweets(): Promise<TweetV2[]> {
+  console.log('[Tweet Storage] Fetching selected tweets:', {
+    timestamp: new Date().toISOString(),
+    step: 'start'
+  });
+
   const cache = await (prisma as any).tweetCache.findFirst({
     where: {
       type: CACHE_TYPES.SELECTED,
@@ -353,16 +358,35 @@ export async function getSelectedTweets(): Promise<TweetV2[]> {
       }
     }
   });
+
+  console.log('[Tweet Storage] Selected tweets query result:', {
+    hasCache: !!cache,
+    totalTweets: cache?.tweets?.length || 0,
+    isActive: cache?.isActive,
+    type: cache?.type,
+    timestamp: new Date().toISOString(),
+    step: 'after-query'
+  });
   
   // Ensure we return exactly SELECTED_TWEET_COUNT tweets
   const tweets = cache?.tweets || [];
   if (tweets.length > SELECTED_TWEET_COUNT) {
-    console.log('[Twitter Storage] Trimming selected tweets to limit:', {
+    console.log('[Tweet Storage] Trimming selected tweets to limit:', {
       total: tweets.length,
-      limit: SELECTED_TWEET_COUNT
+      limit: SELECTED_TWEET_COUNT,
+      removing: tweets.length - SELECTED_TWEET_COUNT,
+      timestamp: new Date().toISOString(),
+      step: 'trimming'
     });
     return tweets.slice(0, SELECTED_TWEET_COUNT);
   }
+  
+  console.log('[Tweet Storage] Returning selected tweets:', {
+    count: tweets.length,
+    ids: tweets.map(t => t.id),
+    timestamp: new Date().toISOString(),
+    step: 'complete'
+  });
   
   return tweets;
 }
