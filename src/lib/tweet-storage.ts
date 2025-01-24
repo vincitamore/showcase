@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { TweetV2, TweetEntitiesV2, MediaObjectV2, ApiV2Includes } from 'twitter-api-v2'
-import type { Tweet, TweetEntity } from '@prisma/client'
+import type { PrismaClient as PrismaClientType } from '@prisma/client'
 
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000 // 15 minutes in milliseconds
@@ -209,8 +209,14 @@ async function storeTweetEntities(tweetId: string, entities: TweetEntitiesV2) {
   }
 }
 
-// Remove the custom TweetEntity type since we're using Prisma's
-type EntityGroups = Record<string, TweetEntity[]>;
+interface PrismaTweet {
+  id: string;
+  entities: Array<{
+    id: string;
+    type: string;
+    text: string;
+  }>;
+}
 
 // Helper function to clean up duplicate entities
 async function cleanupDuplicateEntities() {
@@ -224,7 +230,7 @@ async function cleanupDuplicateEntities() {
     include: {
       entities: true
     }
-  });
+  }) as PrismaTweet[];
 
   console.log('[Twitter Storage] Found tweets to clean:', {
     tweetCount: tweets.length,
@@ -235,39 +241,64 @@ async function cleanupDuplicateEntities() {
   let totalDuplicatesRemoved = 0;
 
   for (const tweet of tweets) {
-    // Group entities by their type and text to find duplicates
-    const entityGroups = tweet.entities.reduce((groups: EntityGroups, entity: TweetEntity) => {
-      const key = `${entity.type}-${entity.text}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(entity);
-      return groups;
-    }, {});
+    try {
+      // Group entities by their type and text to find duplicates
+      const entityGroups = tweet.entities.reduce<Record<string, Array<{ id: string }>>>((acc, entity) => {
+        const key = `${entity.type}-${entity.text}`;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push({ id: entity.id });
+        return acc;
+      }, {} as Record<string, Array<{ id: string }>>);
 
-    // For each group of duplicate entities, keep one and delete the rest
-    for (const [key, entities] of Object.entries(entityGroups)) {
-      if (entities.length > 1) {
-        // Keep the first entity and delete the rest
-        const [keep, ...duplicates] = entities;
-        const duplicateIds = duplicates.map(d => d.id);
+      // For each group of duplicate entities, keep one and delete the rest
+      for (const [key, entities] of Object.entries(entityGroups)) {
+        if (entities.length > 1) {
+          // Keep the first entity and delete the rest
+          const [_keep, ...duplicates] = entities;
+          if (duplicates.length > 0) {
+            const duplicateIds = duplicates.map(d => d.id);
 
-        await prisma.tweetEntity.deleteMany({
-          where: {
-            id: {
-              in: duplicateIds
-            }
+            console.log('[Twitter Storage] Removing duplicates for tweet:', {
+              tweetId: tweet.id,
+              entityKey: key,
+              duplicateCount: duplicateIds.length,
+              duplicateIds,
+              timestamp: new Date().toISOString(),
+              step: 'pre-delete'
+            });
+
+            await prisma.tweetEntity.deleteMany({
+              where: {
+                id: {
+                  in: duplicateIds
+                }
+              }
+            });
+
+            totalDuplicatesRemoved += duplicateIds.length;
+
+            console.log('[Twitter Storage] Removed duplicates for tweet:', {
+              tweetId: tweet.id,
+              entityKey: key,
+              duplicatesRemoved: duplicateIds.length,
+              timestamp: new Date().toISOString(),
+              step: 'duplicates-removed'
+            });
           }
-        });
-
-        totalDuplicatesRemoved += duplicateIds.length;
-
-        console.log('[Twitter Storage] Removed duplicates for tweet:', {
-          tweetId: tweet.id,
-          entityKey: key,
-          duplicatesRemoved: duplicateIds.length,
-          timestamp: new Date().toISOString(),
-          step: 'duplicates-removed'
-        });
+        }
       }
+    } catch (error) {
+      console.error('[Twitter Storage] Error cleaning duplicates for tweet:', {
+        tweetId: tweet.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        step: 'error'
+      });
+      // Continue with next tweet even if this one fails
+      continue;
     }
   }
 

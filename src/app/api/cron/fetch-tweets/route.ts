@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
+import { getReadOnlyClient } from '@/lib/x-api';
 import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEET_COUNT } from '@/lib/tweet-storage';
 import { env } from '@/env';
-import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError, TweetSearchRecentV2Paginator, TwitterRateLimit } from 'twitter-api-v2';
+import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError } from 'twitter-api-v2';
+import { 
+  canMakeRequest, 
+  getRateLimit,
+  updateRateLimit,
+  MAX_TWEETS 
+} from '@/lib/tweet-storage';
 
 type TweetWithEntities = {
   id: string;
@@ -96,13 +102,15 @@ function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
   };
 }
 
-// Ensure this is only called by Vercel cron
-export async function GET(request: Request) {
+export const dynamic = 'force-dynamic'
+export const maxDuration = 58 // Just under Vercel's 60s limit
+
+export async function GET(req: Request) {
   const startTime = Date.now();
   
   try {
     // Verify cron secret
-    const authHeader = request.headers.get('authorization');
+    const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
       console.error('[Cron] Unauthorized request:', {
         hasAuth: !!authHeader,
@@ -117,7 +125,7 @@ export async function GET(request: Request) {
       step: 'start'
     });
 
-    // Get Twitter client
+    // Initialize Twitter client
     const client = await getReadOnlyClient();
     
     console.log('[Cron] Client initialized, preparing search...', {
@@ -129,224 +137,133 @@ export async function GET(request: Request) {
     // Get user info for query
     const username = env.TWITTER_USERNAME?.replace('@', '');
     if (!username) {
-      console.error('[Cron] Twitter username not configured:', {
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'config-error'
-      });
+      console.error('[Cron] Twitter username not configured');
       return new NextResponse('Twitter username not configured', { status: 500 });
     }
 
-    // Construct search query for user's tweets, excluding replies and retweets
-    const query = `from:${username} -is:retweet`;  // Removed -is:reply and has:links to get more tweets
+    const query = `from:${username} -is:retweet`;
 
-    try {
-      // Fetch tweets with rate limit handling using recent search
-      const paginator = await executeWithRateLimit<TweetSearchRecentV2Paginator>(
-        'tweets/search/recent',
-        {
-          query,
-          max_results: 100,
-          'tweet.fields': [
-            'created_at',
-            'public_metrics',
-            'entities',
-            'author_id',
-            'attachments'
-          ],
-          'user.fields': ['profile_image_url', 'username'],
-          'media.fields': [
-            'url',
-            'preview_image_url',
-            'alt_text',
-            'type',
-            'width',
-            'height',
-            'duration_ms',
-            'variants'
-          ],
-          expansions: [
-            'author_id',
-            'attachments.media_keys',
-            'attachments.poll_ids',
-            'entities.mentions.username',
-            'referenced_tweets.id',
-            'referenced_tweets.id.author_id'
-          ]
-        },
-        () => client.search(query, {
-          max_results: 100,
-          'tweet.fields': [
-            'created_at',
-            'public_metrics',
-            'entities',
-            'author_id',
-            'attachments'
-          ],
-          'user.fields': ['profile_image_url', 'username'],
-          'media.fields': [
-            'url',
-            'preview_image_url',
-            'alt_text',
-            'type',
-            'width',
-            'height',
-            'duration_ms',
-            'variants'
-          ],
-          expansions: [
-            'author_id',
-            'attachments.media_keys',
-            'attachments.poll_ids',
-            'entities.mentions.username',
-            'referenced_tweets.id',
-            'referenced_tweets.id.author_id'
-          ]
-        })
-      );
-
-      // Get the first page of tweets
-      const page = await paginator.fetchNext();
-      const tweets: TweetV2[] = Array.isArray(page.data) ? page.data : [];
-      const meta = page.meta;
-
-      if (!tweets?.length) {
-        console.error('[Cron] No tweets found:', {
-          username,
-          query,
-          meta,
-          timestamp: new Date().toISOString(),
-          durationMs: Date.now() - startTime,
-          step: 'no-tweets'
-        });
-        return new NextResponse('No tweets found', { status: 404 });
-      }
-
-      console.log('[Cron] Recent tweets fetched:', {
-        count: tweets.length,
-        firstTweetId: tweets[0]?.id,
-        lastTweetId: tweets[tweets.length - 1]?.id,
-        meta,
+    // Check if we can make the request
+    const canMakeReq = await canMakeRequest('tweets/search/recent');
+    if (!canMakeReq) {
+      const rateLimit = await getRateLimit('tweets/search/recent');
+      const resetAt = new Date(rateLimit.resetAt);
+      
+      console.log('[Twitter API] Rate limited, returning 429:', {
+        endpoint: 'tweets/search/recent',
+        resetAt: resetAt.toISOString(),
+        remaining: rateLimit.remaining,
         timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'tweets-fetched'
+        step: 'rate-limited'
       });
 
-      // Cache the tweets
-      const cache = await cacheTweets(tweets);
-      console.log('[Cron] Tweets cached:', {
-        cacheId: cache.id,
-        tweetCount: tweets.length,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'tweets-cached'
-      });
-
-      // Get cached tweets to verify
-      const cachedTweets = await getCachedTweets();
-      if (!cachedTweets.tweets?.length) {
-        console.error('[Cron] Failed to verify cached tweets:', {
-          timestamp: new Date().toISOString(),
-          durationMs: Date.now() - startTime,
-          step: 'verify-cached'
-        });
-        return new Response('Failed to verify cached tweets', { status: 500 });
-      }
-
-      // Select random tweets with improved entity handling
-      const tweetsWithEntities = tweets.filter(tweet => 
-        tweet.entities?.urls?.length || 
-        tweet.attachments?.media_keys?.length
-      );
-      
-      // If we don't have enough tweets with entities, include tweets without entities
-      const tweetPool = tweetsWithEntities.length >= SELECTED_TWEET_COUNT 
-        ? tweetsWithEntities 
-        : tweets;
-      
-      const tweetIds = tweetPool.map(t => t.id);
-      console.log('[Cron] Tweet selection pool:', {
-        totalTweets: tweets.length,
-        withEntities: tweetsWithEntities.length,
-        poolSize: tweetIds.length,
-        timestamp: new Date().toISOString(),
-        step: 'selection-pool'
-      });
-      
-      const selectedCount = Math.min(SELECTED_TWEET_COUNT, tweetIds.length);
-      const selectedIds: string[] = [];
-      
-      while (selectedIds.length < selectedCount) {
-        const randomIndex = Math.floor(Math.random() * tweetIds.length);
-        const id = tweetIds[randomIndex];
-        if (!selectedIds.includes(id)) {
-          selectedIds.push(id);
-        }
-      }
-
-      console.log('[Cron] Selected random tweets:', {
-        selectedCount,
-        selectedIds,
-        withEntities: selectedIds
-          .filter(id => tweetsWithEntities.some(t => t.id === id))
-          .length,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'tweets-selected'
-      });
-
-      // Update selected tweets
-      const selectedCache = await updateSelectedTweets(selectedIds);
-      
-      console.log('[Cron] Selected tweets updated:', {
-        selectedCacheId: selectedCache.id,
-        selectedIds,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'complete'
-      });
-      
       return NextResponse.json({
-        message: 'Tweets fetched and cached successfully',
-        tweetCount: tweets.length,
-        selectedCount: selectedIds.length
-      });
-
-    } catch (searchError) {
-      console.error('[Cron] Search error:', {
-        error: searchError instanceof Error ? searchError.message : 'Unknown error',
-        stack: searchError instanceof Error ? searchError.stack : undefined,
-        query,
-        username,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'search-error'
-      });
-      
-      if (searchError instanceof ApiResponseError) {
-        console.error('[Cron] Twitter API error details:', {
-          code: searchError.code,
-          data: searchError.data,
-          rateLimit: searchError.rateLimit,
-          headers: searchError.headers
-        });
-      }
-      
-      throw searchError;
+        status: 'rate_limited',
+        resetAt: resetAt.toISOString(),
+        message: 'Rate limit exceeded, try again after reset time'
+      }, { status: 429 });
     }
+
+    // Make the API request
+    console.log('[Twitter API] Making search request:', {
+      query,
+      timestamp: new Date().toISOString(),
+      step: 'search-start'
+    });
+
+    const response = await client.search(query, {
+      max_results: MAX_TWEETS,
+      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
+      'user.fields': ['profile_image_url', 'username'],
+      'media.fields': [
+        'url',
+        'preview_image_url',
+        'alt_text',
+        'type',
+        'width',
+        'height',
+        'duration_ms',
+        'variants'
+      ],
+      expansions: [
+        'author_id',
+        'attachments.media_keys',
+        'attachments.poll_ids',
+        'entities.mentions.username',
+        'referenced_tweets.id',
+        'referenced_tweets.id.author_id'
+      ]
+    });
+
+    // Get tweets from the response
+    const tweets = response.data.data;
+    if (!tweets?.length) {
+      console.log('[Twitter API] No tweets found:', {
+        timestamp: new Date().toISOString(),
+        step: 'no-tweets'
+      });
+      return NextResponse.json({ 
+        status: 'success',
+        tweetCount: 0
+      });
+    }
+
+    // Update rate limit after successful request
+    if (response.rateLimit) {
+      const remainingRequests = parseInt(response.rateLimit.remaining.toString());
+      const rateLimitReset = new Date(parseInt(response.rateLimit.reset.toString()) * 1000);
+
+      await updateRateLimit('tweets/search/recent', rateLimitReset, remainingRequests);
+
+      console.log('[Twitter API] Updated rate limits:', {
+        endpoint: 'tweets/search/recent',
+        remaining: remainingRequests,
+        resetAt: rateLimitReset.toISOString(),
+        timestamp: new Date().toISOString(),
+        step: 'rate-limit-update'
+      });
+    }
+
+    console.log('[Twitter API] Search complete:', {
+      tweetCount: tweets.length,
+      timestamp: new Date().toISOString(),
+      step: 'search-complete'
+    });
+
+    // Cache the tweets
+    await cacheTweets(tweets, 'current', response.includes);
+
+    return NextResponse.json({
+      status: 'success',
+      tweetCount: tweets.length
+    });
+
   } catch (error) {
-    console.error('[Cron] Job failed:', {
+    console.error('[Cron] Error fetching tweets:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      executionTimeMs: Date.now() - startTime,
-      step: 'error',
       timestamp: new Date().toISOString()
     });
-    
-    return new NextResponse(
-      error instanceof Error ? error.message : 'Internal Server Error',
-      { status: 500 }
-    );
+
+    // Handle rate limit errors specifically
+    if (error instanceof ApiResponseError && error.code === 429) {
+      const resetAt = error.rateLimit?.reset 
+        ? new Date(parseInt(error.rateLimit.reset.toString()) * 1000)
+        : new Date(Date.now() + 15 * 60 * 1000); // Default to 15 minutes if no reset time
+
+      await updateRateLimit('tweets/search/recent', resetAt, 0);
+
+      return NextResponse.json({
+        status: 'rate_limited',
+        resetAt: resetAt.toISOString(),
+        message: 'Rate limit exceeded from API response'
+      }, { status: 429 });
+    }
+
+    return NextResponse.json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 } 
 
