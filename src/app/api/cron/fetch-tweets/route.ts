@@ -88,13 +88,13 @@ export async function GET(request: Request) {
     // Get Twitter client
     const client = await getReadOnlyClient();
     
-    console.log('[Cron] Client initialized, fetching user...', {
+    console.log('[Cron] Client initialized, preparing search...', {
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
       step: 'client-ready'
     });
 
-    // Get user info
+    // Get user info for query
     const username = env.TWITTER_USERNAME?.replace('@', '');
     if (!username) {
       console.error('[Cron] Twitter username not configured:', {
@@ -105,57 +105,34 @@ export async function GET(request: Request) {
       return new NextResponse('Twitter username not configured', { status: 500 });
     }
 
-    // Get user data with rate limit handling
-    const user = await executeWithRateLimit(
-      'users/by/username',
-      { username },
-      () => client.userByUsername(username)
-    );
+    // Construct search query for user's tweets, excluding replies and retweets
+    const query = `from:${username} -is:reply -is:retweet`;
 
-    if (!user.data) {
-      console.error('[Cron] User not found:', {
-        username,
-        timestamp: new Date().toISOString(),
-        durationMs: Date.now() - startTime,
-        step: 'user-not-found'
-      });
-      return new NextResponse('User not found', { status: 404 });
-    }
-
-    console.log('[Cron] User found, fetching timeline...', {
-      userId: user.data.id,
-      username: user.data.username,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'user-found'
-    });
-
-    // Fetch tweets with rate limit handling
+    // Fetch tweets with rate limit handling using recent search
     const tweets = await executeWithRateLimit(
-      'users/:id/tweets',
+      'tweets/search/recent',
       {
-        userId: user.data.id,
-        exclude: ['retweets', 'replies'],
-        expansions: ['author_id', 'attachments.media_keys'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+        query,
+        max_results: 50,
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
         'user.fields': ['profile_image_url', 'username'],
         'media.fields': ['url', 'preview_image_url', 'alt_text'],
-        max_results: 100
+        expansions: ['author_id', 'attachments.media_keys']
       },
-      () => client.userTimeline(user.data.id, {
-        exclude: ['retweets', 'replies'],
-        expansions: ['author_id', 'attachments.media_keys'],
-        'tweet.fields': ['created_at', 'public_metrics', 'entities'],
+      () => client.get('tweets/search/recent', {
+        query,
+        max_results: 50,
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
         'user.fields': ['profile_image_url', 'username'],
         'media.fields': ['url', 'preview_image_url', 'alt_text'],
-        max_results: 100
+        expansions: ['author_id', 'attachments.media_keys']
       })
     );
 
-    if (!tweets.data?.data?.length) {
+    if (!tweets.data?.length) {
       console.error('[Cron] No tweets found:', {
         username,
-        userId: user.data.id,
+        query,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
         step: 'no-tweets'
@@ -163,20 +140,20 @@ export async function GET(request: Request) {
       return new NextResponse('No tweets found', { status: 404 });
     }
 
-    console.log('[Cron] Timeline fetched:', {
-      count: tweets.data.data.length,
-      firstTweetId: tweets.data.data[0].id,
-      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id,
+    console.log('[Cron] Recent tweets fetched:', {
+      count: tweets.data.length,
+      firstTweetId: tweets.data[0].id,
+      lastTweetId: tweets.data[tweets.data.length - 1].id,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
       step: 'tweets-fetched'
     });
 
     // Cache the tweets
-    const cache = await cacheTweets(tweets.data.data);
+    const cache = await cacheTweets(tweets.data);
     console.log('[Cron] Tweets cached:', {
       cacheId: cache.id,
-      tweetCount: tweets.data.data.length,
+      tweetCount: tweets.data.length,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
       step: 'tweets-cached'
@@ -194,7 +171,7 @@ export async function GET(request: Request) {
     }
 
     // Select random tweets
-    const tweetIds = tweets.data.data.map(t => t.id);
+    const tweetIds = tweets.data.map((t: TweetV2) => t.id);
     const selectedCount = Math.min(3, tweetIds.length);
     const selectedIds: string[] = [];
     
@@ -227,7 +204,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       message: 'Tweets fetched and cached successfully',
-      tweetCount: tweets.data.data.length,
+      tweetCount: tweets.data.length,
       selectedCount: selectedIds.length
     });
   } catch (error) {
