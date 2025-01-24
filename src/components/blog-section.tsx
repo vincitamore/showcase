@@ -624,81 +624,88 @@ const BlogSection = () => {
               dragFree: false
             }}
           >
-            <div className="grid grid-flow-col auto-cols-[100%] sm:auto-cols-[50%] lg:auto-cols-[33%] gap-4 sm:gap-6">
+            <div className="flex gap-4 sm:gap-6">
               {tweets.map((tweet, index) => (
-                <Card3D
-                  key={tweet.id}
-                  onClick={() => handleCardClick(tweet.id)}
+                <div 
+                  key={tweet.id} 
                   className={cn(
-                    "group cursor-pointer",
-                    "p-3 sm:p-6",
-                    "mx-1.5",
-                    "w-[calc(100%-1rem)] sm:w-[calc(100%-1.5rem)]",
-                    "max-w-[28rem]",
-                    "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+                    "flex-[0_0_auto] min-w-0",
+                    "w-[calc(100vw-4rem)] sm:w-[calc(50vw-4rem)] lg:w-[calc(33.333vw-4rem)]",
+                    "max-w-[28rem]"
                   )}
-                  containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
                 >
-                  <div className="flex flex-col h-full">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <Image
-                          src={profileConfig.profileImage}
-                          alt={profileConfig.username}
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                          unoptimized
-                        />
-                        <div>
-                          <p className="font-medium text-sm">{profileConfig.displayName}</p>
-                          <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
+                  <Card3D
+                    onClick={() => handleCardClick(tweet.id)}
+                    className={cn(
+                      "group cursor-pointer",
+                      "p-3 sm:p-6",
+                      "mx-1.5",
+                      "w-full",
+                      "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+                    )}
+                    containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
+                  >
+                    <div className="flex flex-col h-full">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={profileConfig.profileImage}
+                            alt={profileConfig.username}
+                            width={40}
+                            height={40}
+                            className="rounded-full"
+                            unoptimized
+                          />
+                          <div>
+                            <p className="font-medium text-sm">{profileConfig.displayName}</p>
+                            <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
+                          </div>
                         </div>
-                      </div>
-                      <span 
-                        className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleCardClick(tweet.id)
-                        }}
-                      >
-                        𝕏
-                      </span>
-                    </div>
-                    {renderTweetText(tweet)}
-                    {tweet.referenced_tweets?.map((ref) => (
-                      <div 
-                        key={ref.id}
-                        className="mb-4 rounded-lg border border-border/50 overflow-hidden"
-                      >
-                        <blockquote 
-                          className="twitter-tweet" 
-                          data-conversation="none"
-                          data-theme="dark"
+                        <span 
+                          className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCardClick(tweet.id)
+                          }}
                         >
-                          <a href={`https://twitter.com/x/status/${ref.id}`}></a>
-                        </blockquote>
+                          𝕏
+                        </span>
                       </div>
-                    ))}
-                    <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
-                      </span>
-                      <time className="ml-auto">
-                        {tweet.created_at 
-                          ? new Date(tweet.created_at).toLocaleDateString()
-                          : 'Just now'
-                        }
-                      </time>
+                      {renderTweetText(tweet)}
+                      {tweet.referenced_tweets?.map((ref) => (
+                        <div 
+                          key={ref.id}
+                          className="mb-4 rounded-lg border border-border/50 overflow-hidden"
+                        >
+                          <blockquote 
+                            className="twitter-tweet" 
+                            data-conversation="none"
+                            data-theme="dark"
+                          >
+                            <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                          </blockquote>
+                        </div>
+                      ))}
+                      <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
+                        </span>
+                        <time className="ml-auto">
+                          {tweet.created_at 
+                            ? new Date(tweet.created_at).toLocaleDateString()
+                            : 'Just now'
+                          }
+                        </time>
+                      </div>
                     </div>
-                  </div>
-                </Card3D>
+                  </Card3D>
+                </div>
               ))}
             </div>
           </Carousel>
