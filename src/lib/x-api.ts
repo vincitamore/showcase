@@ -185,7 +185,7 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
   return true;
 }
 
-// Initialize read-only client for public data
+// Initialize read-only client for fetching tweets
 export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
   return new TwitterApi({
@@ -200,49 +200,33 @@ export async function getReadOnlyClient() {
 export async function executeWithRateLimit<T>(
   endpoint: string,
   params: Record<string, any>,
-  apiCall: () => Promise<T>
+  request: () => Promise<T>
 ): Promise<T> {
   const startTime = Date.now();
-  
+
+  console.log('[Twitter API] Starting rate limit check:', {
+    endpoint,
+    params,
+    timestamp: new Date().toISOString(),
+    step: 'pre-check'
+  });
+
+  // Check if we can make the request
+  const canProceed = await getRateLimit(endpoint);
+
+  console.log('[Twitter API] Rate limit check result:', {
+    endpoint,
+    canProceed,
+    checkDurationMs: Date.now() - startTime,
+    timestamp: new Date().toISOString(),
+    step: 'post-check'
+  });
+
+  if (!canProceed) {
+    throw new Error(`Rate limit exceeded for ${endpoint}`);
+  }
+
   try {
-    console.log('[Twitter API] Starting rate limit check:', {
-      endpoint,
-      params,
-      timestamp: new Date().toISOString(),
-      step: 'pre-check'
-    });
-
-    // Check if we can make the request
-    const canProceed = await canMakeRequest(endpoint);
-    
-    console.log('[Twitter API] Rate limit check result:', {
-      endpoint,
-      canProceed,
-      checkDurationMs: Date.now() - startTime,
-      timestamp: new Date().toISOString(),
-      step: 'post-check'
-    });
-
-    if (!canProceed) {
-      const rateLimit = await getRateLimit(endpoint);
-      const now = new Date();
-      const resetAt = rateLimit?.resetAt ? new Date(rateLimit.resetAt) : new Date(now.getTime() + RATE_LIMIT_WINDOW);
-      const waitTime = Math.ceil((resetAt.getTime() - now.getTime()) / 1000);
-      
-      console.error('[Twitter API] Rate limit check failed:', {
-        endpoint,
-        remaining: rateLimit?.remaining ?? 'unknown',
-        resetAt: resetAt.toISOString(),
-        waitTime: `${waitTime}s`,
-        params,
-        checkDurationMs: Date.now() - startTime,
-        step: 'rate-limited'
-      });
-      
-      throw new Error(`Rate limit exceeded for ${endpoint}. Reset in ${waitTime} seconds.`);
-    }
-
-    // Log request attempt
     console.log('[Twitter API] Making request:', {
       endpoint,
       params,
@@ -251,110 +235,54 @@ export async function executeWithRateLimit<T>(
       step: 'pre-request'
     });
 
-    // Make the API call
-    const response = await apiCall();
+    const response = await request();
 
-    console.log('[Twitter API] Request completed:', {
-      endpoint,
-      success: true,
-      totalDurationMs: Date.now() - startTime,
-      step: 'post-request'
-    });
+    // Update rate limit info from response headers
+    const headers = (response as any)._headers;
+    if (headers) {
+      const remaining = parseInt(headers.get('x-rate-limit-remaining') || '0');
+      const resetTime = parseInt(headers.get('x-rate-limit-reset') || '0') * 1000;
+      
+      await updateRateLimit(endpoint, new Date(resetTime), remaining);
 
-    // Handle rate limit headers if response is from Twitter API
-    if (response && typeof response === 'object' && '_headers' in response) {
-      const headers = (response as any)._headers;
-      const rateLimitRemaining = headers?.['x-rate-limit-remaining'];
-      const rateLimitReset = headers?.['x-rate-limit-reset'];
-      const rateLimitLimit = headers?.['x-rate-limit-limit'];
-
-      console.log('[Twitter API] Response headers:', {
+      console.log('[Twitter API] Rate limit updated:', {
         endpoint,
-        headers: {
-          remaining: rateLimitRemaining,
-          reset: rateLimitReset,
-          limit: rateLimitLimit
-        },
-        totalDurationMs: Date.now() - startTime,
-        step: 'headers-check'
+        remaining,
+        resetTime: new Date(resetTime).toISOString(),
+        timestamp: new Date().toISOString(),
+        requestDurationMs: Date.now() - startTime,
+        step: 'rate-limit-updated'
       });
-
-      if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
-        const remaining = parseInt(rateLimitRemaining);
-        const resetTime = new Date(parseInt(rateLimitReset) * 1000);
-
-        console.log('[Twitter API] Updating rate limit:', {
-          endpoint,
-          remaining,
-          resetTime: resetTime.toISOString(),
-          totalDurationMs: Date.now() - startTime,
-          step: 'rate-limit-update'
-        });
-
-        await updateRateLimit(endpoint, resetTime, remaining);
-      }
     }
 
     return response;
   } catch (error) {
-    const errorTime = Date.now();
-    
-    // Handle Twitter API errors
-    if (error instanceof ApiResponseError) {
-      // Extract rate limit info from error response if available
-      const response = error.response as any;
-      if (response?._headers) {
-        const rateLimitRemaining = response._headers['x-rate-limit-remaining'];
-        const rateLimitReset = response._headers['x-rate-limit-reset'];
-        const rateLimitLimit = response._headers['x-rate-limit-limit'];
+    // Handle rate limit errors
+    const headers = (error as any)?.response?.headers;
+    if (headers) {
+      const remaining = parseInt(headers.get('x-rate-limit-remaining') || '0');
+      const resetTime = parseInt(headers.get('x-rate-limit-reset') || '0') * 1000;
+      
+      await updateRateLimit(endpoint, new Date(resetTime), remaining);
 
-        console.error('[Twitter API] Rate limit error details:', {
-          endpoint,
-          status: response.status,
-          headers: {
-            remaining: rateLimitRemaining,
-            reset: rateLimitReset,
-            limit: rateLimitLimit
-          },
-          data: response.data,
-          errorDurationMs: errorTime - startTime,
-          step: 'api-error'
-        });
-
-        if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
-          const remaining = parseInt(rateLimitRemaining);
-          const resetTime = new Date(parseInt(rateLimitReset) * 1000);
-          
-          console.log('[Twitter API] Updating rate limit from error:', {
-            endpoint,
-            remaining,
-            resetTime: resetTime.toISOString(),
-            errorDurationMs: errorTime - startTime,
-            step: 'error-rate-limit-update'
-          });
-          
-          await updateRateLimit(endpoint, resetTime, remaining);
-        }
-      } else {
-        console.error('[Twitter API] Error response without headers:', {
-          endpoint,
-          status: error.code,
-          message: error.message,
-          data: error.data,
-          errorDurationMs: errorTime - startTime,
-          step: 'error-no-headers'
-        });
-      }
-    } else {
-      console.error('[Twitter API] Non-API error:', {
+      console.log('[Twitter API] Rate limit updated from error:', {
         endpoint,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        errorDurationMs: errorTime - startTime,
-        step: 'non-api-error'
+        remaining,
+        resetTime: new Date(resetTime).toISOString(),
+        timestamp: new Date().toISOString(),
+        errorDurationMs: Date.now() - startTime,
+        step: 'rate-limit-error'
+      });
+    } else {
+      console.log('[Twitter API] Error response without headers:', {
+        endpoint,
+        status: (error as any)?.response?.status,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        data: (error as any)?.response?.data,
+        errorDurationMs: Date.now() - startTime,
+        step: 'error-no-headers'
       });
     }
-
     throw error;
   }
 }
@@ -400,18 +328,14 @@ export const fetchTechTweets = async (username: string) => {
   const cleanUsername = username.replace('@', '');
   
   const client = await getReadOnlyClient();
-  const user = await client.userByUsername(cleanUsername);
   
-  if (!user.data) {
-    throw new Error('User not found');
-  }
-
-  const tweets = await client.userTimeline(user.data.id, {
-    exclude: ['retweets'],  // Only exclude retweets, allow replies
+  // Use search endpoint instead of user lookup
+  const tweets = await client.get('tweets/search/recent', {
+    query: `from:${cleanUsername} -is:retweet`,
     expansions: ['author_id', 'attachments.media_keys'],
     'tweet.fields': ['created_at', 'text', 'public_metrics'],
     'user.fields': ['profile_image_url', 'username'],
-    max_results: 10,
+    max_results: 50,
   });
   
   return tweets.data;
