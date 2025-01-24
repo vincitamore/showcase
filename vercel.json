@@ -9,5 +9,5 @@
     "path": "/api/cron/fetch-tweets",
     "schedule": "*/5 * * * *"
   }],
-  "buildCommand": "bash -c 'if [ -n \"$NEXT_PUBLIC_URL\" ] && [ -n \"$CRON_SECRET\" ]; then curl -X GET -H \"Authorization: Bearer $CRON_SECRET\" \"$NEXT_PUBLIC_URL/api/init/fetch-tweets\"; fi && next build'"
+  "buildCommand": "next build"
 } 

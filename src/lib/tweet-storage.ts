@@ -10,6 +10,13 @@ export const CACHE_TYPES = {
   SELECTED: 'selected'
 } as const
 
+// Default rate limits per endpoint (requests per 15 minutes)
+export const DEFAULT_RATE_LIMITS = {
+  'users/by/username': 900,
+  'users/:id/tweets': 1500,
+  'default': 100
+} as const
+
 type CacheType = (typeof CACHE_TYPES)[keyof typeof CACHE_TYPES]
 
 // Helper function to safely convert to Prisma JSON
@@ -306,12 +313,38 @@ export async function getRateLimit(endpoint: string) {
       step: 'post-fetch-found'
     });
   } else {
-    console.log('[Twitter Storage] No rate limit found:', {
+    // Create default rate limit if none exists
+    const defaultLimit = DEFAULT_RATE_LIMITS[endpoint as keyof typeof DEFAULT_RATE_LIMITS] || DEFAULT_RATE_LIMITS.default;
+    const now = new Date();
+    const resetAt = new Date(now.getTime() + FIFTEEN_MINUTES);
+    
+    console.log('[Twitter Storage] Creating default rate limit:', {
       endpoint,
+      defaultLimit,
+      resetAt: resetAt.toISOString(),
+      timestamp: now.toISOString(),
+      durationMs: Date.now() - startTime,
+      step: 'creating-default'
+    });
+
+    const newLimit = await (prisma as any).twitterRateLimit.create({
+      data: {
+        endpoint,
+        resetAt,
+        remaining: defaultLimit
+      }
+    });
+
+    console.log('[Twitter Storage] Created default rate limit:', {
+      endpoint,
+      resetAt: toSafeISOString(newLimit.resetAt),
+      remaining: newLimit.remaining,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
-      step: 'post-fetch-empty'
+      step: 'post-fetch-created'
     });
+
+    return newLimit;
   }
 
   return rateLimit;
