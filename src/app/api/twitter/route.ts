@@ -5,7 +5,8 @@ import {
   cacheTweets,
   getRateLimitTimestamp,
   updateRateLimitTimestamp,
-  canMakeRequest 
+  canMakeRequest,
+  FIFTEEN_MINUTES
 } from '@/lib/blob-storage';
 
 async function searchRecentTweets(client: any) {
@@ -58,7 +59,19 @@ export async function GET(request: Request) {
     console.log('Twitter API Request:', { action, username });
 
     if (!action) {
-      return NextResponse.json({ error: 'Action is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing action parameter' }, { status: 400 });
+    }
+
+    // Check rate limit
+    const lastRequestTime = await getRateLimitTimestamp();
+    const now = Date.now();
+    if (!canMakeRequest(now)) {
+      console.log('Rate limit in effect, waiting for timeout');
+      return NextResponse.json({ 
+        error: 'Rate limit exceeded',
+        lastRequest: lastRequestTime ? new Date(lastRequestTime).toISOString() : 'never',
+        nextRequest: lastRequestTime ? new Date(lastRequestTime + FIFTEEN_MINUTES).toISOString() : undefined
+      }, { status: 429 });
     }
 
     switch (action) {
@@ -70,13 +83,6 @@ export async function GET(request: Request) {
         if (cachedTweets.length > 0) {
           console.log('Returning cached tweets, count:', cachedTweets.length);
           return NextResponse.json({ tweets: cachedTweets });
-        }
-
-        // Check rate limit
-        const lastRequestTime = await getRateLimitTimestamp();
-        if (!canMakeRequest(lastRequestTime)) {
-          console.log('Rate limit in effect, waiting for timeout');
-          return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
         }
 
         // Make new request

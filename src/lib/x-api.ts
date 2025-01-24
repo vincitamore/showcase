@@ -9,7 +9,7 @@ import {
 // Rate limit configuration
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // 1 second
+const BASE_RETRY_DELAY = 15000; // 15 seconds base delay
 
 interface RateLimitInfo {
   reset: number;
@@ -130,8 +130,9 @@ async function executeWithRateLimit<T>(
     return result;
   } catch (error: any) {
     if (error?.data?.status === 429 && retryCount < MAX_RETRIES) {
-      const delay = RETRY_DELAY * Math.pow(2, retryCount);
-      console.log(`[Twitter API] Rate limited, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      // Exponential backoff with jitter
+      const delay = BASE_RETRY_DELAY * Math.pow(2, retryCount) * (0.5 + Math.random());
+      console.log(`[Twitter API] Rate limited, retrying in ${Math.round(delay)}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return executeWithRateLimit(endpoint, operation, retryCount + 1);
     }
@@ -356,38 +357,31 @@ export async function getReadOnlyClient(): Promise<TwitterApiv2> {
 
   // Check if we can make a request based on rate limit
   const now = Date.now();
-  const canRequest = await canMakeRequest(now);
-  const lastUpdate = await getRateLimitTimestamp() ?? 0; // Default to 0 if null
+  const lastUpdate = await getRateLimitTimestamp();
   
   // Calculate time windows
   const minutesSinceLastUpdate = lastUpdate ? Math.floor((now - lastUpdate) / (60 * 1000)) : Infinity;
-  const withinRateLimit = lastUpdate && (now - lastUpdate) < RATE_LIMIT_WINDOW;
-  const timeUntilReset = lastUpdate ? Math.round((lastUpdate + RATE_LIMIT_WINDOW - now) / 1000) : 0;
+  const withinRateLimit = lastUpdate ? (now - lastUpdate) < RATE_LIMIT_WINDOW : false;
+  const timeUntilReset = lastUpdate ? Math.max(0, (lastUpdate + RATE_LIMIT_WINDOW - now) / 1000) : 0;
   
   console.log('[Twitter API] Rate limit evaluation:', {
-    canRequest,
-    lastUpdate,
+    lastUpdate: lastUpdate ?? 'none',
     lastUpdateDate: lastUpdate ? new Date(lastUpdate).toISOString() : 'never',
     minutesSinceLastUpdate,
     withinRateLimit,
-    timeUntilReset: timeUntilReset + 's',
+    timeUntilReset: Math.round(timeUntilReset) + 's',
     rateLimitWindow: RATE_LIMIT_WINDOW / 1000 + 's',
     now: new Date(now).toISOString()
   });
 
-  // We should only block requests if:
-  // 1. canRequest is false AND
-  // 2. we're within the rate limit window AND
-  // 3. we have a valid last update timestamp
-  if (!canRequest && withinRateLimit && lastUpdate > 0) {
+  // Block requests if we're within the rate limit window and have a valid last update
+  if (withinRateLimit && lastUpdate && lastUpdate > 0) {
     console.log('[Twitter API] Rate limit check failed:', {
-      reason: 'Local rate limit check',
-      canRequest,
-      withinRateLimit,
+      reason: 'Within rate limit window',
       minutesSinceLastUpdate,
-      timeUntilReset: timeUntilReset + 's'
+      timeUntilReset: Math.round(timeUntilReset) + 's'
     });
-    throw new Error('Local rate limit check failed during client initialization');
+    throw new Error('Rate limit window active');
   }
 
   const apiKey = process.env.TWITTER_API_KEY?.trim();

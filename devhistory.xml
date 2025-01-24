@@ -7,6 +7,23 @@
     </meta>
 
     <history-entries>
+        <entry id="2024-01-21-05" scope="enhancement" type="refactor">
+            <title>Tweet Cache System Migration</title>
+            <changes>
+                <change>Implemented two-file rotation system for tweet caching</change>
+                <change>Added migration function to handle transition from old to new cache format</change>
+                <change>Enhanced error handling and logging in cache operations</change>
+                <change>Fixed issues with cache file detection and rotation</change>
+                <change>Improved storage cleanup and management</change>
+            </changes>
+            <files-affected>
+                <file>src/lib/blob-storage.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="tweet-content-handling"/>
+            </related-entries>
+        </entry>
+
         <entry id="2024-01-21-04" scope="enhancement" type="feature">
             <title>Comprehensive Tweet Content Processing</title>
             <changes>

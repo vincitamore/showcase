@@ -34,14 +34,15 @@ interface BlobInfo {
 
 // Helper function to check if a tweet has entities with URLs
 function hasTweetEntities(tweet: TweetV2): boolean {
-  // Log the full entities structure for debugging
-  console.log('[Twitter] Checking entities for tweet:', {
-    id: tweet.id,
-    hasEntities: !!tweet.entities,
-    entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
-    urlCount: tweet.entities?.urls?.length || 0,
-    fullEntities: tweet.entities
-  });
+  // Only log full entities in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Twitter] Checking entities for tweet:', {
+      id: tweet.id,
+      hasEntities: !!tweet.entities,
+      entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+      urlCount: tweet.entities?.urls?.length || 0
+    });
+  }
 
   // Check for any type of entity, not just URLs
   if (!tweet.entities) return false;
@@ -55,16 +56,18 @@ function hasTweetEntities(tweet: TweetV2): boolean {
 
   const hasAnyEntity = hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
 
-  // Log detailed entity presence
-  console.log('[Twitter] Entity detection result:', {
-    id: tweet.id,
-    hasUrls,
-    hasMentions,
-    hasHashtags,
-    hasAnnotations,
-    hasCashtags,
-    hasAnyEntity
-  });
+  // Only log detailed entity presence in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Twitter] Entity detection result:', {
+      id: tweet.id,
+      hasUrls,
+      hasMentions,
+      hasHashtags,
+      hasAnnotations,
+      hasCashtags,
+      hasAnyEntity
+    });
+  }
 
   return hasAnyEntity;
 }
@@ -340,7 +343,7 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
     console.log('Parsed rate limit timestamp:', {
       timestamp,
       date: new Date(timestamp).toISOString(),
-      minutesAgo: Math.round((Date.now() - timestamp) / (60 * 1000))
+      age: Math.round((Date.now() - timestamp) / 1000) + 's'
     });
     
     return timestamp;
@@ -352,14 +355,28 @@ export async function getRateLimitTimestamp(): Promise<number | null> {
 
 export async function updateRateLimitTimestamp(): Promise<void> {
   try {
-    const timestamp = Date.now().toString();
-    await put(RATE_LIMIT_FILE, timestamp, {
+    const now = Date.now();
+    
+    // Delete any existing timestamp file
+    const { blobs } = await list({ prefix: RATE_LIMIT_FILE });
+    if (blobs.length > 0) {
+      await del(blobs[0].url);
+    }
+    
+    // Store new timestamp
+    await put(RATE_LIMIT_FILE, now.toString(), {
+      contentType: 'text/plain',
       access: 'public',
-      addRandomSuffix: false,
+      addRandomSuffix: false
     });
-    console.log('Updated rate limit timestamp:', new Date(parseInt(timestamp)).toISOString());
+    
+    console.log('Updated rate limit timestamp:', {
+      timestamp: now,
+      date: new Date(now).toISOString()
+    });
   } catch (error) {
     console.error('Error updating rate limit timestamp:', error);
+    throw error;
   }
 }
 
@@ -491,9 +508,30 @@ function getRandomItems<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-export async function canMakeRequest(lastTimestamp: number | null): Promise<boolean> {
-  if (!lastTimestamp) return true;
-  return Date.now() - lastTimestamp >= FIFTEEN_MINUTES;
+export async function canMakeRequest(now: number): Promise<boolean> {
+  try {
+    const lastTimestamp = await getRateLimitTimestamp();
+    if (!lastTimestamp) {
+      console.log('No previous request timestamp found, allowing request');
+      return true;
+    }
+    
+    const minutesSinceLastRequest = Math.floor((now - lastTimestamp) / (60 * 1000));
+    const withinRateLimit = (now - lastTimestamp) < FIFTEEN_MINUTES;
+    
+    console.log('Rate limit check:', {
+      lastTimestamp,
+      lastRequestDate: new Date(lastTimestamp).toISOString(),
+      minutesSinceLastRequest,
+      withinRateLimit,
+      timeUntilReset: Math.max(0, Math.round((lastTimestamp + FIFTEEN_MINUTES - now) / 1000)) + 's'
+    });
+    
+    return !withinRateLimit;
+  } catch (error) {
+    console.error('Error checking rate limit:', error);
+    return false;
+  }
 }
 
 export async function searchBuildTweets(client: TwitterApi) {
