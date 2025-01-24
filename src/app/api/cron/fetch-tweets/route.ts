@@ -34,10 +34,10 @@ type TwitterSearchResponse = {
   };
   includes?: {
     users?: Array<{
-      id: string;
-      name: string;
-      username: string;
-      profile_image_url?: string;
+    id: string;
+    name: string;
+    username: string;
+    profile_image_url?: string;
     }>;
     media?: Array<{
       media_key: string;
@@ -171,8 +171,8 @@ export async function GET(request: Request) {
 
     console.log('[Cron] Recent tweets fetched:', {
       count: tweets.length,
-      firstTweetId: tweets[0].id,
-      lastTweetId: tweets[tweets.length - 1].id,
+      firstTweetId: tweets[0]?.id,
+      lastTweetId: tweets[tweets.length - 1]?.id,
       meta,
       timestamp: new Date().toISOString(),
       durationMs: Date.now() - startTime,
