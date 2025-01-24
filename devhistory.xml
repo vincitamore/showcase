@@ -185,6 +185,24 @@
             </related-entries>
             <impact>Improved tweet variety while maintaining quality standards</impact>
         </entry>
+
+        <entry id="2024-01-21-13" scope="enhancement" type="feature">
+            <title>Enhanced Tweet URL Handling and Carousel Size</title>
+            <changes>
+                <change>Added URL extraction from tweet text when entities are missing</change>
+                <change>Improved entity validation and logging</change>
+                <change>Increased carousel size from 4 to 7 tweets</change>
+                <change>Enhanced URL entity type safety</change>
+            </changes>
+            <files-affected>
+                <file>src/app/api/cron/fetch-tweets/route.ts</file>
+            </files-affected>
+            <related-entries>
+                <entry ref="2024-01-21-12">Increased tweet selection pool</entry>
+                <entry ref="2024-01-21-11">Tweet rotation system fix</entry>
+            </related-entries>
+            <impact>Improved URL detection and display variety</impact>
+        </entry>
     </history-entries>
 
     <tags>

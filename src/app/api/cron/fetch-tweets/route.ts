@@ -8,7 +8,23 @@ import {
   canMakeRequest,
   updateSelectedTweets
 } from '@/lib/blob-storage';
-import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, MediaObjectV2 } from 'twitter-api-v2';
+import { 
+  TwitterApiv2, 
+  TweetV2, 
+  TweetPublicMetricsV2, 
+  TweetEntitiesV2, 
+  TweetEntityUrlV2,
+  UserV2, 
+  MediaObjectV2 
+} from 'twitter-api-v2';
+
+type TweetEntities = {
+  urls: TweetEntityUrlV2[];
+  mentions: { start: number; end: number; username: string; id: string; }[];
+  hashtags: { start: number; end: number; tag: string; }[];
+  cashtags: { start: number; end: number; tag: string; }[];
+  annotations: { start: number; end: number; probability: number; type: string; normalized_text: string; }[];
+};
 
 interface TweetWithAuthor extends TweetV2 {
   author?: {
@@ -18,6 +34,7 @@ interface TweetWithAuthor extends TweetV2 {
     profile_image_url?: string;
   };
   media?: MediaObjectV2[];
+  entities: TweetEntities;
 }
 
 // Helper function to check if a tweet has any type of entity
@@ -86,7 +103,16 @@ function validateTweet(
       return null;
     }
 
-    // Create a clean copy of the tweet with empty entities
+    // Initialize entities with empty arrays and proper type assertion
+    const entities = {
+      urls: [] as TweetEntityUrlV2[],
+      mentions: [] as { start: number; end: number; username: string; id: string; }[],
+      hashtags: [] as { start: number; end: number; tag: string; }[],
+      cashtags: [] as { start: number; end: number; tag: string; }[],
+      annotations: [] as { start: number; end: number; probability: number; type: string; normalized_text: string; }[]
+    } satisfies TweetEntities;
+
+    // Create a clean copy of the tweet with initialized entities
     const cleanTweet: TweetWithAuthor = {
       id: tweet.id,
       text: tweet.text,
@@ -94,13 +120,7 @@ function validateTweet(
       public_metrics: tweet.public_metrics,
       created_at: '', // Initialize created_at
       author_id: tweet.author_id,
-      entities: {
-        urls: [],
-        mentions: [],
-        hashtags: [],
-        cashtags: [],
-        annotations: []
-      } as TweetEntitiesV2
+      entities
     };
 
     // Add author data if available
@@ -115,11 +135,48 @@ function validateTweet(
         .filter((media): media is MediaObjectV2 => !!media);
     }
 
+    // Extract URLs from tweet text if no entities exist
+    if (!tweet.entities?.urls || tweet.entities.urls.length === 0) {
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const matches = tweet.text.match(urlRegex);
+      
+      if (matches) {
+        cleanTweet.entities.urls = matches.map((url) => {
+          const start = tweet.text.indexOf(url);
+          return {
+            start,
+            end: start + url.length,
+            url,
+            expanded_url: url,
+            display_url: url.replace(/^https?:\/\//, ''),
+            unwound_url: url,
+            images: [],
+            status: '200',
+            title: '',
+            description: ''
+          } as TweetEntityUrlV2;
+        });
+        
+        logStatus('Extracted URLs from text', {
+          id: tweet.id,
+          urls: cleanTweet.entities.urls
+        });
+      }
+    } else if (tweet.entities?.urls) {
+      cleanTweet.entities.urls = tweet.entities.urls;
+    }
+
     // Log the full tweet structure for debugging
+    const entityTypes = Object.keys(cleanTweet.entities).filter(key => 
+      Array.isArray(cleanTweet.entities[key as keyof TweetEntities]) && 
+      cleanTweet.entities[key as keyof TweetEntities].length > 0
+    );
+
     logStatus('Validating tweet', {
       id: tweet.id,
-      hasEntities: !!tweet.entities,
-      entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
+      hasEntities: !!cleanTweet.entities && cleanTweet.entities.urls.length > 0,
+      entityTypes,
+      urlCount: cleanTweet.entities.urls.length,
       hasCreatedAt: !!tweet.created_at,
       hasAuthorId: !!tweet.author_id,
       hasAuthorData: !!cleanTweet.author,
@@ -127,144 +184,6 @@ function validateTweet(
       mediaCount: cleanTweet.media?.length || 0,
       fullTweet: tweet
     });
-
-    // Ensure required fields exist
-    if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
-      logStatus('Invalid tweet structure', {
-        id: tweet.id,
-        hasText: !!tweet.text,
-        hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids),
-        hasAuthorId: !!tweet.author_id
-      });
-      return null;
-    }
-
-    // Handle created_at - try multiple formats
-    if (tweet.created_at) {
-      try {
-        // First try parsing as ISO string
-        const date = new Date(tweet.created_at);
-        if (!isNaN(date.getTime())) {
-          cleanTweet.created_at = date.toISOString();
-        } else {
-          // Try parsing as a timestamp
-          const timestamp = parseInt(tweet.created_at);
-          if (!isNaN(timestamp)) {
-            const timestampDate = new Date(timestamp);
-            if (!isNaN(timestampDate.getTime())) {
-              cleanTweet.created_at = timestampDate.toISOString();
-            } else {
-              logStatus('Invalid timestamp in tweet', {
-                id: tweet.id,
-                date: tweet.created_at,
-                timestamp
-              });
-              // Set to current time as fallback
-              cleanTweet.created_at = new Date().toISOString();
-            }
-          } else {
-            logStatus('Invalid date format in tweet', {
-              id: tweet.id,
-              date: tweet.created_at
-            });
-            // Set to current time as fallback
-            cleanTweet.created_at = new Date().toISOString();
-          }
-        }
-      } catch (error) {
-        logStatus('Error parsing date for tweet', {
-          id: tweet.id,
-          date: tweet.created_at,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-        // Set to current time as fallback
-        cleanTweet.created_at = new Date().toISOString();
-      }
-    } else {
-      // If no created_at provided, use current time
-      cleanTweet.created_at = new Date().toISOString();
-      logStatus('No created_at found, using current time', {
-        id: tweet.id,
-        created_at: cleanTweet.created_at
-      });
-    }
-
-    // Handle entities
-    if (tweet.entities) {
-      try {
-        // Deep clone entities to avoid reference issues
-        const clonedEntities = JSON.parse(JSON.stringify(tweet.entities));
-        const entities = cleanTweet.entities as TweetEntitiesV2;
-        
-        // Validate and clean URLs
-        if (Array.isArray(clonedEntities.urls)) {
-          entities.urls = clonedEntities.urls.map((url: any) => ({
-            start: url.start || url.indices?.[0] || 0,
-            end: url.end || url.indices?.[1] || 0,
-            url: url.url || '',
-            expanded_url: url.expanded_url || url.url || '',
-            display_url: url.display_url || url.expanded_url || url.url || '',
-            title: url.title,
-            description: url.description,
-            unwound_url: url.unwound_url,
-            images: url.images?.map((img: any) => ({
-              url: img.url,
-              width: img.width || 0,
-              height: img.height || 0
-            }))
-          }));
-        }
-
-        // Copy other entity types if they exist
-        if (Array.isArray(clonedEntities.mentions)) {
-          entities.mentions = clonedEntities.mentions.map((mention: any) => ({
-            start: mention.start || mention.indices?.[0] || 0,
-            end: mention.end || mention.indices?.[1] || 0,
-            username: mention.username || '',
-            id: mention.id || ''
-          }));
-        }
-        if (Array.isArray(clonedEntities.hashtags)) {
-          entities.hashtags = clonedEntities.hashtags.map((hashtag: any) => ({
-            start: hashtag.start || hashtag.indices?.[0] || 0,
-            end: hashtag.end || hashtag.indices?.[1] || 0,
-            tag: hashtag.tag || hashtag.text || ''
-          }));
-        }
-        if (Array.isArray(clonedEntities.cashtags)) {
-          entities.cashtags = clonedEntities.cashtags.map((cashtag: any) => ({
-            start: cashtag.start || cashtag.indices?.[0] || 0,
-            end: cashtag.end || cashtag.indices?.[1] || 0,
-            tag: cashtag.tag || cashtag.text || ''
-          }));
-        }
-        if (Array.isArray(clonedEntities.annotations)) {
-          entities.annotations = clonedEntities.annotations.map((annotation: any) => ({
-            start: annotation.start || annotation.indices?.[0] || 0,
-            end: annotation.end || annotation.indices?.[1] || 0,
-            probability: annotation.probability || 0,
-            type: annotation.type || '',
-            normalized_text: annotation.normalized_text || ''
-          }));
-        }
-
-        // Log entity processing results
-        logStatus('Processed entities', {
-          id: tweet.id,
-          entityTypes: Object.keys(entities),
-          urlCount: entities.urls.length,
-          mentionCount: entities.mentions.length,
-          hashtagCount: entities.hashtags.length,
-          annotationCount: entities.annotations.length,
-          cashtagCount: entities.cashtags.length
-        });
-      } catch (error) {
-        logStatus('Error processing entities', {
-          id: tweet.id,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
 
     return cleanTweet;
   } catch (error) {
@@ -568,7 +487,7 @@ export async function GET(req: Request) {
 
     if (newTweets.length === 0) {
       logStatus('No new tweets fetched, using cache for rotation');
-      const selectedTweets = getRandomItems(currentTweets, 4);
+      const selectedTweets = getRandomItems(currentTweets, 7);
       await updateSelectedTweets(selectedTweets);
       
       return NextResponse.json({
@@ -617,7 +536,7 @@ export async function GET(req: Request) {
     });
 
     // Select new display tweets, prioritizing new tweets
-    const selectedTweets = getRandomItems([...validNewTweets, ...updatedTweets], 4);
+    const selectedTweets = getRandomItems([...validNewTweets, ...updatedTweets], 7);
     await updateSelectedTweets(selectedTweets);
     
     logStatus('Display tweets updated', {
