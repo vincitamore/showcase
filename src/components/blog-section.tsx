@@ -720,32 +720,34 @@ const BlogSection = () => {
                 onClick={() => handleCardClick(tweet.id)}
                 className={cn(
                   "group cursor-pointer",
-                  "p-3 sm:p-6",
+                  "p-3 sm:p-4",
                   "mx-1.5",
                   "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
                   "max-w-[28rem]",
-                  "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
+                  "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300",
+                  "flex flex-col h-full"
                 )}
-                containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
+                containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
               >
                 <div className="flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                  {/* Header section with fixed height */}
+                  <div className="flex items-start justify-between h-12 mb-2">
+                    <div className="flex items-center gap-2">
                       <Image
                         src={profileConfig.profileImage}
                         alt={profileConfig.username}
-                        width={40}
-                        height={40}
+                        width={32}
+                        height={32}
                         className="rounded-full"
                         unoptimized
                       />
                       <div>
-                        <p className="font-medium text-sm">{profileConfig.displayName}</p>
-                        <p className="text-xs text-muted-foreground">@{profileConfig.username}</p>
+                        <p className="font-medium text-sm leading-tight">{profileConfig.displayName}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">@{profileConfig.username}</p>
                       </div>
                     </div>
                     <span 
-                      className="text-primary hover:text-primary/80 transition-colors text-xl font-bold"
+                      className="text-primary hover:text-primary/80 transition-colors text-lg font-bold"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleCardClick(tweet.id)
@@ -754,32 +756,38 @@ const BlogSection = () => {
                       𝕏
                     </span>
                   </div>
-                  {renderTweetText(tweet)}
-                  {tweet.referenced_tweets?.map((ref) => (
-                    <div 
-                      key={ref.id}
-                      className="mb-4 rounded-lg border border-border/50 overflow-hidden"
-                    >
-                      <blockquote 
-                        className="twitter-tweet" 
-                        data-conversation="none"
-                        data-theme="dark"
+
+                  {/* Content section with dynamic height */}
+                  <div className="flex-1 overflow-hidden">
+                    {renderTweetText(tweet)}
+                    {tweet.referenced_tweets?.map((ref) => (
+                      <div 
+                        key={ref.id}
+                        className="mt-2 rounded-lg border border-border/50 overflow-hidden"
                       >
-                        <a href={`https://twitter.com/x/status/${ref.id}`}></a>
-                      </blockquote>
-                    </div>
-                  ))}
-                  <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
+                        <blockquote 
+                          className="twitter-tweet" 
+                          data-conversation="none"
+                          data-theme="dark"
+                        >
+                          <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                        </blockquote>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer section with fixed height */}
+                  <div className="h-8 mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3.5 w-3.5" /> {tweet.public_metrics?.like_count ?? 0}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <MessageCircle className="h-4 w-4" /> {tweet.public_metrics?.reply_count ?? 0}
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="h-3.5 w-3.5" /> {tweet.public_metrics?.reply_count ?? 0}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <Repeat2 className="h-4 w-4" /> {tweet.public_metrics?.retweet_count ?? 0}
+                    <span className="flex items-center gap-1">
+                      <Repeat2 className="h-3.5 w-3.5" /> {tweet.public_metrics?.retweet_count ?? 0}
                     </span>
-                    <time className="ml-auto">
+                    <time className="ml-auto text-[10px]">
                       {tweet.created_at 
                         ? new Date(tweet.created_at).toLocaleDateString()
                         : 'Just now'
