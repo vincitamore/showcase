@@ -137,7 +137,18 @@ async function storeTweetEntities(tweetId: string, entities: TweetEntitiesV2) {
 
 // Cache tweets in the database
 export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYPES.CURRENT) {
-  console.log(`[Twitter Storage] Caching ${tweets.length} tweets of type ${type}`)
+  console.log(`[Twitter Storage] Caching ${tweets.length} tweets of type ${type}`);
+
+  // Deactivate previous caches of the same type
+  await (prisma as any).tweetCache.updateMany({
+    where: {
+      type,
+      isActive: true
+    },
+    data: {
+      isActive: false
+    }
+  });
 
   const cache = await (prisma as any).tweetCache.create({
     data: {
@@ -145,16 +156,16 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
       expiresAt: type === CACHE_TYPES.CURRENT ? new Date(Date.now() + FIFTEEN_MINUTES) : null,
       isActive: true
     }
-  })
+  });
 
   for (const tweet of tweets) {
     try {
-      const tweetData = await convertTweetForStorage(tweet)
+      const tweetData = await convertTweetForStorage(tweet);
       const createdTweet = await (prisma as any).tweet.upsert({
         where: { id: tweet.id },
         create: tweetData,
         update: tweetData
-      })
+      });
 
       await (prisma as any).tweetCache.update({
         where: { id: cache.id },
@@ -163,17 +174,17 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
             connect: { id: createdTweet.id }
           }
         }
-      })
+      });
 
       if (hasTweetEntities(tweet) && tweet.entities) {
-        await storeTweetEntities(tweet.id, tweet.entities)
+        await storeTweetEntities(tweet.id, tweet.entities);
       }
     } catch (error) {
-      console.error('[Twitter Storage] Error caching tweet:', tweet.id, error)
+      console.error('[Twitter Storage] Error caching tweet:', tweet.id, error);
     }
   }
 
-  return cache
+  return cache;
 }
 
 // Get cached tweets

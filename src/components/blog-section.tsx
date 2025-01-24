@@ -389,8 +389,8 @@ const BlogSection = () => {
   };
 
   return (
-    <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
-      <div className="mb-12 text-center">
+    <section id="blog" className="relative w-full max-w-[100vw] overflow-hidden px-1 sm:px-4 py-8 sm:py-16 scroll-mt-16">
+      <div className="mb-8 sm:mb-12 text-center">
         <h2 className="text-3xl font-bold mb-4">My Thoughts</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Sharing insights and experiences from my journey in software development,
@@ -433,13 +433,13 @@ const BlogSection = () => {
       */}
       {/* Tweets Display */}
       {tweets && tweets.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-8 w-full">
           <h3 className="text-lg sm:text-xl font-semibold mb-4">Recent Posts</h3>
           <Carousel 
-            className="w-full max-w-[100rem] mx-auto pb-4" 
+            className="w-full overflow-visible mx-auto pb-4" 
             opts={{ 
               loop: true, 
-              align: "start",
+              align: "center",
               containScroll: "trimSnaps",
               dragFree: false
             }}
@@ -450,15 +450,16 @@ const BlogSection = () => {
                 onClick={() => handleCardClick(tweet.id)}
                 className={cn(
                   "group cursor-pointer",
-                  "p-4 sm:p-6",
-                  "mx-2 sm:mx-4",
-                  "w-[calc(100vw-2rem)] sm:w-[calc(100vw-6rem)] md:w-[calc(85vw-6rem)] lg:w-[32rem]",
+                  "p-3 sm:p-6",
+                  "mx-1.5",
+                  "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
+                  "max-w-[28rem]",
                   "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
                 )}
-                containerClassName="min-h-[16rem] sm:min-h-[18rem] rounded-lg sm:rounded-xl"
+                containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
               >
                 <div className="flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Image
                         src={profileConfig.profileImage}

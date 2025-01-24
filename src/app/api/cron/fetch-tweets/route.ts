@@ -172,7 +172,7 @@ export async function GET(request: Request) {
 
     // Select random tweets
     const tweetIds = tweets.data.map((t: TweetV2) => t.id);
-    const selectedCount = Math.min(3, tweetIds.length);
+    const selectedCount = Math.min(4, tweetIds.length);
     const selectedIds: string[] = [];
     
     while (selectedIds.length < selectedCount) {

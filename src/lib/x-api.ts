@@ -9,8 +9,6 @@ import { env } from '@/env';
 
 // Rate limit configuration
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
-const MAX_RETRIES = 3;
-const BASE_RETRY_DELAY = 15000; // 15 seconds base delay
 
 // Interface to match TweetV2 structure but only include what we need
 interface StoredTweet {
