@@ -1,10 +1,10 @@
 import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, ApiResponseError } from 'twitter-api-v2';
 import { 
   canMakeRequest,
-  getRateLimitTimestamp,
-  updateRateLimitTimestamp,
+  updateRateLimit,
+  getRateLimit,
   getCachedTweets
-} from '@/lib/blob-storage';
+} from '@/lib/tweet-storage';
 
 // Rate limit configuration
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -86,7 +86,7 @@ function isRateLimited(endpoint: string): boolean {
 }
 
 // Helper to update rate limit info from response headers
-function updateRateLimitInfo(endpoint: string, headers: Record<string, string | string[]>) {
+async function updateRateLimitInfo(endpoint: string, headers: Record<string, string | string[]>) {
   const now = Date.now();
   
   if (!rateLimitCache[endpoint]) {
@@ -97,18 +97,26 @@ function updateRateLimitInfo(endpoint: string, headers: Record<string, string | 
     };
   }
   
+  let resetTime = now + RATE_LIMIT_WINDOW;
+  let remaining = 1;
+
   if (headers['x-rate-limit-reset']) {
-    rateLimitCache[endpoint].reset = parseInt(String(headers['x-rate-limit-reset'])) * 1000;
+    resetTime = parseInt(String(headers['x-rate-limit-reset'])) * 1000;
   }
   if (headers['x-rate-limit-remaining']) {
-    rateLimitCache[endpoint].remaining = parseInt(String(headers['x-rate-limit-remaining']));
+    remaining = parseInt(String(headers['x-rate-limit-remaining']));
   }
+
+  rateLimitCache[endpoint].reset = resetTime;
+  rateLimitCache[endpoint].remaining = remaining;
   rateLimitCache[endpoint].lastUpdated = now;
   
+  // Update database rate limit info
+  await updateRateLimit(endpoint, new Date(resetTime), remaining);
+  
   console.log(`[Twitter API] Rate limit status for ${endpoint}:`, {
-    reset: new Date(rateLimitCache[endpoint].reset).toISOString(),
-    remaining: rateLimitCache[endpoint].remaining,
-    timeUntilReset: Math.round((rateLimitCache[endpoint].reset - now) / 1000) + 's'
+    reset: new Date(resetTime).toISOString(),
+    remaining
   });
 }
 
@@ -290,7 +298,8 @@ export async function executeWithRateLimit<T>(
   params: Record<string, any>,
   execute: () => Promise<T>
 ): Promise<T> {
-  if (isRateLimited(endpoint)) {
+  const canRequest = await canMakeRequest(endpoint);
+  if (!canRequest) {
     throw new Error(`Rate limit in effect for endpoint: ${endpoint}`);
   }
 
@@ -318,7 +327,7 @@ export async function executeWithRateLimit<T>(
       
       // Update rate limit info with the reset time if available
       if (error.rateLimit?.reset) {
-        updateRateLimitInfo(endpoint, {
+        await updateRateLimitInfo(endpoint, {
           'x-rate-limit-reset': String(error.rateLimit.reset),
           'x-rate-limit-remaining': '0'
         });

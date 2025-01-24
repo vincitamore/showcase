@@ -2,18 +2,20 @@ import { PrismaClient } from '@prisma/client'
 import { env } from '@/env'
 
 declare global {
+  // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined
 }
 
-export const prisma = globalThis.prisma || new PrismaClient()
+const prismaClientSingleton = () => {
+  return new PrismaClient({
+    log: ['error', 'warn']
+  })
+}
+
+export const prisma = globalThis.prisma ?? prismaClientSingleton()
 
 if (env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma
 }
 
-export type { 
-  ChatSession,
-  Message,
-  SystemPrompt,
-  RateLimit,
-} from '@prisma/client' 
+export type { PrismaClient } from '@prisma/client' 
