@@ -540,17 +540,44 @@ const BlogSection = () => {
           indices: hashtag.indices,
           render: () => renderHashtag(hashtag.tag)
         })) || [])
-      ].sort((a, b) => a.indices[0] - b.indices[0]);
+      ].sort((a, b) => {
+        // Sort by start index, if equal sort by end index
+        if (a.indices[0] === b.indices[0]) {
+          return b.indices[1] - a.indices[1]; // Longer entities first
+        }
+        return a.indices[0] - b.indices[0];
+      });
+
+      // Log entities for debugging
+      console.log('Processing text:', {
+        text: tweet.text,
+        entities: entities.map(e => ({
+          type: e.type,
+          indices: e.indices,
+        }))
+      });
 
       const segments: Array<JSX.Element | string> = [];
       let lastIndex = 0;
 
+      // Create a map of positions that are part of entities
+      const entityPositions = new Set<number>();
+      entities.forEach(entity => {
+        for (let i = entity.indices[0]; i < entity.indices[1]; i++) {
+          entityPositions.add(i);
+        }
+      });
+
       entities.forEach((entity, index) => {
         const [start, end] = entity.indices;
 
-        // Add text before the entity
+        // Only add text before entity if it's not part of a previous entity
         if (start > lastIndex) {
-          segments.push(tweet.text.slice(lastIndex, start));
+          // Check if this text segment is not part of any entity
+          const textSegment = tweet.text.slice(lastIndex, start);
+          if (textSegment.trim()) {
+            segments.push(textSegment);
+          }
         }
 
         // Add the entity
@@ -563,9 +590,12 @@ const BlogSection = () => {
         lastIndex = end;
       });
 
-      // Add any remaining text
+      // Add any remaining text that's not part of any entity
       if (lastIndex < tweet.text.length) {
-        segments.push(tweet.text.slice(lastIndex));
+        const remainingText = tweet.text.slice(lastIndex);
+        if (remainingText.trim()) {
+          segments.push(remainingText);
+        }
       }
 
       return segments;
