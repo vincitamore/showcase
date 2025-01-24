@@ -38,10 +38,20 @@ interface HashtagEntity {
   indices: number[]
 }
 
+interface MediaEntity {
+  media_key: string
+  type: 'photo' | 'video' | 'animated_gif'
+  url?: string
+  preview_image_url?: string
+  width?: number
+  height?: number
+}
+
 interface TweetEntities {
   urls?: UrlEntity[]
   mentions?: MentionEntity[]
   hashtags?: HashtagEntity[]
+  media?: MediaEntity[]
 }
 
 interface TweetMetrics {
@@ -138,57 +148,100 @@ const BlogSection = () => {
       const data = await response.json();
       
       // Enhanced debug logging
-      console.log('Raw tweet response:', JSON.stringify(data, null, 2));
+      console.log('Raw tweet response:', data);
+      
+      if (!data.tweets || !Array.isArray(data.tweets)) {
+        console.error('Invalid tweets data received:', data);
+        toast({
+          title: "Error",
+          description: "Received invalid tweet data. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Convert database tweets to TweetV2 format
-      const processedTweets = data.tweets.map((dbTweet: any) => ({
-        id: dbTweet.id,
-        text: dbTweet.text,
-        created_at: dbTweet.createdAt,
-        public_metrics: dbTweet.publicMetrics ? JSON.parse(dbTweet.publicMetrics) : {
-          like_count: 0,
-          reply_count: 0,
-          retweet_count: 0
-        },
-        author: {
-          profile_image_url: profileConfig.profileImage,
-          username: profileConfig.username,
-          name: profileConfig.displayName
-        },
-        entities: dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
-          const entityData = entity.metadata ? JSON.parse(entity.metadata) : {};
-          
-          switch (entity.type) {
-            case 'url':
-              if (!acc.urls) acc.urls = [];
-              acc.urls.push({
-                url: entity.url,
-                expanded_url: entity.expandedUrl,
-                display_url: entity.text,
-                indices: entityData.indices || [0, 0],
-                title: entityData.title,
-                description: entityData.description,
-                images: entityData.images
-              });
-              break;
-            case 'mention':
-              if (!acc.mentions) acc.mentions = [];
-              acc.mentions.push({
-                username: entity.text,
-                indices: entityData.indices || [0, 0]
-              });
-              break;
-            case 'hashtag':
-              if (!acc.hashtags) acc.hashtags = [];
-              acc.hashtags.push({
-                tag: entity.text,
-                indices: entityData.indices || [0, 0]
-              });
-              break;
-          }
-          return acc;
-        }, {} as TweetEntities)
-      }));
+      const processedTweets = data.tweets.map((dbTweet: any) => {
+        try {
+          const publicMetrics = dbTweet.publicMetrics 
+            ? (typeof dbTweet.publicMetrics === 'string' 
+                ? JSON.parse(dbTweet.publicMetrics) 
+                : dbTweet.publicMetrics)
+            : {
+                like_count: 0,
+                reply_count: 0,
+                retweet_count: 0
+              };
+
+          return {
+            id: dbTweet.id,
+            text: dbTweet.text,
+            created_at: dbTweet.createdAt,
+            public_metrics: publicMetrics,
+            author: {
+              profile_image_url: profileConfig.profileImage,
+              username: profileConfig.username,
+              name: profileConfig.displayName
+            },
+            entities: dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
+              try {
+                const entityData = entity.metadata 
+                  ? (typeof entity.metadata === 'string'
+                      ? JSON.parse(entity.metadata)
+                      : entity.metadata)
+                  : {};
+                
+                switch (entity.type) {
+                  case 'url':
+                    if (!acc.urls) acc.urls = [];
+                    acc.urls.push({
+                      url: entity.url,
+                      expanded_url: entity.expandedUrl,
+                      display_url: entity.text,
+                      indices: entityData.indices || [0, 0],
+                      title: entityData.title,
+                      description: entityData.description,
+                      images: entityData.images
+                    });
+                    break;
+                  case 'mention':
+                    if (!acc.mentions) acc.mentions = [];
+                    acc.mentions.push({
+                      username: entity.text,
+                      indices: entityData.indices || [0, 0]
+                    });
+                    break;
+                  case 'hashtag':
+                    if (!acc.hashtags) acc.hashtags = [];
+                    acc.hashtags.push({
+                      tag: entity.text,
+                      indices: entityData.indices || [0, 0]
+                    });
+                    break;
+                  case 'media':
+                    if (!acc.media) acc.media = [];
+                    acc.media.push({
+                      media_key: entity.mediaKey || '',
+                      type: entityData.type || 'photo',
+                      url: entityData.url,
+                      preview_image_url: entityData.preview_image_url,
+                      width: entityData.width,
+                      height: entityData.height
+                    });
+                    break;
+                }
+                return acc;
+              } catch (entityError) {
+                console.error('Error processing entity:', { entity, error: entityError });
+                return acc;
+              }
+            }, {} as TweetEntities)
+          };
+        } catch (tweetError) {
+          console.error('Error processing tweet:', { tweet: dbTweet, error: tweetError });
+          return null;
+        }
+      }).filter(Boolean) as Tweet[];
       
       // Log the processed tweets
       console.log('Processed tweets:', processedTweets.map((t: Tweet) => ({
@@ -198,7 +251,8 @@ const BlogSection = () => {
         entityCounts: {
           urls: t.entities?.urls?.length || 0,
           mentions: t.entities?.mentions?.length || 0,
-          hashtags: t.entities?.hashtags?.length || 0
+          hashtags: t.entities?.hashtags?.length || 0,
+          media: t.entities?.media?.length || 0
         }
       })));
       
@@ -207,9 +261,7 @@ const BlogSection = () => {
       console.error('Error fetching cached tweets:', error);
       toast({
         title: "Error",
-        description: error instanceof Error 
-          ? `Failed to load tweets: ${error.message}`
-          : "Failed to load tweets. Please try again later.",
+        description: "Failed to load tweets. Please try again later.",
         variant: "destructive",
       });
     }
@@ -277,7 +329,8 @@ const BlogSection = () => {
       console.log('Processing entities:', {
         urls: tweet.entities.urls?.length || 0,
         mentions: tweet.entities.mentions?.length || 0,
-        hashtags: tweet.entities.hashtags?.length || 0
+        hashtags: tweet.entities.hashtags?.length || 0,
+        media: tweet.entities.media?.length || 0
       });
     }
 
@@ -384,6 +437,81 @@ const BlogSection = () => {
         #{tag}
       </span>
     );
+
+    const renderMedia = (media: MediaEntity[]) => {
+      if (!media.length) return null;
+
+      // If there's only one media item
+      if (media.length === 1) {
+        const item = media[0];
+        return (
+          <div className="mt-3 rounded-lg overflow-hidden bg-accent/5">
+            {item.type === 'photo' && (
+              <div className="relative w-full aspect-[16/9]">
+                <Image
+                  src={item.url || item.preview_image_url || ''}
+                  alt="Tweet media"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            )}
+            {(item.type === 'video' || item.type === 'animated_gif') && item.preview_image_url && (
+              <div className="relative w-full aspect-[16/9] group/media">
+                <Image
+                  src={item.preview_image_url}
+                  alt="Tweet media preview"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/media:opacity-100 transition-opacity">
+                  <span className="text-white text-sm">
+                    {item.type === 'video' ? 'Play Video' : 'View GIF'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // If there are multiple media items
+      return (
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg overflow-hidden">
+          {media.map((item, index) => {
+            if (index > 3) return null; // Only show up to 4 items
+            return (
+              <div 
+                key={item.media_key}
+                className={cn(
+                  "relative bg-accent/5",
+                  "aspect-square",
+                  media.length === 3 && index === 0 && "col-span-2", // First item spans full width in 3-item layout
+                  media.length === 1 && "col-span-2" // Single item spans full width
+                )}
+              >
+                <Image
+                  src={item.type === 'photo' ? (item.url || '') : (item.preview_image_url || '')}
+                  alt="Tweet media"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+                {(item.type === 'video' || item.type === 'animated_gif') && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-white text-sm">
+                      {item.type === 'video' ? 'Play Video' : 'View GIF'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
 
     // Function to process text and replace entities with clickable elements
     const processText = () => {
@@ -507,6 +635,7 @@ const BlogSection = () => {
         <div className="text-sm text-muted-foreground/90 leading-relaxed">
           {processText()}
         </div>
+        {tweet.entities?.media && renderMedia(tweet.entities.media)}
         {renderPreviews()}
       </div>
     );
