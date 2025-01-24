@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
-import { TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
+import { TweetV2, TweetEntitiesV2, MediaObjectV2, ApiV2Includes } from 'twitter-api-v2'
+import type { Prisma } from '.prisma/client'
 
 // Constants
 export const FIFTEEN_MINUTES = 15 * 60 * 1000 // 15 minutes in milliseconds
@@ -84,16 +85,106 @@ function hasTweetEntities(tweet: TweetV2): boolean {
 }
 
 // Helper to convert TweetV2 to database format
-async function convertTweetForStorage(tweet: TweetV2) {
+async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) {
+  const publicMetrics = toPrismaJson(tweet.public_metrics);
+  const entityPromises: Promise<Prisma.TweetEntityCreateInput>[] = [];
+
+  // Process URLs
+  if (tweet.entities?.urls?.length) {
+    tweet.entities.urls.forEach(url => {
+      entityPromises.push(Promise.resolve({
+        type: 'url',
+        text: url.url,
+        url: url.url,
+        expandedUrl: url.expanded_url,
+        displayUrl: url.display_url,
+        tweet: { connect: { id: tweet.id } },
+        metadata: toPrismaJson({
+          title: url.title,
+          description: url.description,
+          images: url.images || []
+        })
+      }));
+    });
+  }
+
+  // Process mentions
+  if (tweet.entities?.mentions?.length) {
+    tweet.entities.mentions.forEach(mention => {
+      entityPromises.push(Promise.resolve({
+        type: 'mention',
+        text: `@${mention.username}`,
+        url: `https://twitter.com/${mention.username}`,
+        expandedUrl: `https://twitter.com/${mention.username}`,
+        displayUrl: `@${mention.username}`,
+        tweet: { connect: { id: tweet.id } },
+        metadata: toPrismaJson({
+          username: mention.username,
+          id: mention.id
+        })
+      }));
+    });
+  }
+
+  // Process hashtags
+  if (tweet.entities?.hashtags?.length) {
+    tweet.entities.hashtags.forEach(hashtag => {
+      entityPromises.push(Promise.resolve({
+        type: 'hashtag',
+        text: `#${hashtag.tag}`,
+        url: `https://twitter.com/hashtag/${hashtag.tag}`,
+        expandedUrl: `https://twitter.com/hashtag/${hashtag.tag}`,
+        displayUrl: `#${hashtag.tag}`,
+        tweet: { connect: { id: tweet.id } },
+        metadata: toPrismaJson({
+          tag: hashtag.tag
+        })
+      }));
+    });
+  }
+
+  // Process media from attachments
+  if (tweet.attachments?.media_keys?.length && includes?.media?.length) {
+    const mediaItems = tweet.attachments.media_keys.map(key => {
+      // Type guard to ensure media array exists
+      const mediaArray = includes?.media;
+      if (!mediaArray) return null;
+      
+      const media = mediaArray.find((m: MediaObjectV2) => m.media_key === key);
+      if (!media) return null;
+      
+      return {
+        type: 'media',
+        text: media.url || '',
+        url: media.url || '',
+        expandedUrl: media.url || '',
+        displayUrl: media.url || '',
+        tweet: { connect: { id: tweet.id } },
+        metadata: toPrismaJson({
+          media_key: media.media_key,
+          type: media.type,
+          url: media.url,
+          preview_image_url: media.preview_image_url,
+          width: media.width,
+          height: media.height
+        })
+      } as Prisma.TweetEntityCreateInput;
+    }).filter((item): item is Prisma.TweetEntityCreateInput => item !== null);
+
+    entityPromises.push(...mediaItems.map(item => Promise.resolve(item)));
+  }
+
+  const entities = await Promise.all(entityPromises);
+
   return {
     id: tweet.id,
     text: tweet.text,
     createdAt: toValidDate(tweet.created_at),
-    updatedAt: new Date(),
-    publicMetrics: tweet.public_metrics ? toPrismaJson(tweet.public_metrics) : null,
-    editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
-    authorId: tweet.author_id || 'unknown'
-  } as const
+    publicMetrics,
+    entities: {
+      create: entities
+    }
+  };
 }
 
 // Helper to store tweet entities
@@ -136,7 +227,7 @@ async function storeTweetEntities(tweetId: string, entities: TweetEntitiesV2) {
 }
 
 // Cache tweets in the database
-export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYPES.CURRENT) {
+export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYPES.CURRENT, includes?: ApiV2Includes) {
   console.log(`[Twitter Storage] Caching ${tweets.length} tweets of type ${type}`);
 
   // Deactivate previous caches of the same type
@@ -160,7 +251,7 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
 
   for (const tweet of tweets) {
     try {
-      const tweetData = await convertTweetForStorage(tweet);
+      const tweetData = await convertTweetForStorage(tweet, includes);
       const createdTweet = await (prisma as any).tweet.upsert({
         where: { id: tweet.id },
         create: tweetData,

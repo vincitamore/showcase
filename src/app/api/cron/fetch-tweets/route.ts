@@ -69,7 +69,7 @@ function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
         status: (e.metadata as any)?.status?.toString(),
         title: (e.metadata as any)?.title?.toString(),
         description: (e.metadata as any)?.description?.toString(),
-        images: []
+        images: (e.metadata as any)?.images || []
       } as TweetEntityUrlV2)),
       mentions: dbTweet.entities.filter(e => e.type === 'mention').map(e => ({
         start: 0,
@@ -81,6 +81,14 @@ function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
         start: 0,
         end: 0,
         tag: e.text || ''
+      })),
+      media: dbTweet.entities.filter(e => e.type === 'media').map(e => ({
+        media_key: e.mediaKey || '',
+        type: (e.metadata as any)?.type || 'photo',
+        url: e.url || '',
+        preview_image_url: (e.metadata as any)?.preview_image_url || e.url || '',
+        width: (e.metadata as any)?.width,
+        height: (e.metadata as any)?.height
       })),
       cashtags: [],
       annotations: []
@@ -138,17 +146,55 @@ export async function GET(request: Request) {
       {
         query,
         max_results: 50,
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'tweet.fields': [
+          'created_at',
+          'public_metrics',
+          'entities',
+          'author_id',
+          'attachments'
+        ],
         'user.fields': ['profile_image_url', 'username'],
-        'media.fields': ['url', 'preview_image_url', 'alt_text'],
-        expansions: ['author_id', 'attachments.media_keys']
+        'media.fields': [
+          'url',
+          'preview_image_url',
+          'alt_text',
+          'type',
+          'width',
+          'height',
+          'duration_ms',
+          'variants'
+        ],
+        expansions: [
+          'author_id',
+          'attachments.media_keys',
+          'attachments.poll_ids'
+        ]
       },
       () => client.search(query, {
         max_results: 50,
-        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'tweet.fields': [
+          'created_at',
+          'public_metrics',
+          'entities',
+          'author_id',
+          'attachments'
+        ],
         'user.fields': ['profile_image_url', 'username'],
-        'media.fields': ['url', 'preview_image_url', 'alt_text'],
-        expansions: ['author_id', 'attachments.media_keys']
+        'media.fields': [
+          'url',
+          'preview_image_url',
+          'alt_text',
+          'type',
+          'width',
+          'height',
+          'duration_ms',
+          'variants'
+        ],
+        expansions: [
+          'author_id',
+          'attachments.media_keys',
+          'attachments.poll_ids'
+        ]
       })
     );
 
@@ -189,15 +235,15 @@ export async function GET(request: Request) {
       step: 'tweets-cached'
     });
 
-    // Get current cached tweets
+    // Get cached tweets
     const cachedTweets = await getCachedTweets();
-    if (!cachedTweets?.tweets?.length) {
+    if (!cachedTweets.tweets?.length) {
       console.error('[Cron] Failed to verify cached tweets:', {
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
-        step: 'cache-verification-failed'
+        step: 'verify-cached'
       });
-      return new NextResponse('Failed to verify cached tweets', { status: 500 });
+      return new Response('Failed to verify cached tweets', { status: 500 });
     }
 
     // Select random tweets
