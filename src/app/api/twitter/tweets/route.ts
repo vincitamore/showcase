@@ -7,6 +7,12 @@ import {
   updateSelectedTweets,
   SELECTED_TWEET_COUNT 
 } from '@/lib/tweet-storage'
+import type { Tweet, TweetEntity } from '@prisma/client'
+
+// Define the Tweet type with entities
+type TweetWithEntities = Tweet & {
+  entities: TweetEntity[];
+};
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -317,23 +323,24 @@ export async function GET() {
     console.log('[Twitter API] Selected tweets check:', {
       hasSelected: !!selectedTweets,
       count: selectedTweets?.length || 0,
-      ids: selectedTweets?.map(t => t.id) || []
+      ids: selectedTweets?.map((t: TweetV2) => t.id) || []
     });
 
     // Only use selected tweets if we have enough of them
     if (selectedTweets?.length === SELECTED_TWEET_COUNT) {
       console.log('[Twitter API] Using selected tweets:', {
         count: selectedTweets.length,
-        ids: selectedTweets.map(t => t.id)
+        ids: selectedTweets.map((t: TweetV2) => t.id)
       });
       return NextResponse.json({ tweets: selectedTweets });
     }
 
-    // If no selected tweets or not enough, get cached tweets
+    // If no selected tweets or not enough, get all available tweets
     const cachedTweets = await getCachedTweets();
     console.log('[Twitter API] Cache check:', {
       hasCached: !!cachedTweets?.tweets,
-      count: cachedTweets?.tweets?.length || 0
+      count: cachedTweets?.tweets?.length || 0,
+      ids: cachedTweets?.tweets?.map((t: TweetWithEntities) => t.id) || []
     });
 
     if (!cachedTweets?.tweets?.length) {
@@ -342,16 +349,44 @@ export async function GET() {
     }
 
     // Get random tweets from the cache, prioritizing those with entities
-    const selectedFromCache = getRandomItems(cachedTweets.tweets, SELECTED_TWEET_COUNT);
-    console.log('[Twitter API] Cache selection complete:', {
-      totalCached: cachedTweets.tweets.length,
-      selected: selectedFromCache.length,
-      ids: selectedFromCache.map(t => t.id)
+    const tweetsWithEntities = (cachedTweets.tweets as TweetWithEntities[]).filter((tweet) => 
+      tweet.entities?.some((e: TweetEntity) => e.type === 'url' || e.type === 'media')
+    );
+
+    console.log('[Twitter API] Entity filtering:', {
+      total: cachedTweets.tweets.length,
+      withEntities: tweetsWithEntities.length,
+      timestamp: new Date().toISOString()
     });
 
-    // Update selected tweets with our new selection
+    // Use tweets with entities if we have enough, otherwise use all tweets
+    const tweetPool = tweetsWithEntities.length >= SELECTED_TWEET_COUNT 
+      ? tweetsWithEntities 
+      : (cachedTweets.tweets as TweetWithEntities[]);
+
+    // Randomly select tweets
+    const selectedIds: string[] = [];
+    const availableIds = tweetPool.map((t) => t.id);
+    
+    while (selectedIds.length < SELECTED_TWEET_COUNT && availableIds.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableIds.length);
+      const id = availableIds[randomIndex];
+      selectedIds.push(id);
+      availableIds.splice(randomIndex, 1);
+    }
+
+    const selectedFromCache = tweetPool.filter((t) => selectedIds.includes(t.id));
+    
+    console.log('[Twitter API] Cache selection complete:', {
+      totalCached: cachedTweets.tweets.length,
+      withEntities: tweetsWithEntities.length,
+      selected: selectedFromCache.length,
+      ids: selectedFromCache.map((t) => t.id)
+    });
+
+    // Update selected tweets with our new selection if we have enough
     if (selectedFromCache.length === SELECTED_TWEET_COUNT) {
-      await updateSelectedTweets(selectedFromCache.map(t => t.id));
+      await updateSelectedTweets(selectedFromCache.map((t) => t.id));
       console.log('[Twitter API] Updated selected tweets cache');
     }
 
