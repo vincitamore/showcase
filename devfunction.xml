@@ -65,6 +65,7 @@
     </dev-functions>
 
     <critical-rules>
+        <rule id="model-id">ALWAYS use "grok-2-latest" as the xAI model identifier</rule>
         <rule id="streaming">NEVER use StreamingTextResponse - use streamText().toDataStreamResponse()</rule>
         <rule id="planning">ALWAYS check devprogress.xml before changes</rule>
         <rule id="updates">ALWAYS update tracking files after changes</rule>
@@ -73,6 +74,7 @@
         <rule id="shell">ALWAYS use PowerShell commands for terminal operations</rule>
         <rule id="step-by-step">ALWAYS work through solutions step by step for both AI and user understanding</rule>
         <rule id="project-context">ALWAYS examine current project folder structure, files, and logic flows before generating any output to ensure contextual accuracy and consistency</rule>
+        <rule id="preserve-functionality">NEVER remove or modify functionality unrelated to the specific issue being worked on - maintain strict scope isolation</rule>
     </critical-rules>
 
     <logging-guidelines>

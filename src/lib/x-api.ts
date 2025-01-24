@@ -1,4 +1,4 @@
-import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2 } from 'twitter-api-v2';
+import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2 } from 'twitter-api-v2';
 import { 
   canMakeRequest,
   getRateLimitTimestamp,
@@ -148,14 +148,20 @@ function validateTweet(tweet: any): TweetV2 | null {
       return null;
     }
 
-    // Create a clean copy of the tweet
-    const cleanTweet = {
+    // Create a clean copy of the tweet with empty entities
+    const cleanTweet: TweetV2 = {
       id: tweet.id,
       text: tweet.text,
       edit_history_tweet_ids: tweet.edit_history_tweet_ids,
-      entities: tweet.entities,
-      public_metrics: tweet.public_metrics
-    } as TweetV2;
+      public_metrics: tweet.public_metrics,
+      entities: {
+        urls: [],
+        mentions: [],
+        hashtags: [],
+        cashtags: [],
+        annotations: []
+      } as TweetEntitiesV2
+    };
 
     // Ensure required fields exist
     if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
@@ -185,6 +191,83 @@ function validateTweet(tweet: any): TweetV2 | null {
           id: tweet.id,
           date: tweet.created_at,
           error
+        });
+      }
+    }
+
+    // Handle entities
+    if (tweet.entities) {
+      try {
+        // Deep clone entities to avoid reference issues
+        const clonedEntities = JSON.parse(JSON.stringify(tweet.entities));
+        const entities = cleanTweet.entities as TweetEntitiesV2;
+        
+        // Validate and clean URLs
+        if (Array.isArray(clonedEntities.urls)) {
+          entities.urls = clonedEntities.urls.map((url: any) => ({
+            start: url.start || url.indices?.[0] || 0,
+            end: url.end || url.indices?.[1] || 0,
+            url: url.url || '',
+            expanded_url: url.expanded_url || url.url || '',
+            display_url: url.display_url || url.expanded_url || url.url || '',
+            title: url.title,
+            description: url.description,
+            unwound_url: url.unwound_url,
+            images: url.images?.map((img: any) => ({
+              url: img.url,
+              width: img.width || 0,
+              height: img.height || 0
+            }))
+          }));
+        }
+
+        // Copy other entity types if they exist
+        if (Array.isArray(clonedEntities.mentions)) {
+          entities.mentions = clonedEntities.mentions.map((mention: any) => ({
+            start: mention.start || mention.indices?.[0] || 0,
+            end: mention.end || mention.indices?.[1] || 0,
+            username: mention.username || '',
+            id: mention.id || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.hashtags)) {
+          entities.hashtags = clonedEntities.hashtags.map((hashtag: any) => ({
+            start: hashtag.start || hashtag.indices?.[0] || 0,
+            end: hashtag.end || hashtag.indices?.[1] || 0,
+            tag: hashtag.tag || hashtag.text || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.cashtags)) {
+          entities.cashtags = clonedEntities.cashtags.map((cashtag: any) => ({
+            start: cashtag.start || cashtag.indices?.[0] || 0,
+            end: cashtag.end || cashtag.indices?.[1] || 0,
+            tag: cashtag.tag || cashtag.text || ''
+          }));
+        }
+        if (Array.isArray(clonedEntities.annotations)) {
+          entities.annotations = clonedEntities.annotations.map((annotation: any) => ({
+            start: annotation.start || annotation.indices?.[0] || 0,
+            end: annotation.end || annotation.indices?.[1] || 0,
+            probability: annotation.probability || 0,
+            type: annotation.type || '',
+            normalized_text: annotation.normalized_text || ''
+          }));
+        }
+
+        // Log entity processing results
+        console.log('[Twitter] Processed entities:', {
+          id: tweet.id,
+          entityTypes: Object.keys(entities),
+          urlCount: entities.urls.length,
+          mentionCount: entities.mentions.length,
+          hashtagCount: entities.hashtags.length,
+          annotationCount: entities.annotations.length,
+          cashtagCount: entities.cashtags.length
+        });
+      } catch (error) {
+        console.warn('[Twitter] Error processing entities:', {
+          id: tweet.id,
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }
