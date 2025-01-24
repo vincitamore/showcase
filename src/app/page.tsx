@@ -105,7 +105,7 @@ export default function Home() {
 
         {/* Blog Section */}
         <section id="blog" className="container relative mx-auto px-4 py-16 scroll-mt-16">
-          {*/
+          {/*
           <h2 className="mb-16 text-center text-3xl font-bold tracking-tight sm:text-4xl">
             Latest Thoughts
           </h2>
