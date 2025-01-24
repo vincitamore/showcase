@@ -450,8 +450,15 @@ const BlogSection = () => {
             metadata
           });
 
-          const imageUrl = metadata?.preview_image_url || metadata?.url;
-          if (!imageUrl) return null;
+          // Try different paths for the image URL
+          const imageUrl = metadata?.preview_image_url || metadata?.url || entity.url;
+          if (!imageUrl) {
+            console.warn('[Tweet Rendering] No image URL found for media entity:', {
+              mediaKey: entity.mediaKey,
+              metadata
+            });
+            return null;
+          }
 
           const width = metadata?.width || 0;
           const height = metadata?.height || 0;
@@ -482,34 +489,45 @@ const BlogSection = () => {
   }
 
   function renderUrlPreviews(entities: TweetEntity[]) {
-    const urlEntities = entities.filter(e => e.type === 'url');
-    if (!urlEntities?.length) return null;
+    // Deduplicate URL entities by their expanded URL
+    const uniqueUrlEntities = entities
+      .filter(e => e.type === 'url')
+      .reduce((acc: TweetEntity[], entity) => {
+        const exists = acc.find(e => e.expandedUrl === entity.expandedUrl);
+        if (!exists) acc.push(entity);
+        return acc;
+      }, []);
 
-    console.log('[Tweet Rendering] Processing URL entities:', {
-      count: urlEntities.length,
-      entities: urlEntities.map(e => ({
+    if (!uniqueUrlEntities?.length) return null;
+
+    console.log('[Tweet Rendering] Processing unique URL entities:', {
+      originalCount: entities.filter(e => e.type === 'url').length,
+      uniqueCount: uniqueUrlEntities.length,
+      entities: uniqueUrlEntities.map(e => ({
         type: e.type,
         url: e.url,
-        expandedUrl: e.expandedUrl,
-        metadata: e.metadata
+        expandedUrl: e.expandedUrl
       }))
     });
 
     return (
       <div className="mt-2 space-y-2">
-        {urlEntities.map((entity, index) => {
+        {uniqueUrlEntities.map((entity, index) => {
           const metadata = typeof entity.metadata === 'string'
             ? JSON.parse(entity.metadata)
             : entity.metadata;
 
-          // Skip if no preview data
-          if (!metadata?.title && !metadata?.description && !metadata?.images?.length) {
+          // Skip if no preview data or if it's a Twitter URL (will be embedded)
+          if (
+            (!metadata?.title && !metadata?.description && !metadata?.images?.length) ||
+            (entity.expandedUrl && entity.expandedUrl.includes('twitter.com'))
+          ) {
             return null;
           }
 
           return (
             <div
-              key={entity.url || index}
+              key={entity.expandedUrl || entity.url || index}
               className="rounded-lg border overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
               onClick={(e) => {
                 e.preventDefault();
@@ -563,6 +581,11 @@ const BlogSection = () => {
       urlEntities: entities.filter(e => e.type === 'url')
     });
 
+    // Check for Twitter URLs that should be embedded
+    const twitterUrls = entities
+      .filter(e => e.type === 'url' && e.expandedUrl?.includes('twitter.com/'))
+      .map(e => e.expandedUrl);
+
     return (
       <div className="flex h-full flex-col justify-between gap-4">
         <div className="space-y-4">
@@ -570,6 +593,20 @@ const BlogSection = () => {
             {renderTweetText(tweet.text, entities)}
             {renderMedia(entities)}
             {renderUrlPreviews(entities)}
+            {twitterUrls.map((url, index) => (
+              <div 
+                key={`${tweet.id}-embed-${index}`}
+                className="mt-2 rounded-lg border border-border/50 overflow-hidden"
+              >
+                <blockquote 
+                  className="twitter-tweet" 
+                  data-conversation="none"
+                  data-theme="dark"
+                >
+                  <a href={url}></a>
+                </blockquote>
+              </div>
+            ))}
           </div>
         </div>
 
