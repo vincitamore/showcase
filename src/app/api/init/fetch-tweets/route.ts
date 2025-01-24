@@ -24,12 +24,34 @@ type TweetWithEntities = {
   }>;
 };
 
+// Helper function to validate and format dates
+function toValidDate(date: Date | string | number | null | undefined): Date {
+  if (!date) return new Date();
+  
+  try {
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) {
+      console.warn('[Twitter Storage] Invalid date:', date);
+      return new Date();
+    }
+    return parsed;
+  } catch (error) {
+    console.warn('[Twitter Storage] Error parsing date:', date, error);
+    return new Date();
+  }
+}
+
+// Helper function to safely convert date to ISO string
+function toSafeISOString(date: Date | string | number | null | undefined): string {
+  return toValidDate(date).toISOString();
+}
+
 // Convert database tweet to TweetV2 format
 function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
   return {
     id: dbTweet.id,
     text: dbTweet.text,
-    created_at: dbTweet.createdAt.toISOString(),
+    created_at: toSafeISOString(dbTweet.createdAt),
     edit_history_tweet_ids: dbTweet.editHistoryTweetIds,
     author_id: dbTweet.authorId,
     public_metrics: dbTweet.publicMetrics as any,

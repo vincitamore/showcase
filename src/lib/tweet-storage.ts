@@ -18,6 +18,28 @@ function toPrismaJson<T>(data: T) {
   return JSON.parse(JSON.stringify(data));
 }
 
+// Helper function to validate and format dates
+function toValidDate(date: Date | string | number | null | undefined): Date {
+  if (!date) return new Date();
+  
+  try {
+    const parsed = new Date(date);
+    if (isNaN(parsed.getTime())) {
+      console.warn('[Twitter Storage] Invalid date:', date);
+      return new Date();
+    }
+    return parsed;
+  } catch (error) {
+    console.warn('[Twitter Storage] Error parsing date:', date, error);
+    return new Date();
+  }
+}
+
+// Helper function to safely convert date to ISO string
+function toSafeISOString(date: Date | string | number | null | undefined): string {
+  return toValidDate(date).toISOString();
+}
+
 // Helper function to check if a tweet has entities
 function hasTweetEntities(tweet: TweetV2): boolean {
   if (process.env.NODE_ENV === 'development') {
@@ -56,23 +78,10 @@ function hasTweetEntities(tweet: TweetV2): boolean {
 
 // Helper to convert TweetV2 to database format
 async function convertTweetForStorage(tweet: TweetV2) {
-  // Ensure created_at is a valid date
-  let createdAt: Date
-  try {
-    createdAt = tweet.created_at ? new Date(tweet.created_at) : new Date()
-    if (isNaN(createdAt.getTime())) {
-      console.warn('[Twitter Storage] Invalid date found in tweet:', tweet.id)
-      createdAt = new Date()
-    }
-  } catch (error) {
-    console.warn('[Twitter Storage] Error parsing date for tweet:', tweet.id, error)
-    createdAt = new Date()
-  }
-
   return {
     id: tweet.id,
     text: tweet.text,
-    createdAt,
+    createdAt: toValidDate(tweet.created_at),
     updatedAt: new Date(),
     publicMetrics: tweet.public_metrics ? toPrismaJson(tweet.public_metrics) : null,
     editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
@@ -236,7 +245,7 @@ export async function getSelectedTweets() {
 export async function updateRateLimit(endpoint: string, resetAt: Date, remaining: number) {
   console.log('[Twitter Storage] Updating rate limit:', {
     endpoint,
-    resetAt: resetAt.toISOString(),
+    resetAt: toSafeISOString(resetAt),
     remaining,
     timestamp: new Date().toISOString()
   });
@@ -247,35 +256,25 @@ export async function updateRateLimit(endpoint: string, resetAt: Date, remaining
     },
     create: {
       endpoint,
-      resetAt,
-      remaining,
-      lastUpdated: new Date()
+      resetAt: toValidDate(resetAt),
+      remaining
     },
     update: {
-      resetAt,
-      remaining,
-      lastUpdated: new Date()
+      resetAt: toValidDate(resetAt),
+      remaining
     }
-  });
+  })
 }
 
+// Get rate limit info
 export async function getRateLimit(endpoint: string) {
   const rateLimit = await (prisma as any).twitterRateLimit.findUnique({
     where: {
       endpoint
     }
-  });
+  })
 
-  if (rateLimit) {
-    console.log('[Twitter Storage] Retrieved rate limit:', {
-      endpoint,
-      resetAt: rateLimit.resetAt.toISOString(),
-      remaining: rateLimit.remaining,
-      lastUpdated: rateLimit.lastUpdated.toISOString()
-    });
-  }
-
-  return rateLimit;
+  return rateLimit
 }
 
 export async function canMakeRequest(endpoint: string): Promise<boolean> {

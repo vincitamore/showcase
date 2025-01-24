@@ -1,10 +1,11 @@
-import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, ApiResponseError } from 'twitter-api-v2';
+import { TwitterApi, TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, ApiResponseError, TwitterApiReadOnly } from 'twitter-api-v2';
 import { 
   canMakeRequest,
   updateRateLimit,
   getRateLimit,
   getCachedTweets
 } from '@/lib/tweet-storage';
+import { env } from '@/env';
 
 // Rate limit configuration
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -281,100 +282,106 @@ async function updateEndpointRateLimit(endpoint: string): Promise<void> {
   };
 }
 
-// Helper to safely execute rate-limited API calls
+// Initialize read-only client for public data
+export async function getReadOnlyClient() {
+  console.log('[Twitter API] Initializing read-only client...');
+  return new TwitterApi({
+    appKey: env.TWITTER_API_KEY,
+    appSecret: env.TWITTER_API_SECRET,
+    accessToken: env.TWITTER_ACCESS_TOKEN,
+    accessSecret: env.TWITTER_ACCESS_SECRET,
+  }).v2;
+}
+
+// Execute a Twitter API request with rate limit handling
 export async function executeWithRateLimit<T>(
   endpoint: string,
   params: Record<string, any>,
-  execute: () => Promise<T>
+  apiCall: () => Promise<T>
 ): Promise<T> {
-  const canRequest = await canMakeRequest(endpoint);
-  if (!canRequest) {
-    const rateLimit = await getRateLimit(endpoint);
-    const now = Date.now();
-    const resetTime = rateLimit ? rateLimit.resetAt.getTime() : now + RATE_LIMIT_WINDOW;
-    const timeUntilReset = Math.max(0, resetTime - now);
-    
-    throw new Error(`Rate limit in effect for endpoint: ${endpoint}. Reset in ${Math.floor(timeUntilReset / 1000)}s`);
-  }
-
   try {
-    await logApiRequest(endpoint, params);
-    const result = await execute();
-    await logApiResponse(endpoint, result);
-    return result;
-  } catch (error) {
-    if (error instanceof ApiResponseError) {
-      if (error.code === 429) {
-        console.log('[Twitter API] Rate limit exceeded:', {
+    // Get current rate limit info
+    const rateLimit = await getRateLimit(endpoint);
+    const now = new Date();
+    
+    console.log('[Twitter API] Rate limit status:', {
+      endpoint,
+      remaining: rateLimit?.remaining ?? 'unknown',
+      resetTime: rateLimit?.resetAt?.toISOString() ?? 'unknown',
+      currentTime: now.toISOString(),
+      timeUntilReset: rateLimit?.resetAt ? Math.floor((rateLimit.resetAt.getTime() - now.getTime()) / 1000) : 'unknown',
+      params
+    });
+
+    // Check if we're rate limited
+    if (rateLimit?.resetAt && rateLimit.resetAt > now && rateLimit.remaining <= 0) {
+      const waitTime = Math.ceil((rateLimit.resetAt.getTime() - now.getTime()) / 1000);
+      throw new Error(`Rate limit exceeded for ${endpoint}. Reset in ${waitTime} seconds.`);
+    }
+
+    // Make the API call
+    const response = await apiCall();
+
+    // Handle rate limit headers if response is from Twitter API
+    if (response && typeof response === 'object' && '_headers' in response) {
+      const headers = (response as any)._headers;
+      const rateLimitRemaining = headers?.['x-rate-limit-remaining'];
+      const rateLimitReset = headers?.['x-rate-limit-reset'];
+
+      if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
+        const remaining = parseInt(rateLimitRemaining);
+        const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+
+        console.log('[Twitter API] Updating rate limit:', {
           endpoint,
-          params,
-          error: error.message,
-          rateLimitReset: error.rateLimit?.reset
+          remaining,
+          resetTime: resetTime.toISOString(),
+          headers
         });
-        
-        // Update rate limit info with the reset time if available
-        if (error.rateLimit?.reset) {
-          const resetTime = error.rateLimit.reset * 1000;
-          await updateRateLimit(endpoint, new Date(resetTime), 0);
-          
-          const now = Date.now();
-          const timeUntilReset = Math.max(0, resetTime - now);
-          console.log('[Twitter API] Rate limit status for', endpoint, {
-            reset: new Date(resetTime).toISOString(),
-            remaining: 0,
-            timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
-          });
-        }
-      } else {
-        console.error('[Twitter API] API error:', {
-          endpoint,
-          code: error.code,
-          message: error.message,
-          data: error.data
-        });
+
+        await updateRateLimit(endpoint, resetTime, remaining);
       }
     }
-    
-    await logApiResponse(endpoint, null, error);
+
+    return response;
+  } catch (error) {
+    // Handle Twitter API errors
+    if (error instanceof ApiResponseError) {
+      // Extract rate limit info from error response if available
+      const response = error.response as any;
+      if (response?._headers) {
+        const rateLimitRemaining = response._headers['x-rate-limit-remaining'];
+        const rateLimitReset = response._headers['x-rate-limit-reset'];
+
+        if (rateLimitRemaining !== undefined && rateLimitReset !== undefined) {
+          const remaining = parseInt(rateLimitRemaining);
+          const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+
+          console.error('[Twitter API] Rate limit error details:', {
+            endpoint,
+            remaining,
+            resetTime: resetTime.toISOString(),
+            headers: response._headers,
+            status: response.status,
+            data: response.data
+          });
+
+          await updateRateLimit(endpoint, resetTime, remaining);
+        }
+      }
+    }
+
     throw error;
   }
 }
 
-// Initialize the read-only client for public tweet fetching using OAuth 1.0a
-export async function getReadOnlyClient(): Promise<TwitterApiv2> {
-  console.log('[Twitter API] Initializing read-only client...');
-  
-  // Check credentials before creating client
-  const apiKey = process.env.TWITTER_API_KEY;
-  const apiSecret = process.env.TWITTER_API_SECRET;
-  const accessToken = process.env.TWITTER_ACCESS_TOKEN;
-  const accessSecret = process.env.TWITTER_ACCESS_SECRET;
-
-  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
-    throw new Error('Twitter credentials not configured');
-  }
-
-  // Create client without immediate verification
-  const client = new TwitterApi({
-    appKey: apiKey,
-    appSecret: apiSecret,
-    accessToken: accessToken,
-    accessSecret: accessSecret,
-  });
-
-  return client.v2;
-}
-
-// Get the OAuth2 URL for user login (using CLIENT_ID/CLIENT_SECRET)
+// Get the OAuth2 URL for user login
 export async function getOAuthUrl() {
   const clientId = process.env.TWITTER_CLIENT_ID;
   const clientSecret = process.env.TWITTER_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    console.error('[Twitter OAuth] Missing OAuth credentials:', {
-      hasClientId: !!clientId,
-      hasClientSecret: !!clientSecret
-    });
+    console.error('[Twitter OAuth] Missing OAuth credentials');
     throw new Error('Missing Twitter OAuth credentials');
   }
 
@@ -383,13 +390,20 @@ export async function getOAuthUrl() {
     clientSecret: clientSecret,
   });
   
-  // Generate OAuth 2.0 URL for user authentication
   const { url, state, codeVerifier } = client.generateOAuth2AuthLink(
     process.env.NEXT_PUBLIC_URL + '/api/auth/x/callback',
     { scope: ['tweet.read', 'tweet.write', 'users.read'] }
   );
 
   return { url, state, codeVerifier };
+}
+
+// Get authenticated client for user actions
+export async function getAuthenticatedClient(accessToken: string) {
+  if (!accessToken) {
+    throw new Error('Access token is required for authenticated client');
+  }
+  return new TwitterApi(accessToken);
 }
 
 // Fetch tech-related tweets (public read-only using API Key/Secret)
@@ -432,12 +446,4 @@ export const postTweet = async (text: string, accessToken: string) => {
   const client = new TwitterApi(accessToken);
   const tweet = await client.v2.tweet(text);
   return tweet.data;
-};
-
-// Get authenticated client for user actions (using OAuth 2.0)
-export async function getAuthenticatedClient(accessToken: string) {
-  if (!accessToken) {
-    throw new Error('Access token is required for authenticated client');
-  }
-  return new TwitterApi(accessToken);
-} 
+}; 
