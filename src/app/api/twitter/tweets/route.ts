@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { TwitterApi, TweetV2, TweetEntitiesV2 } from 'twitter-api-v2'
-import { getCachedTweets, getSelectedTweets, SELECTED_TWEET_COUNT } from '@/lib/tweet-storage'
+import { 
+  getCachedTweets, 
+  getSelectedTweets, 
+  updateSelectedTweets,
+  SELECTED_TWEET_COUNT 
+} from '@/lib/tweet-storage'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -315,7 +320,8 @@ export async function GET() {
       ids: selectedTweets?.map(t => t.id) || []
     });
 
-    if (selectedTweets?.length) {
+    // Only use selected tweets if we have enough of them
+    if (selectedTweets?.length === SELECTED_TWEET_COUNT) {
       console.log('[Twitter API] Using selected tweets:', {
         count: selectedTweets.length,
         ids: selectedTweets.map(t => t.id)
@@ -323,7 +329,7 @@ export async function GET() {
       return NextResponse.json({ tweets: selectedTweets });
     }
 
-    // If no selected tweets, get cached tweets
+    // If no selected tweets or not enough, get cached tweets
     const cachedTweets = await getCachedTweets();
     console.log('[Twitter API] Cache check:', {
       hasCached: !!cachedTweets?.tweets,
@@ -342,6 +348,12 @@ export async function GET() {
       selected: selectedFromCache.length,
       ids: selectedFromCache.map(t => t.id)
     });
+
+    // Update selected tweets with our new selection
+    if (selectedFromCache.length === SELECTED_TWEET_COUNT) {
+      await updateSelectedTweets(selectedFromCache.map(t => t.id));
+      console.log('[Twitter API] Updated selected tweets cache');
+    }
 
     return NextResponse.json({ tweets: selectedFromCache });
   } catch (error) {

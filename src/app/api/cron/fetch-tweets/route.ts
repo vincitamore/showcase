@@ -254,12 +254,24 @@ export async function GET(request: Request) {
       }
 
       // Select random tweets with improved entity handling
-      const tweetIds = tweets
-        .filter(tweet => 
-          tweet.entities?.urls?.length || 
-          tweet.attachments?.media_keys?.length
-        )
-        .map(t => t.id);
+      const tweetsWithEntities = tweets.filter(tweet => 
+        tweet.entities?.urls?.length || 
+        tweet.attachments?.media_keys?.length
+      );
+      
+      // If we don't have enough tweets with entities, include tweets without entities
+      const tweetPool = tweetsWithEntities.length >= SELECTED_TWEET_COUNT 
+        ? tweetsWithEntities 
+        : tweets;
+      
+      const tweetIds = tweetPool.map(t => t.id);
+      console.log('[Cron] Tweet selection pool:', {
+        totalTweets: tweets.length,
+        withEntities: tweetsWithEntities.length,
+        poolSize: tweetIds.length,
+        timestamp: new Date().toISOString(),
+        step: 'selection-pool'
+      });
       
       const selectedCount = Math.min(SELECTED_TWEET_COUNT, tweetIds.length);
       const selectedIds: string[] = [];
@@ -275,6 +287,9 @@ export async function GET(request: Request) {
       console.log('[Cron] Selected random tweets:', {
         selectedCount,
         selectedIds,
+        withEntities: selectedIds
+          .filter(id => tweetsWithEntities.some(t => t.id === id))
+          .length,
         timestamp: new Date().toISOString(),
         durationMs: Date.now() - startTime,
         step: 'tweets-selected'
