@@ -488,7 +488,11 @@ const BlogSection = () => {
         indices: number[]
         render: () => JSX.Element
       }> = [
-        // Only include mentions and hashtags in text processing
+        ...(tweet.entities.urls?.map(url => ({
+          type: 'url' as const,
+          indices: url.indices,
+          render: () => renderLink(url.expanded_url, url.display_url, url)
+        })) || []),
         ...(tweet.entities.mentions?.map(mention => ({
           type: 'mention' as const,
           indices: mention.indices,
@@ -515,13 +519,6 @@ const BlogSection = () => {
         }
       });
 
-      // Also mark URL positions as taken to prevent duplicate text
-      tweet.entities.urls?.forEach(url => {
-        for (let i = url.indices[0]; i < url.indices[1]; i++) {
-          entityPositions.add(i);
-        }
-      });
-
       const segments: Array<JSX.Element | string> = [];
       let lastIndex = 0;
 
@@ -536,12 +533,14 @@ const BlogSection = () => {
           }
         }
 
-        // Add the entity
-        segments.push(
-          <span key={`entity-${index}`} className="mx-0.5">
-            {entity.render()}
-          </span>
-        );
+        // Only render mentions and hashtags in text, URLs will be rendered as previews
+        if (entity.type !== 'url') {
+          segments.push(
+            <span key={`entity-${index}`} className="mx-0.5">
+              {entity.render()}
+            </span>
+          );
+        }
 
         lastIndex = end;
       });
@@ -559,56 +558,83 @@ const BlogSection = () => {
 
     // Function to render preview cards for non-Twitter URLs
     const renderPreviews = () => {
-      // Only process URLs that aren't Twitter/X links and have preview data
-      const urlsWithPreviews = tweet.entities?.urls?.filter(url => 
-        !url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/) &&
-        (url.images?.[0] || url.title || url.description)
-      );
+      if (!tweet.entities?.urls?.length) return null;
 
-      if (!urlsWithPreviews?.length) return null;
+      // Separate Twitter/X links and other URLs
+      const twitterLinks: UrlEntity[] = [];
+      const otherLinks: UrlEntity[] = [];
+
+      tweet.entities.urls.forEach(url => {
+        if (url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/)) {
+          twitterLinks.push(url);
+        } else if (url.images?.[0] || url.title || url.description) {
+          otherLinks.push(url);
+        }
+      });
 
       return (
-        <div className="mt-3 space-y-3">
-          {urlsWithPreviews.map((url, index) => (
-            <div
-              key={`${url.url}-${index}`}
-              className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
-              }}
+        <>
+          {/* Render Twitter embeds first */}
+          {twitterLinks.map((url, index) => (
+            <div 
+              key={`twitter-${url.url}-${index}`}
+              className="mt-3 rounded-lg border border-border/50 overflow-hidden"
             >
-              {url.images?.[0] && (
-                <div className="relative w-full h-[160px] bg-accent/5">
-                  <Image
-                    src={url.images[0].url}
-                    alt={url.title || 'Link preview'}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <div className="p-3">
-                {url.title && (
-                  <h4 className="font-medium text-sm mb-2 line-clamp-1">
-                    {url.title}
-                  </h4>
-                )}
-                {url.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                    {url.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                  <ExternalLink className="h-3 w-3" />
-                  {new URL(url.expanded_url).hostname}
-                </div>
-              </div>
+              <blockquote 
+                className="twitter-tweet" 
+                data-conversation="none"
+                data-theme="dark"
+              >
+                <a href={url.expanded_url}></a>
+              </blockquote>
             </div>
           ))}
-        </div>
+
+          {/* Then render other URL previews */}
+          {otherLinks.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {otherLinks.map((url, index) => (
+                <div
+                  key={`preview-${url.url}-${index}`}
+                  className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
+                  }}
+                >
+                  {url.images?.[0] && (
+                    <div className="relative w-full h-[160px] bg-accent/5">
+                      <Image
+                        src={url.images[0].url}
+                        alt={url.title || 'Link preview'}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    {url.title && (
+                      <h4 className="font-medium text-sm mb-2 line-clamp-1">
+                        {url.title}
+                      </h4>
+                    )}
+                    {url.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                        {url.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                      <ExternalLink className="h-3 w-3" />
+                      {new URL(url.expanded_url).hostname}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       );
     };
 
@@ -619,7 +645,7 @@ const BlogSection = () => {
         </div>
         {/* Render media first if present */}
         {tweet.entities?.media && renderMedia(tweet.entities.media)}
-        {/* Then render URL previews */}
+        {/* Then render URL previews and embeds */}
         {renderPreviews()}
       </div>
     );
