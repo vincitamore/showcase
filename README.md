@@ -1,4 +1,6 @@
 # Portfolio Showcase
+> [!CAUTION]
+> This site is a work in progress and the Readme is hit or miss as to the actual state of things right now. Once I get a last few things sorted out I will come back and fix this
 
 A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/ui. This project serves as both a showcase of work and a demonstration of modern web development practices.
 
