@@ -197,13 +197,21 @@ const BlogSection = () => {
                     : entity.metadata)
                 : {};
 
+              // Log entity processing for debugging
+              console.log('[Tweet Processing] Processing entity:', {
+                type: entity.type,
+                mediaKey: entity.mediaKey,
+                url: entity.url,
+                metadata: metadata
+              });
+
               return {
                 id: entity.id,
                 type: entity.type,
                 text: entity.text,
-                url: entity.url,
-                expandedUrl: entity.expandedUrl,
-                displayUrl: entity.displayUrl,
+                url: entity.url || metadata?.url,
+                expandedUrl: entity.expandedUrl || metadata?.expanded_url,
+                displayUrl: entity.displayUrl || metadata?.display_url,
                 mediaKey: entity.mediaKey,
                 metadata
               };
@@ -217,10 +225,13 @@ const BlogSection = () => {
           console.log('[Tweet Processing] Processed entities:', {
             tweetId: dbTweet.id,
             entityCount: entities?.length || 0,
+            mediaCount: entities?.filter((e: TweetEntity) => e.type === 'media').length || 0,
+            urlCount: entities?.filter((e: TweetEntity) => e.type === 'url').length || 0,
             entities: entities?.map((e: TweetEntity) => ({
               type: e.type,
               text: e.text,
-              mediaKey: e.mediaKey
+              mediaKey: e.mediaKey,
+              url: e.url
             }))
           });
 
@@ -581,10 +592,17 @@ const BlogSection = () => {
       urlEntities: entities.filter(e => e.type === 'url')
     });
 
-    // Check for Twitter URLs that should be embedded
+    // Get unique Twitter URLs for embedding
     const twitterUrls = entities
       .filter(e => e.type === 'url' && e.expandedUrl?.includes('twitter.com/'))
-      .map(e => e.expandedUrl);
+      .reduce((acc: string[], entity) => {
+        const url = entity.expandedUrl;
+        if (url && !acc.includes(url)) acc.push(url);
+        return acc;
+      }, []);
+
+    // Only render one Twitter embed per tweet
+    const primaryTwitterUrl = twitterUrls[0];
 
     return (
       <div className="flex h-full flex-col justify-between gap-4">
@@ -593,9 +611,9 @@ const BlogSection = () => {
             {renderTweetText(tweet.text, entities)}
             {renderMedia(entities)}
             {renderUrlPreviews(entities)}
-            {twitterUrls.map((url, index) => (
+            {primaryTwitterUrl && (
               <div 
-                key={`${tweet.id}-embed-${index}`}
+                key={`${tweet.id}-embed`}
                 className="mt-2 rounded-lg border border-border/50 overflow-hidden"
               >
                 <blockquote 
@@ -603,10 +621,10 @@ const BlogSection = () => {
                   data-conversation="none"
                   data-theme="dark"
                 >
-                  <a href={url}></a>
+                  <a href={primaryTwitterUrl}></a>
                 </blockquote>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
