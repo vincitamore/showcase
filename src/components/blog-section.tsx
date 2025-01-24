@@ -560,11 +560,18 @@ const BlogSection = () => {
     const renderPreviews = () => {
       if (!tweet.entities?.urls?.length) return null;
 
+      // Track rendered URLs to prevent duplicates
+      const renderedUrls = new Set<string>();
+
       // Separate Twitter/X links and other URLs
       const twitterLinks: UrlEntity[] = [];
       const otherLinks: UrlEntity[] = [];
 
       tweet.entities.urls.forEach(url => {
+        // Skip if we've already rendered this URL
+        if (renderedUrls.has(url.expanded_url)) return;
+        renderedUrls.add(url.expanded_url);
+
         if (url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/)) {
           twitterLinks.push(url);
         } else if (url.images?.[0] || url.title || url.description) {
@@ -577,7 +584,7 @@ const BlogSection = () => {
           {/* Render Twitter embeds first */}
           {twitterLinks.map((url, index) => (
             <div 
-              key={`twitter-${url.url}-${index}`}
+              key={`twitter-${url.expanded_url}-${index}`}
               className="mt-3 rounded-lg border border-border/50 overflow-hidden"
             >
               <blockquote 
@@ -595,7 +602,7 @@ const BlogSection = () => {
             <div className="mt-3 space-y-3">
               {otherLinks.map((url, index) => (
                 <div
-                  key={`preview-${url.url}-${index}`}
+                  key={`preview-${url.expanded_url}-${index}`}
                   className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
                   onClick={(e) => {
                     e.preventDefault();
@@ -702,9 +709,10 @@ const BlogSection = () => {
             className="w-full overflow-visible mx-auto pb-4" 
             opts={{ 
               loop: true, 
-              align: "center",
-              containScroll: "trimSnaps",
-              dragFree: false
+              align: "start",
+              containScroll: false,
+              dragFree: true,
+              slidesToScroll: 1
             }}
           >
             {tweets.map((tweet, index) => (
@@ -715,8 +723,8 @@ const BlogSection = () => {
                   "group cursor-pointer",
                   "p-3 sm:p-6",
                   "mx-1.5",
-                  "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
-                  "max-w-[28rem]",
+                  "w-[calc(100vw-3rem)] sm:w-[calc(50vw-3rem)] md:w-[calc(33vw-3rem)] lg:w-[28rem]",
+                  "min-w-[280px] max-w-[28rem]",
                   "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
                 )}
                 containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
@@ -748,20 +756,6 @@ const BlogSection = () => {
                     </span>
                   </div>
                   {renderTweetText(tweet)}
-                  {tweet.referenced_tweets?.map((ref) => (
-                    <div 
-                      key={ref.id}
-                      className="mb-4 rounded-lg border border-border/50 overflow-hidden"
-                    >
-                      <blockquote 
-                        className="twitter-tweet" 
-                        data-conversation="none"
-                        data-theme="dark"
-                      >
-                        <a href={`https://twitter.com/x/status/${ref.id}`}></a>
-                      </blockquote>
-                    </div>
-                  ))}
                   <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Heart className="h-4 w-4" /> {tweet.public_metrics?.like_count ?? 0}
