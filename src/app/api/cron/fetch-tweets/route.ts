@@ -466,7 +466,39 @@ async function getRandomUserTweet(client: TwitterApiv2, username: string): Promi
   }
 }
 
+// Add detailed logging for tweet processing
+function logTweetProcessing(tweets: TweetV2[], validTweets: TweetWithAuthor[]) {
+  console.log('[CRON] Processing tweets:', {
+    total: tweets.length,
+    valid: validTweets.length,
+    withMedia: validTweets.filter(t => t.media?.length).length,
+    withEntities: validTweets.filter(t => 
+      t.entities?.urls?.length || 
+      t.entities?.mentions?.length || 
+      t.entities?.hashtags?.length
+    ).length,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Add detailed logging for search results
+function logSearchResults(results: any) {
+  console.log('[CRON] Search results:', {
+    tweets: results.data?.length || 0,
+    includes: {
+      users: results.includes?.users?.length || 0,
+      media: results.includes?.media?.length || 0
+    },
+    meta: results.meta,
+    timestamp: new Date().toISOString()
+  });
+}
+
 export async function GET(req: Request) {
+  console.log('[CRON] Starting tweet fetch:', {
+    timestamp: new Date().toISOString()
+  });
+
   const startTime = Date.now();
   logStatus('Starting cron job');
   
@@ -480,7 +512,7 @@ export async function GET(req: Request) {
 
     const canRequest = await checkRateLimit();
     if (!canRequest) {
-      logStatus('Rate limited, using cached tweets');
+      console.log('[CRON] Rate limited, using cached tweets');
       return new Response('Rate limited, using cached tweets', { status: 429 });
     }
 

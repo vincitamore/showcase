@@ -216,6 +216,41 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
   return true;
 }
 
+// Add detailed logging for API requests
+async function logApiRequest(endpoint: string, params: Record<string, any>) {
+  console.log('[Twitter API] Making request:', {
+    endpoint,
+    params,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// Add detailed logging for API responses
+async function logApiResponse(endpoint: string, response: any, error?: any) {
+  if (error) {
+    console.error('[Twitter API] Request failed:', {
+      endpoint,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      status: error.status,
+      data: error.data,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  console.log('[Twitter API] Request succeeded:', {
+    endpoint,
+    status: 'success',
+    resultCount: response?.data?.length || 0,
+    includes: {
+      users: response?.includes?.users?.length || 0,
+      media: response?.includes?.media?.length || 0,
+      tweets: response?.includes?.tweets?.length || 0
+    },
+    timestamp: new Date().toISOString()
+  });
+}
+
 // Helper to safely execute rate-limited API calls with retries
 async function executeWithRateLimit<T>(
   endpoint: string,

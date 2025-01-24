@@ -84,20 +84,22 @@ function validateTweet(
         .filter((media): media is MediaObjectV2 => media !== undefined);
     }
 
-    // Handle created_at - try multiple formats
+    // Handle created_at with robust validation
+    let validDate: Date | null = null;
+
     if (tweet.created_at) {
       try {
         // First try parsing as ISO string
         const date = new Date(tweet.created_at);
-        if (!isNaN(date.getTime())) {
-          cleanTweet.created_at = date.toISOString();
+        if (!isNaN(date.getTime()) && date.getTime() > 0) {
+          validDate = date;
         } else {
-          // Try parsing as a timestamp
+          // Try parsing as a timestamp (milliseconds)
           const timestamp = parseInt(tweet.created_at);
-          if (!isNaN(timestamp)) {
+          if (!isNaN(timestamp) && timestamp > 0) {
             const timestampDate = new Date(timestamp);
-            if (!isNaN(timestampDate.getTime())) {
-              cleanTweet.created_at = timestampDate.toISOString();
+            if (!isNaN(timestampDate.getTime()) && timestampDate.getTime() > 0) {
+              validDate = timestampDate;
             }
           }
         }
@@ -110,8 +112,18 @@ function validateTweet(
       }
     }
 
-    // Set current time if no valid date was found
-    if (!cleanTweet.created_at) {
+    // Set a valid date, using current time as fallback
+    cleanTweet.created_at = validDate ? validDate.toISOString() : new Date().toISOString();
+
+    // Verify the date is valid before returning
+    try {
+      new Date(cleanTweet.created_at).toISOString();
+    } catch (error) {
+      console.error('[Init] Invalid date after cleaning:', {
+        id: tweet.id,
+        originalDate: tweet.created_at,
+        cleanedDate: cleanTweet.created_at
+      });
       cleanTweet.created_at = new Date().toISOString();
     }
 
