@@ -1,146 +1,67 @@
 import { NextResponse } from 'next/server';
-import { getReadOnlyClient } from '@/lib/x-api';
-import { 
-  cacheTweets,
-  getRateLimitTimestamp,
-  updateRateLimitTimestamp,
-  getCachedTweets,
-  canMakeRequest,
-  updateSelectedTweets
-} from '@/lib/blob-storage';
-import { TwitterApiv2, TweetV2, TweetPublicMetricsV2, TweetEntitiesV2, UserV2, MediaObjectV2 } from 'twitter-api-v2';
-import { TwitterApi } from 'twitter-api-v2';
+import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
+import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
+import { env } from '@/env';
+import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2 } from 'twitter-api-v2';
 
-interface TweetWithAuthor extends TweetV2 {
-  author?: {
+type TweetWithEntities = {
+  id: string;
+  text: string;
+  createdAt: Date;
+  updatedAt: Date;
+  publicMetrics: any;
+  editHistoryTweetIds: string[];
+  authorId: string;
+  entities: Array<{
     id: string;
-    name: string;
-    username: string;
-    profile_image_url?: string;
+    type: string;
+    text: string;
+    url: string | null;
+    expandedUrl: string | null;
+    mediaKey: string | null;
+    tweetId: string;
+    metadata: any;
+  }>;
+};
+
+// Convert database tweet to TweetV2 format
+function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
+  return {
+    id: dbTweet.id,
+    text: dbTweet.text,
+    created_at: dbTweet.createdAt.toISOString(),
+    edit_history_tweet_ids: dbTweet.editHistoryTweetIds,
+    author_id: dbTweet.authorId,
+    public_metrics: dbTweet.publicMetrics as any,
+    entities: dbTweet.entities?.length ? {
+      urls: dbTweet.entities.filter(e => e.type === 'url').map(e => ({
+        start: 0,
+        end: 0,
+        url: e.url || '',
+        expanded_url: e.expandedUrl || '',
+        display_url: e.text || '',
+        unwound_url: e.expandedUrl || '',
+        media_key: e.mediaKey || undefined,
+        status: (e.metadata as any)?.status?.toString(),
+        title: (e.metadata as any)?.title?.toString(),
+        description: (e.metadata as any)?.description?.toString(),
+        images: []
+      } as TweetEntityUrlV2)),
+      mentions: dbTweet.entities.filter(e => e.type === 'mention').map(e => ({
+        start: 0,
+        end: 0,
+        username: e.text || '',
+        id: (e.metadata as any)?.id?.toString() || ''
+      })),
+      hashtags: dbTweet.entities.filter(e => e.type === 'hashtag').map(e => ({
+        start: 0,
+        end: 0,
+        tag: e.text || ''
+      })),
+      cashtags: [],
+      annotations: []
+    } as TweetEntitiesV2 : undefined
   };
-  media?: MediaObjectV2[];
-}
-
-// Helper function to extract user data from includes
-function extractUserData(includes: any): Map<string, UserV2> {
-  if (!includes?.users) return new Map();
-  
-  const userMap = new Map<string, UserV2>();
-  includes.users.forEach((user: UserV2) => {
-    if (user.id) {
-      userMap.set(user.id, {
-        id: user.id,
-        name: user.name || '',
-        username: user.username || '',
-        profile_image_url: user.profile_image_url
-      });
-    }
-  });
-  
-  return userMap;
-}
-
-// Helper function to extract media data from includes
-function extractMediaData(includes: any): Map<string, MediaObjectV2> {
-  if (!includes?.media) return new Map();
-  
-  const mediaMap = new Map<string, MediaObjectV2>();
-  includes.media.forEach((media: MediaObjectV2) => {
-    if (media.media_key) {
-      mediaMap.set(media.media_key, media);
-    }
-  });
-  
-  return mediaMap;
-}
-
-// Helper function to validate and clean tweet data
-function validateTweet(
-  tweet: TweetV2, 
-  userData?: Map<string, UserV2>,
-  mediaData?: Map<string, MediaObjectV2>
-): TweetWithAuthor | null {
-  try {
-    const cleanTweet: TweetWithAuthor = {
-      ...tweet,
-      entities: tweet.entities || {
-        urls: [],
-        mentions: [],
-        hashtags: [],
-        cashtags: [],
-        annotations: []
-      }
-    };
-
-    // Add author data if available
-    if (tweet.author_id && userData?.has(tweet.author_id)) {
-      cleanTweet.author = userData.get(tweet.author_id);
-    }
-
-    // Add media data if available
-    if (tweet.attachments?.media_keys?.length && mediaData) {
-      cleanTweet.media = tweet.attachments.media_keys
-        .map(key => mediaData.get(key))
-        .filter((media): media is MediaObjectV2 => media !== undefined);
-    }
-
-    // Handle created_at with robust validation
-    let validDate: Date | null = null;
-
-    if (tweet.created_at) {
-      try {
-        // First try parsing as ISO string
-        const date = new Date(tweet.created_at);
-        if (!isNaN(date.getTime()) && date.getTime() > 0) {
-          validDate = date;
-        } else {
-          // Try parsing as a timestamp (milliseconds)
-          const timestamp = parseInt(tweet.created_at);
-          if (!isNaN(timestamp) && timestamp > 0) {
-            const timestampDate = new Date(timestamp);
-            if (!isNaN(timestampDate.getTime()) && timestampDate.getTime() > 0) {
-              validDate = timestampDate;
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('[Init] Error parsing date for tweet:', {
-          id: tweet.id,
-          date: tweet.created_at,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
-
-    // Set a valid date, using current time as fallback
-    cleanTweet.created_at = validDate ? validDate.toISOString() : new Date().toISOString();
-
-    // Verify the date is valid before returning
-    try {
-      new Date(cleanTweet.created_at).toISOString();
-    } catch (error) {
-      console.error('[Init] Invalid date after cleaning:', {
-        id: tweet.id,
-        originalDate: tweet.created_at,
-        cleanedDate: cleanTweet.created_at
-      });
-      cleanTweet.created_at = new Date().toISOString();
-    }
-
-    return cleanTweet;
-  } catch (error) {
-    console.error('[Init] Error validating tweet:', {
-      id: tweet.id,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-    return null;
-  }
-}
-
-// Helper function to get random items from an array
-function getRandomItems<T>(array: T[], count: number): T[] {
-  const shuffled = [...array].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
 }
 
 // Mark route as dynamic to prevent static generation
@@ -152,6 +73,8 @@ export const maxDuration = 10; // 10 seconds timeout
 
 // This route is called during build/deployment to initialize tweets
 export async function GET(request: Request) {
+  const startTime = Date.now();
+  
   try {
     // During build time, return empty success to prevent API calls
     if (process.env.VERCEL_ENV === 'production' && process.env.NEXT_PHASE === 'build') {
@@ -165,73 +88,115 @@ export async function GET(request: Request) {
 
     // Verify the request is from Vercel Cron
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.log('[Init] Unauthorized request');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
+      console.error('[Init] Invalid authorization');
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Get currently cached tweets
-    const cachedData = await getCachedTweets();
-    if (cachedData?.tweets?.length) {
-      // Select random tweets from cache
-      const selectedTweets = getRandomItems(cachedData.tweets, 4);
-      await updateSelectedTweets(selectedTweets);
+    console.log('[Init] Starting tweet initialization...', {
+      timestamp: new Date().toISOString()
+    });
 
-      console.log('[Init] Successfully selected tweets from cache:', {
-        cached: cachedData.tweets.length,
-        selected: selectedTweets.length
-      });
-
-      return NextResponse.json({ 
-        success: true,
-        tweetsCount: cachedData.tweets.length,
-        selectedCount: selectedTweets.length,
-        fromCache: true
-      });
-    }
-
-    // Only proceed with API call if no cached data
+    // Get Twitter client
     const client = await getReadOnlyClient();
     
-    // Search for tweets containing ".build"
-    const searchResults = await client.search('.build', {
-      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'attachments'],
-      'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url'],
-      expansions: ['author_id', 'attachments.media_keys'],
-      max_results: 10
+    // Get user info
+    const username = env.TWITTER_USERNAME?.replace('@', '');
+    if (!username) {
+      console.error('[Init] Twitter username not configured');
+      return new NextResponse('Twitter username not configured', { status: 500 });
+    }
+
+    const user = await client.userByUsername(username);
+    if (!user.data) {
+      console.error('[Init] User not found:', { username });
+      return new NextResponse('User not found', { status: 404 });
+    }
+
+    console.log('[Init] Found user:', {
+      id: user.data.id,
+      username: user.data.username
     });
 
-    // Extract user and media data
-    const userData = extractUserData(searchResults.includes);
-    const mediaData = extractMediaData(searchResults.includes);
+    // Fetch tweets with proper parameters
+    const tweets = await executeWithRateLimit(
+      'userTimeline',
+      {
+        userId: user.data.id,
+        exclude: ['replies', 'retweets'],
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'user.fields': ['name', 'username', 'profile_image_url'],
+        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        expansions: ['author_id', 'attachments.media_keys'],
+        max_results: 40
+      },
+      () => client.userTimeline(user.data.id, {
+        exclude: ['replies', 'retweets'],
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'user.fields': ['name', 'username', 'profile_image_url'],
+        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        expansions: ['author_id', 'attachments.media_keys'],
+        max_results: 40
+      })
+    );
 
-    // Validate and clean tweets
-    const tweets = searchResults.data?.data || [];
-    const validTweets = tweets
-      .map(tweet => validateTweet(tweet, userData, mediaData))
-      .filter((tweet): tweet is TweetWithAuthor => tweet !== null);
+    if (!tweets.data?.data?.length) {
+      console.error('[Init] No tweets found for user:', { username });
+      return new NextResponse('No tweets found', { status: 404 });
+    }
 
-    // Cache the valid tweets
-    await cacheTweets(validTweets);
-    await updateRateLimitTimestamp(Date.now());
+    console.log('[Init] Retrieved tweets:', {
+      count: tweets.data.data.length,
+      firstTweetId: tweets.data.data[0].id,
+      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id
+    });
 
-    // Select random tweets for display
-    const selectedTweets = getRandomItems(validTweets, 4);
+    // Cache the tweets
+    const cache = await cacheTweets(tweets.data.data);
+    console.log('[Init] Cached tweets:', {
+      cacheId: cache.id,
+      tweetCount: tweets.data.data.length
+    });
+
+    // Get current cached tweets
+    const cachedTweets = await getCachedTweets();
+    if (!cachedTweets?.tweets?.length) {
+      console.error('[Init] Failed to verify cached tweets');
+      return new NextResponse('Failed to verify cached tweets', { status: 500 });
+    }
+
+    // Convert and update selected tweets
+    const selectedTweets = cachedTweets.tweets
+      .slice(0, 7) // Get first 7 tweets
+      .sort(() => 0.5 - Math.random()) // Randomize order
+      .map((tweet: TweetWithEntities) => tweet.id);
+
     await updateSelectedTweets(selectedTweets);
+    
+    const executionTime = Date.now() - startTime;
+    console.log('[Init] Job completed successfully:', {
+      tweetsStored: tweets.data.data.length,
+      selectedTweets: selectedTweets.length,
+      executionTimeMs: executionTime
+    });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      tweetsCount: validTweets.length,
-      selectedCount: selectedTweets.length,
-      fromCache: false
+      tweetsStored: tweets.data.data.length,
+      selectedTweets: selectedTweets.length,
+      executionTimeMs: executionTime
     });
   } catch (error) {
-    console.error('[Init] Error initializing tweets:', error);
-    return NextResponse.json({ 
-      success: false,
+    const executionTime = Date.now() - startTime;
+    console.error('[Init] Job failed:', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      fromCache: false
-    }, { status: 500 });
+      stack: error instanceof Error ? error.stack : undefined,
+      executionTimeMs: executionTime
+    });
+
+    return new NextResponse(
+      error instanceof Error ? error.message : 'Internal Server Error', 
+      { status: 500 }
+    );
   }
 } 
