@@ -173,6 +173,64 @@ const BlogSection = () => {
                 retweet_count: 0
               };
 
+          const entities = dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
+            try {
+              const entityData = entity.metadata 
+                ? (typeof entity.metadata === 'string'
+                    ? JSON.parse(entity.metadata)
+                    : entity.metadata)
+                : {};
+              
+              switch (entity.type) {
+                case 'url':
+                  if (!acc.urls) acc.urls = [];
+                  acc.urls.push({
+                    url: entity.url,
+                    expanded_url: entity.expandedUrl || entity.url,
+                    display_url: entity.text || entity.url,
+                    indices: entityData.indices || [0, 0],
+                    title: entityData.title,
+                    description: entityData.description,
+                    images: entityData.images?.map((img: any) => ({
+                      url: img.url,
+                      width: img.width || 0,
+                      height: img.height || 0
+                    }))
+                  });
+                  break;
+                case 'mention':
+                  if (!acc.mentions) acc.mentions = [];
+                  acc.mentions.push({
+                    username: entity.text,
+                    indices: entityData.indices || [0, 0]
+                  });
+                  break;
+                case 'hashtag':
+                  if (!acc.hashtags) acc.hashtags = [];
+                  acc.hashtags.push({
+                    tag: entity.text,
+                    indices: entityData.indices || [0, 0]
+                  });
+                  break;
+                case 'media':
+                  if (!acc.media) acc.media = [];
+                  acc.media.push({
+                    media_key: entity.mediaKey || '',
+                    type: entityData.type || 'photo',
+                    url: entityData.url || entity.url,
+                    preview_image_url: entityData.preview_image_url || entityData.url || entity.url,
+                    width: entityData.width,
+                    height: entityData.height
+                  });
+                  break;
+              }
+              return acc;
+            } catch (entityError) {
+              console.error('Error processing entity:', { entity, error: entityError });
+              return acc;
+            }
+          }, {} as TweetEntities);
+
           return {
             id: dbTweet.id,
             text: dbTweet.text,
@@ -183,59 +241,7 @@ const BlogSection = () => {
               username: profileConfig.username,
               name: profileConfig.displayName
             },
-            entities: dbTweet.entities?.reduce((acc: TweetEntities, entity: any) => {
-              try {
-                const entityData = entity.metadata 
-                  ? (typeof entity.metadata === 'string'
-                      ? JSON.parse(entity.metadata)
-                      : entity.metadata)
-                  : {};
-                
-                switch (entity.type) {
-                  case 'url':
-                    if (!acc.urls) acc.urls = [];
-                    acc.urls.push({
-                      url: entity.url,
-                      expanded_url: entity.expandedUrl,
-                      display_url: entity.text,
-                      indices: entityData.indices || [0, 0],
-                      title: entityData.title,
-                      description: entityData.description,
-                      images: entityData.images
-                    });
-                    break;
-                  case 'mention':
-                    if (!acc.mentions) acc.mentions = [];
-                    acc.mentions.push({
-                      username: entity.text,
-                      indices: entityData.indices || [0, 0]
-                    });
-                    break;
-                  case 'hashtag':
-                    if (!acc.hashtags) acc.hashtags = [];
-                    acc.hashtags.push({
-                      tag: entity.text,
-                      indices: entityData.indices || [0, 0]
-                    });
-                    break;
-                  case 'media':
-                    if (!acc.media) acc.media = [];
-                    acc.media.push({
-                      media_key: entity.mediaKey || '',
-                      type: entityData.type || 'photo',
-                      url: entityData.url,
-                      preview_image_url: entityData.preview_image_url,
-                      width: entityData.width,
-                      height: entityData.height
-                    });
-                    break;
-                }
-                return acc;
-              } catch (entityError) {
-                console.error('Error processing entity:', { entity, error: entityError });
-                return acc;
-              }
-            }, {} as TweetEntities)
+            entities
           };
         } catch (tweetError) {
           console.error('Error processing tweet:', { tweet: dbTweet, error: tweetError });
@@ -603,61 +609,62 @@ const BlogSection = () => {
 
     // Function to render preview cards for non-Twitter URLs
     const renderPreviews = () => {
-      if (!tweet.entities?.urls) {
-        console.log('No URLs available for preview cards');
-        return null;
-      }
+      const urlsWithPreviews = tweet.entities?.urls?.filter(url => 
+        url.images?.[0] || url.title || url.description
+      );
 
-      const previewUrls = tweet.entities.urls
-        .filter(url => !url.expanded_url.includes('twitter.com') && !url.expanded_url.includes('x.com'));
+      if (!urlsWithPreviews?.length) return null;
 
-      console.log('Rendering preview cards:', {
-        totalUrls: tweet.entities.urls.length,
-        previewableUrls: previewUrls.length,
-        urls: previewUrls.map(u => ({
-          url: u.expanded_url,
-          hasImage: !!u.images?.[0],
-          title: u.title
-        }))
-      });
+      return (
+        <div className="mt-3 space-y-3">
+          {urlsWithPreviews.map((url, index) => {
+            // Skip Twitter/X URLs as they're handled by the embed
+            if (url.expanded_url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/)) {
+              return null;
+            }
 
-      return previewUrls.map((url, index) => (
-        <div
-          key={`preview-${index}`}
-          className="mt-3 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
-          }}
-        >
-          {url.images?.[0] && (
-            <div className="relative w-full h-[160px] bg-accent/5">
-              <Image
-                src={url.images[0].url}
-                alt={url.title || 'Link preview'}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-          )}
-          <div className="p-4">
-            <h4 className="font-medium text-sm mb-2 line-clamp-1">
-              {url.title || new URL(url.expanded_url).hostname}
-            </h4>
-            {url.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                {url.description}
-              </p>
-            )}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-              <ExternalLink className="h-3 w-3" />
-              {new URL(url.expanded_url).hostname}
-            </div>
-          </div>
+            return (
+              <div
+                key={`${url.url}-${index}`}
+                className="rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(url.expanded_url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {url.images?.[0] && (
+                  <div className="relative w-full h-[160px] bg-accent/5">
+                    <Image
+                      src={url.images[0].url}
+                      alt={url.title || 'Link preview'}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <div className="p-3">
+                  {url.title && (
+                    <h4 className="font-medium text-sm mb-2 line-clamp-1">
+                      {url.title}
+                    </h4>
+                  )}
+                  {url.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                      {url.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                    <ExternalLink className="h-3 w-3" />
+                    {new URL(url.expanded_url).hostname}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ));
+      );
     };
 
     return (
