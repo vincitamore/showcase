@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getReadOnlyClient } from '@/lib/x-api';
+import { getReadOnlyClient, executeWithRateLimit } from '@/lib/x-api';
 import { cacheTweets, getCachedTweets, updateSelectedTweets } from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2 } from 'twitter-api-v2';
@@ -66,6 +66,8 @@ function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
 
 // Ensure this is only called by Vercel cron
 export async function GET(request: Request) {
+  const startTime = Date.now();
+  
   try {
     // Verify cron secret
     const authHeader = request.headers.get('authorization');
@@ -74,35 +76,70 @@ export async function GET(request: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    console.log('[Cron] Starting tweet fetch...');
+    console.log('[Cron] Starting tweet fetch...', {
+      timestamp: new Date().toISOString()
+    });
 
     // Get Twitter client
     const client = await getReadOnlyClient();
     
     // Get user info
-    const user = await client.userByUsername(env.TWITTER_USERNAME);
+    const username = env.TWITTER_USERNAME?.replace('@', '');
+    if (!username) {
+      console.error('[Cron] Twitter username not configured');
+      return new NextResponse('Twitter username not configured', { status: 500 });
+    }
+
+    const user = await client.userByUsername(username);
     if (!user.data) {
-      console.error('[Cron] User not found');
+      console.error('[Cron] User not found:', { username });
       return new NextResponse('User not found', { status: 404 });
     }
 
-    // Fetch tweets
-    const tweets = await client.userTimeline(user.data.id, {
-      exclude: ['replies', 'retweets'],
-      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'attachments'],
-      'user.fields': ['profile_image_url', 'username', 'name'],
-      'media.fields': ['url', 'preview_image_url'],
-      expansions: ['author_id', 'attachments.media_keys'],
-      max_results: 40
+    console.log('[Cron] Found user:', {
+      id: user.data.id,
+      username: user.data.username
     });
 
-    if (!tweets.data.data?.length) {
-      console.error('[Cron] No tweets found');
+    // Fetch tweets with proper parameters
+    const tweets = await executeWithRateLimit(
+      'userTimeline',
+      {
+        userId: user.data.id,
+        exclude: ['replies', 'retweets'],
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'user.fields': ['name', 'username', 'profile_image_url'],
+        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        expansions: ['author_id', 'attachments.media_keys'],
+        max_results: 40
+      },
+      () => client.userTimeline(user.data.id, {
+        exclude: ['replies', 'retweets'],
+        'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id'],
+        'user.fields': ['name', 'username', 'profile_image_url'],
+        'media.fields': ['url', 'preview_image_url', 'type', 'height', 'width'],
+        expansions: ['author_id', 'attachments.media_keys'],
+        max_results: 40
+      })
+    );
+
+    if (!tweets.data?.data?.length) {
+      console.error('[Cron] No tweets found for user:', { username });
       return new NextResponse('No tweets found', { status: 404 });
     }
 
+    console.log('[Cron] Retrieved tweets:', {
+      count: tweets.data.data.length,
+      firstTweetId: tweets.data.data[0].id,
+      lastTweetId: tweets.data.data[tweets.data.data.length - 1].id
+    });
+
     // Cache the tweets
-    await cacheTweets(tweets.data.data);
+    const cache = await cacheTweets(tweets.data.data);
+    console.log('[Cron] Cached tweets:', {
+      cacheId: cache.id,
+      tweetCount: tweets.data.data.length
+    });
 
     // Get current cached tweets
     const cachedTweets = await getCachedTweets();
@@ -119,14 +156,31 @@ export async function GET(request: Request) {
 
     await updateSelectedTweets(selectedTweets);
     
+    const executionTime = Date.now() - startTime;
+    console.log('[Cron] Job completed successfully:', {
+      tweetsStored: tweets.data.data.length,
+      selectedTweets: selectedTweets.length,
+      executionTimeMs: executionTime
+    });
+
     return NextResponse.json({
       success: true,
       tweetsStored: tweets.data.data.length,
-      selectedTweets: selectedTweets.length
+      selectedTweets: selectedTweets.length,
+      executionTimeMs: executionTime
     });
   } catch (error) {
-    console.error('[Cron] Error fetching tweets:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    const executionTime = Date.now() - startTime;
+    console.error('[Cron] Job failed:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      executionTimeMs: executionTime
+    });
+
+    return new NextResponse(
+      error instanceof Error ? error.message : 'Internal Server Error', 
+      { status: 500 }
+    );
   }
 } 
 

@@ -88,15 +88,6 @@ function isRateLimited(endpoint: string): boolean {
 // Helper to update rate limit info from response headers
 async function updateRateLimitInfo(endpoint: string, headers: Record<string, string | string[]>) {
   const now = Date.now();
-  
-  if (!rateLimitCache[endpoint]) {
-    rateLimitCache[endpoint] = {
-      reset: now + RATE_LIMIT_WINDOW,
-      remaining: 1,
-      lastUpdated: now
-    };
-  }
-  
   let resetTime = now + RATE_LIMIT_WINDOW;
   let remaining = 1;
 
@@ -107,16 +98,14 @@ async function updateRateLimitInfo(endpoint: string, headers: Record<string, str
     remaining = parseInt(String(headers['x-rate-limit-remaining']));
   }
 
-  rateLimitCache[endpoint].reset = resetTime;
-  rateLimitCache[endpoint].remaining = remaining;
-  rateLimitCache[endpoint].lastUpdated = now;
-  
   // Update database rate limit info
   await updateRateLimit(endpoint, new Date(resetTime), remaining);
   
+  const timeUntilReset = resetTime - now;
   console.log(`[Twitter API] Rate limit status for ${endpoint}:`, {
     reset: new Date(resetTime).toISOString(),
-    remaining
+    remaining,
+    timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
   });
 }
 
@@ -300,39 +289,52 @@ export async function executeWithRateLimit<T>(
 ): Promise<T> {
   const canRequest = await canMakeRequest(endpoint);
   if (!canRequest) {
-    throw new Error(`Rate limit in effect for endpoint: ${endpoint}`);
+    const rateLimit = await getRateLimit(endpoint);
+    const now = Date.now();
+    const resetTime = rateLimit ? rateLimit.resetAt.getTime() : now + RATE_LIMIT_WINDOW;
+    const timeUntilReset = Math.max(0, resetTime - now);
+    
+    throw new Error(`Rate limit in effect for endpoint: ${endpoint}. Reset in ${Math.floor(timeUntilReset / 1000)}s`);
   }
 
   try {
-    // Add validation for search parameters
-    if (endpoint === 'search' && !params['tweet.fields']) {
-      params['tweet.fields'] = ['created_at', 'public_metrics', 'entities', 'author_id'];
-      params['expansions'] = ['author_id', 'attachments.media_keys'];
-      params['user.fields'] = ['name', 'username', 'profile_image_url'];
-      params['media.fields'] = ['url', 'preview_image_url', 'type', 'height', 'width'];
-    }
-
     await logApiRequest(endpoint, params);
     const result = await execute();
     await logApiResponse(endpoint, result);
     return result;
   } catch (error) {
-    if (error instanceof ApiResponseError && error.code === 429) {
-      console.log('[Twitter API] Rate limit exceeded:', {
-        endpoint,
-        params,
-        error: error.message,
-        rateLimitReset: error.rateLimit?.reset
-      });
-      
-      // Update rate limit info with the reset time if available
-      if (error.rateLimit?.reset) {
-        await updateRateLimitInfo(endpoint, {
-          'x-rate-limit-reset': String(error.rateLimit.reset),
-          'x-rate-limit-remaining': '0'
+    if (error instanceof ApiResponseError) {
+      if (error.code === 429) {
+        console.log('[Twitter API] Rate limit exceeded:', {
+          endpoint,
+          params,
+          error: error.message,
+          rateLimitReset: error.rateLimit?.reset
+        });
+        
+        // Update rate limit info with the reset time if available
+        if (error.rateLimit?.reset) {
+          const resetTime = error.rateLimit.reset * 1000;
+          await updateRateLimit(endpoint, new Date(resetTime), 0);
+          
+          const now = Date.now();
+          const timeUntilReset = Math.max(0, resetTime - now);
+          console.log('[Twitter API] Rate limit status for', endpoint, {
+            reset: new Date(resetTime).toISOString(),
+            remaining: 0,
+            timeUntilReset: Math.floor(timeUntilReset / 1000) + 's'
+          });
+        }
+      } else {
+        console.error('[Twitter API] API error:', {
+          endpoint,
+          code: error.code,
+          message: error.message,
+          data: error.data
         });
       }
     }
+    
     await logApiResponse(endpoint, null, error);
     throw error;
   }
