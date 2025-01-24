@@ -345,67 +345,25 @@ const BlogSection = () => {
       const isTweetLink = url.match(/twitter\.com|x\.com\/\w+\/status\/(\d+)/);
       
       if (isTweetLink) {
+        // Return null here since we'll handle tweet embeds in renderPreviews
         return (
-          <div className="mt-2 rounded-lg border border-border/50 overflow-hidden">
-            <blockquote 
-              className="twitter-tweet" 
-              data-conversation="none"
-              data-theme="dark"
-            >
-              <a href={url}></a>
-            </blockquote>
-          </div>
-        );
-      }
-
-      // For non-Twitter links, show preview if available
-      const hasPreview = urlEntity.images?.[0] || urlEntity.title;
-      
-      if (hasPreview) {
-        return (
-          <div
-            className="mt-2 rounded-lg border border-border/50 overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer"
+          <span
+            className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               window.open(url, '_blank', 'noopener,noreferrer');
             }}
           >
-            {urlEntity.images?.[0] && (
-              <div className="relative w-full h-[160px] bg-accent/5">
-                <Image
-                  src={urlEntity.images[0].url}
-                  alt={urlEntity.title || 'Link preview'}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            )}
-            <div className="p-3">
-              {urlEntity.title && (
-                <h4 className="font-medium text-sm mb-2 line-clamp-1">
-                  {urlEntity.title}
-                </h4>
-              )}
-              {urlEntity.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                  {urlEntity.description}
-                </p>
-              )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                <ExternalLink className="h-3 w-3" />
-                {new URL(url).hostname}
-              </div>
-            </div>
-          </div>
+            {displayText}
+          </span>
         );
       }
 
-      // Default link rendering for links without previews
+      // For non-Twitter links, just render as text link since we'll handle previews separately
       return (
         <span
-          className="inline-flex items-center gap-1 text-primary hover:text-primary/80 hover:underline cursor-pointer"
+          className="text-primary hover:text-primary/80 hover:underline cursor-pointer"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -413,7 +371,6 @@ const BlogSection = () => {
           }}
         >
           {displayText}
-          <ExternalLink className="h-3 w-3 inline-block" />
         </span>
       );
     };
@@ -554,18 +511,6 @@ const BlogSection = () => {
         return a.indices[0] - b.indices[0];
       });
 
-      // Log entities for debugging
-      console.log('Processing text:', {
-        text: tweet.text,
-        entities: entities.map(e => ({
-          type: e.type,
-          indices: e.indices,
-        }))
-      });
-
-      const segments: Array<JSX.Element | string> = [];
-      let lastIndex = 0;
-
       // Create a map of positions that are part of entities
       const entityPositions = new Set<number>();
       entities.forEach(entity => {
@@ -574,14 +519,16 @@ const BlogSection = () => {
         }
       });
 
+      const segments: Array<JSX.Element | string> = [];
+      let lastIndex = 0;
+
       entities.forEach((entity, index) => {
         const [start, end] = entity.indices;
 
         // Only add text before entity if it's not part of a previous entity
         if (start > lastIndex) {
-          // Check if this text segment is not part of any entity
           const textSegment = tweet.text.slice(lastIndex, start);
-          if (textSegment.trim()) {
+          if (textSegment.trim() && !Array.from(textSegment).some((_c, i) => entityPositions.has(lastIndex + i))) {
             segments.push(textSegment);
           }
         }
@@ -599,7 +546,7 @@ const BlogSection = () => {
       // Add any remaining text that's not part of any entity
       if (lastIndex < tweet.text.length) {
         const remainingText = tweet.text.slice(lastIndex);
-        if (remainingText.trim()) {
+        if (remainingText.trim() && !Array.from(remainingText).some((_c, i) => entityPositions.has(lastIndex + i))) {
           segments.push(remainingText);
         }
       }
@@ -672,6 +619,7 @@ const BlogSection = () => {
         <div className="text-sm text-muted-foreground/90 leading-relaxed">
           {processText()}
         </div>
+        {/* Only render media and previews here, not in the text processing */}
         {tweet.entities?.media && renderMedia(tweet.entities.media)}
         {renderPreviews()}
       </div>
