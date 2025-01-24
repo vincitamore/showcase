@@ -140,21 +140,22 @@ const SkillsGrid = () => {
             key={index}
             className={cn(
               "group cursor-pointer",
-              "p-4 sm:p-6",
-              "mx-2 sm:mx-4",
-              "w-[calc(100vw-2rem)] sm:w-[calc(100vw-6rem)] md:w-[calc(85vw-6rem)] lg:w-[28rem]",
+              "p-3 sm:p-4",
+              "mx-1.5",
+              "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[28rem]",
+              "max-w-[28rem]",
               "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
             )}
-            containerClassName="min-h-[20rem] sm:min-h-[22rem] rounded-lg sm:rounded-xl"
+            containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
           >
             <div className="flex flex-col h-full">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-lg bg-primary/5 ring-1 ring-inset ring-primary/10 group-hover:bg-primary/10 transition-all duration-300">
                   {category.icon}
                 </div>
                 <h3 className="text-lg sm:text-xl font-semibold">{category.title}</h3>
               </div>
-              <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                 {category.description}
               </p>
               <div className="mt-auto flex flex-wrap gap-1.5">

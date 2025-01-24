@@ -80,19 +80,20 @@ const ProjectsSection = () => {
             key={index}
             className={cn(
               "group cursor-pointer",
-              "p-4 sm:p-6",
-              "mx-2 sm:mx-4",
-              "w-[calc(100vw-2rem)] sm:w-[calc(100vw-6rem)] md:w-[calc(85vw-6rem)] lg:w-[42rem]",
+              "p-3 sm:p-4",
+              "mx-1.5",
+              "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[42rem]",
+              "max-w-[42rem]",
               "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300"
             )}
-            containerClassName="min-h-[26rem] sm:min-h-[28rem] md:min-h-[30rem] rounded-lg sm:rounded-xl"
+            containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
           >
             <div className="flex h-full flex-col justify-between">
               <div>
                 <h3 className="mb-2 text-lg sm:text-xl font-semibold tracking-tight">{project.title}</h3>
                 <p className="mb-3 text-sm text-muted-foreground leading-relaxed">{project.description}</p>
                 {project.highlights && (
-                  <ul className="mb-4 space-y-1.5">
+                  <ul className="mb-3 space-y-1">
                     {project.highlights.map((highlight, highlightIndex) => (
                       <li 
                         key={highlightIndex}
@@ -105,7 +106,7 @@ const ProjectsSection = () => {
                 )}
               </div>
               <div>
-                <div className="mb-4 flex flex-wrap gap-1.5">
+                <div className="mb-3 flex flex-wrap gap-1.5">
                   {project.tags.map((tag, tagIndex) => (
                     <span
                       key={tagIndex}
@@ -116,7 +117,7 @@ const ProjectsSection = () => {
                   ))}
                 </div>
                 {project.images && (
-                  <div className="mb-4 grid gap-2 grid-cols-2">
+                  <div className="mb-3 grid gap-2 grid-cols-2">
                     {project.images.map((image, imageIndex) => (
                       <ImageModal
                         key={imageIndex}
