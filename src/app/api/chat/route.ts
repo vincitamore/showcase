@@ -60,46 +60,61 @@ export async function POST(req: Request) {
     // Format messages for xAI
     console.log('[Chat API] Formatting messages for xAI')
     const apiMessages = await Promise.all(messages.map(async (msg: MessageType) => {
-      // If the message has array content (image + text), format it for xAI
+      // Handle array content (image + text)
       if (Array.isArray(msg.content)) {
-        const textContent = msg.content
-          .filter(item => item.type === 'text')
-          .map(item => (item as { type: 'text', text: string }).text)
-          .join('\n')
-
-        // Upload images and get URLs
-        const imageUrls = await Promise.all(
-          msg.content
-            .filter(item => item.type === 'image')
-            .map(async item => {
-              const imageData = (item as { type: 'image', image: { mime_type: string, data: string } }).image
-              const url = await uploadImage(imageData, origin)
-              return {
-                type: 'image_url',
-                image_url: { url }
-              }
-            })
-        )
-
+        const formattedContent = []
+        
+        // Add text content first if it exists
+        const textItems = msg.content.filter(item => item.type === 'text')
+        if (textItems.length > 0) {
+          const text = textItems
+            .map(item => (item as { type: 'text', text: string }).text)
+            .join('\n')
+          formattedContent.push({
+            type: 'text',
+            text
+          })
+        }
+        
+        // Add image content
+        const imageItems = msg.content.filter(item => item.type === 'image')
+        for (const item of imageItems) {
+          const imageData = (item as { type: 'image', image: { mime_type: string, data: string } }).image
+          const url = await uploadImage(imageData, origin)
+          formattedContent.push({
+            type: 'image_url',
+            image_url: {
+              url,
+              detail: 'high'
+            }
+          })
+        }
+        
         return {
           role: msg.role,
-          content: [
-            ...(textContent ? [{ type: 'text', text: textContent }] : []),
-            ...imageUrls
-          ]
+          content: formattedContent
         }
       }
-
-      // Regular text message
+      
+      // Handle simple text messages
       return {
         role: msg.role,
-        content: msg.content
+        content: [{
+          type: 'text',
+          text: msg.content
+        }]
       }
     }))
 
     // Add system prompt
     const messagesWithSystem = [
-      { role: 'system', content: systemPrompt },
+      {
+        role: 'system',
+        content: [{
+          type: 'text',
+          text: systemPrompt
+        }]
+      },
       ...apiMessages
     ]
 
