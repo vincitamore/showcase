@@ -761,13 +761,32 @@ export function AnimatedChatInput() {
             if (!reader) throw new Error('No response reader')
 
             let responseText = ''
+            const decoder = new TextDecoder()
+
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
               
-              const chunk = new TextDecoder().decode(value)
-              responseText += chunk
+              const chunk = decoder.decode(value)
               console.log('[Chat Client] Received chunk:', chunk)
+
+              // Split chunk into lines and process each SSE event
+              const lines = chunk.split('\n')
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6) // Remove 'data: ' prefix
+                  if (data === '[DONE]') continue
+
+                  try {
+                    const event = JSON.parse(data)
+                    if (event.choices?.[0]?.delta?.content) {
+                      responseText += event.choices[0].delta.content
+                    }
+                  } catch (e) {
+                    console.warn('[Chat Client] Failed to parse SSE event:', e)
+                  }
+                }
+              }
             }
 
             console.log('[Chat Client] Creating assistant message')
@@ -799,15 +818,9 @@ export function AnimatedChatInput() {
           console.error('[Chat Client] Error in image processing:', error instanceof Error ? error.message : String(error))
         }
       }
-      reader.onerror = (error) => {
-        console.error('[Chat Client] Error reading file:', error)
-      }
-      console.log('[Chat Client] Starting file read')
       reader.readAsDataURL(selectedImage)
     } else {
-      console.log('[Chat Client] Submitting text-only message')
       handleSubmit(e)
-      setIsDialogOpen(true)
     }
   }
 
@@ -1008,15 +1021,15 @@ export function AnimatedChatInput() {
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[600px] px-4">
               <div className="space-y-6 py-4">
-                {messages.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    No chat history yet. Start a conversation!
-                  </div>
-                ) : (
+            {messages.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                No chat history yet. Start a conversation!
+              </div>
+            ) : (
                   <AnimatePresence initial={false}>
                     {messages.map((message: Message) => (
                       <ChatBubble 
-                        key={message.id} 
+                  key={message.id}
                         message={message}
                         isLoading={isLoading && message === messages[messages.length - 1]}
                         onQuote={handleQuote}
@@ -1026,9 +1039,9 @@ export function AnimatedChatInput() {
                   </AnimatePresence>
                 )}
                 <div ref={messagesEndRef} />
-              </div>
-            </div>
-          </div>
+                  </div>
+                  </div>
+                </div>
 
           <div className="border-t p-4">
             <div className="mx-auto max-w-[600px]">
@@ -1041,7 +1054,7 @@ export function AnimatedChatInput() {
                 onImageRemove={handleImageRemove}
                 imagePreview={imagePreview}
               />
-            </div>
+              </div>
           </div>
         </DialogContent>
       </Dialog>
