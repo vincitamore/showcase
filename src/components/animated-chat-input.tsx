@@ -707,6 +707,7 @@ export function AnimatedChatInput() {
           const base64Image = reader.result as string
           const base64Data = base64Image.split(',')[1]
 
+          // Create and add the user's message immediately
           const imageMessage: Message = {
             id: crypto.randomUUID(),
             role: 'user',
@@ -724,15 +725,29 @@ export function AnimatedChatInput() {
           }
 
           handleImageRemove()
-          
+          setIsDialogOpen(true)
+
+          // Add user message to chat
+          const aiMessage = convertToAIMessage(imageMessage)
+          setMessages(prevMessages => 
+            prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiMessage)
+          )
+
+          // Create assistant message placeholder
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            createdAt: new Date()
+          }
+
+          // Add empty assistant message to chat
+          const aiAssistantMessage = convertToAIMessage(assistantMessage)
+          setMessages(prevMessages => 
+            prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiAssistantMessage)
+          )
+
           try {
-            console.log('[Chat Client] Adding message to chat')
-            const aiMessage = convertToAIMessage(imageMessage)
-            setMessages(prevMessages => 
-              prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiMessage)
-            )
-            
-            console.log('[Chat Client] Sending request to API')
             const response = await fetch('/api/chat', {
               method: 'POST',
               headers: {
@@ -747,16 +762,9 @@ export function AnimatedChatInput() {
             })
 
             if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }))
-              console.error('[Chat Client] API Error:', {
-                status: response.status,
-                statusText: response.statusText,
-                errorData
-              })
-              throw new Error(`API Error: ${response.status} ${response.statusText}\n${errorData.details || errorData.error || 'Unknown error'}`)
+              throw new Error(`API Error: ${response.status} ${response.statusText}`)
             }
 
-            console.log('[Chat Client] Got response, reading stream')
             const reader = response.body?.getReader()
             if (!reader) throw new Error('No response reader')
 
@@ -768,19 +776,31 @@ export function AnimatedChatInput() {
               if (done) break
               
               const chunk = decoder.decode(value)
-              console.log('[Chat Client] Received chunk:', chunk)
-
-              // Split chunk into lines and process each SSE event
               const lines = chunk.split('\n')
+              
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
-                  const data = line.slice(6) // Remove 'data: ' prefix
+                  const data = line.slice(6)
                   if (data === '[DONE]') continue
 
                   try {
                     const event = JSON.parse(data)
                     if (event.choices?.[0]?.delta?.content) {
                       responseText += event.choices[0].delta.content
+                      // Update the assistant message content incrementally
+                      setMessages(prevMessages => {
+                        const lastMessage = prevMessages[prevMessages.length - 1]
+                        if (lastMessage.role === 'assistant') {
+                          return [
+                            ...prevMessages.slice(0, -1),
+                            {
+                              ...lastMessage,
+                              content: responseText
+                            }
+                          ]
+                        }
+                        return prevMessages
+                      })
                     }
                   } catch (e) {
                     console.warn('[Chat Client] Failed to parse SSE event:', e)
@@ -789,33 +809,32 @@ export function AnimatedChatInput() {
               }
             }
 
-            console.log('[Chat Client] Creating assistant message')
-            const assistantMessage: Message = {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: responseText,
-              createdAt: new Date()
-            }
+            // Save the final chat history
+            localStorage.setItem('chatHistory', JSON.stringify([
+              ...messages, 
+              imageMessage,
+              { ...assistantMessage, content: responseText }
+            ]))
 
-            console.log('[Chat Client] Updating messages with assistant response')
-            const aiAssistantMessage = convertToAIMessage(assistantMessage)
-            setMessages(prevMessages => 
-              prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiAssistantMessage)
-            )
-            
-            localStorage.setItem('chatHistory', JSON.stringify([...messages, imageMessage, assistantMessage]))
           } catch (error) {
-            console.error('[Chat Client] Error details:', {
-              name: error instanceof Error ? error.name : 'UnknownError',
-              message: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-              cause: error instanceof Error ? error.cause : undefined
+            console.error('[Chat Client] Error:', error)
+            // Update the assistant message to show the error
+            setMessages(prevMessages => {
+              const lastMessage = prevMessages[prevMessages.length - 1]
+              if (lastMessage.role === 'assistant') {
+                return [
+                  ...prevMessages.slice(0, -1),
+                  {
+                    ...lastMessage,
+                    content: 'Sorry, I encountered an error processing your request.'
+                  }
+                ]
+              }
+              return prevMessages
             })
           }
-          
-          setIsDialogOpen(true)
         } catch (error) {
-          console.error('[Chat Client] Error in image processing:', error instanceof Error ? error.message : String(error))
+          console.error('[Chat Client] Error in image processing:', error)
         }
       }
       reader.readAsDataURL(selectedImage)
