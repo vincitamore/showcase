@@ -59,8 +59,7 @@ Key areas of expertise include:
 - Network engineering
 - Cybersecurity
 
-Please provide detailed, technical responses while highlighting relevant skills and experience.`
-  }
+Please provide detailed, technical responses while highlighting relevant skills and experience. Don't output code unless asked. Your Latin motto is Qui Vincit, Vincit Amore.`}
 }
 
 export function extractSkillTags(content: string): string[] {

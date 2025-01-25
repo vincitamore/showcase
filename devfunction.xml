@@ -6,120 +6,14 @@
         <last-updated>2024-01-21</last-updated>
     </meta>
 
-    <function-execution>
-        <description>Rules and formats for executing development functions</description>
-        
-        <single-function>
-            <format>@FUNCTION</format>
-            <examples>
-                <example>@RECORD</example>
-                <example>@CLEAN</example>
-            </examples>
-            <rules>
-                <rule>Prefix with @ symbol for visibility</rule>
-                <rule>Use ALL CAPS for function name</rule>
-                <rule>Place at start of message or on new line</rule>
-                <rule>One function per line if using multiple singles</rule>
-            </rules>
-        </single-function>
-
-        <function-chaining>
-            <format>@[FUNCTION1->FUNCTION2->FUNCTION3]</format>
-            <examples>
-                <chain>@[RECORD->PROCEED]</chain>
-                <chain>@[CLEAN->RECORD->PROCEED]</chain>
-            </examples>
-            <rules>
-                <rule>Use square brackets to encapsulate chain</rule>
-                <rule>Separate functions with arrow operator -></rule>
-                <rule>Prefix with @ symbol for visibility</rule>
-                <rule>Functions execute in left-to-right order</rule>
-                <rule>Place chain at start of message or on new line</rule>
-                <rule>One chain per line if using multiple chains</rule>
-            </rules>
-            <execution-notes>
-                <note>Each function in chain executes completely before next begins</note>
-                <note>Chain execution stops if any function fails</note>
-                <note>Results of previous functions inform subsequent ones</note>
-            </execution-notes>
-        </function-chaining>
-
-        <common-patterns>
-            <pattern>
-                <name>Update and Proceed</name>
-                <chain>@[RECORD->PROCEED]</chain>
-                <description>Record current progress then review all documentation before proceeding</description>
-            </pattern>
-            <pattern>
-                <name>Full System Update</name>
-                <chain>@[CLEAN->RECORD->PROCEED]</chain>
-                <description>Clean files, record progress, then review for next steps</description>
-            </pattern>
-            <pattern>
-                <name>Quick Check</name>
-                <function>@PROCEED</function>
-                <description>Quick review of all documentation before continuing</description>
-            </pattern>
-        </common-patterns>
-    </function-execution>
-
     <linked-files>
         <file id="devhistory" path="devhistory.xml">Development history and changelog</file>
         <file id="devprogress" path="devprogress.xml">Current progress and next steps</file>
         <file id="devgoal" path="devgoal.xml">Project goals and future plans</file>
         <file id="design" path="design-philosophy.xml">Design guidelines and patterns</file>
+        <file id="ai-sdk" path="ai-sdk-reference.md">AI SDK documentation and reference</file>
+        <file id="rag" path="rag-guide.md">RAG implementation guide and best practices</file>
     </linked-files>
-
-    <dev-functions>
-        <function id="CLEAN">
-            <description>Clean and organize development tracking files</description>
-            <steps>
-                <step>Summarize devprogress.xml</step>
-                <step>Create concise history entry in devhistory.xml</step>
-                <step>Transfer function notes to devgoal.xml</step>
-                <step>Update next steps in devprogress.xml</step>
-            </steps>
-            <tags>
-                <tag ref="devprogress"/>
-                <tag ref="devhistory"/>
-                <tag ref="devgoal"/>
-            </tags>
-        </function>
-
-        <function id="PROCEED">
-            <description>Review all documentation before proceeding with development</description>
-            <steps>
-                <step>Read devfunction.xml for guidelines</step>
-                <step>Review devprogress.xml for context</step>
-                <step>Check devhistory.xml for relevant history</step>
-                <step>Consult devgoal.xml for direction</step>
-                <step>Follow design-philosophy.xml patterns</step>
-            </steps>
-            <tags>
-                <tag ref="all-files"/>
-            </tags>
-        </function>
-
-        <function id="RECORD">
-            <description>Examine progress and update tracking files</description>
-            <steps>
-                <step>Review recently modified files and changes</step>
-                <step>Check completed items in devprogress.xml</step>
-                <step>Update in-progress items status</step>
-                <step>Verify and update next steps</step>
-                <step>Add new monitoring needs if identified</step>
-                <step>Update environment setup if changed</step>
-            </steps>
-            <tags>
-                <tag ref="devprogress"/>
-                <tag ref="devhistory"/>
-            </tags>
-            <related-functions>
-                <function ref="CLEAN">Can be chained for full system update</function>
-                <function ref="PROCEED">Can be chained for next steps</function>
-            </related-functions>
-        </function>
-    </dev-functions>
 
     <critical-rules>
         <rule id="planning">ALWAYS check devprogress.xml before changes</rule>
@@ -132,12 +26,13 @@
         <rule id="preserve-functionality">NEVER remove or modify functionality unrelated to the specific issue being worked on - maintain strict scope isolation</rule>
         <rule id="model-id">ALWAYS use "grok-2-latest" as the xAI model identifier</rule>
         <rule id="streaming">NEVER use StreamingTextResponse - use streamText().toDataStreamResponse()</rule>
+        <rule id="ai-sdk-docs">ALWAYS reference ai-sdk-reference.md when implementing AI SDK functionality</rule>
     </critical-rules>
 
     <logging-guidelines>
         <guideline>NEVER remove console logging unless explicitly requested</guideline>
         <guideline>Maintain all error and state change logging</guideline>
-        <guideline>Keep verbose logging in development</guideline>
+        <guideline>Keep robust useful logging in development</guideline>
         <structure>
             <log type="info">Use console.log for info/state tracking</log>
             <log type="error">Use console.error with full context</log>
