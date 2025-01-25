@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 import { checkRateLimit, getRateLimitInfo } from '@/lib/rate-limit'
 import { 
   CHAT_SETTINGS, 
-  getSystemPrompt, 
+  getSystemPrompt,
   extractSkillTags,
   type ChatMessage 
 } from '@/lib/chat-config'
@@ -48,55 +48,39 @@ export async function POST(req: Request) {
   try {
     console.log('[Chat API] Starting request processing')
     const { messages } = await req.json()
-    const origin = new URL(req.url).origin
     console.log('[Chat API] Received messages:', JSON.stringify(messages, null, 2))
     
     // Get the active system prompt
-    const systemPrompt = await getSystemPrompt()
+    let systemPrompt = ''
+    try {
+      systemPrompt = await getSystemPrompt()
+    } catch (error) {
+      console.warn('[Chat API] Failed to get system prompt, using fallback')
+      systemPrompt = `You are an AI assistant with expertise in full-stack development, particularly in TypeScript, React, Next.js, and modern web technologies. You help answer questions about the developer's skills, experience, and projects.
+
+Key areas of expertise include:
+- TypeScript and modern JavaScript
+- React and Next.js
+- Full-stack development
+- System architecture
+- Network engineering
+- Cybersecurity
+
+Please provide detailed, technical responses while highlighting relevant skills and experience. Don't output code unless asked. Your Latin motto is Qui Vincit, Vincit Amore.`
+    }
     console.log('[Chat API] System prompt:', systemPrompt)
     
     // Format messages for xAI
     console.log('[Chat API] Formatting messages for xAI')
-    const apiMessages = await Promise.all(messages.map(async (msg: MessageType) => {
-      // Handle array content (image + text)
-      if (Array.isArray(msg.content)) {
-        let formattedContent = ''
-        const imageUrls: string[] = []
-        
-        // Process text content
-        const textItems = msg.content.filter(item => item.type === 'text')
-        if (textItems.length > 0) {
-          formattedContent = textItems
-            .map(item => (item as { type: 'text', text: string }).text)
-            .join('\n')
-        }
-        
-        // Process image content
-        const imageItems = msg.content.filter(item => item.type === 'image')
-        for (const item of imageItems) {
-          const imageData = (item as { type: 'image', image: { mime_type: string, data: string } }).image
-          const url = await uploadImage(imageData, origin)
-          imageUrls.push(url)
-        }
-        
-        // Combine text and image URLs in the content
-        const fullContent = [
-          formattedContent,
-          ...imageUrls.map(url => `![Image](${url})`)
-        ].filter(Boolean).join('\n')
-        
-        return {
-          role: msg.role,
-          content: fullContent
-        }
-      }
-      
-      // Handle simple text messages
+    const apiMessages = messages.map((msg: MessageType) => {
+      // Skip empty messages
+      if (!msg.content) return null
+
       return {
         role: msg.role,
         content: msg.content
       }
-    }))
+    }).filter(Boolean)
 
     // Add system prompt
     const messagesWithSystem = [

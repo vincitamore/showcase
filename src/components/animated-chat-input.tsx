@@ -602,25 +602,29 @@ function ChatInput({
 
 function convertToAIMessage(msg: Message): AIMessage {
   if (Array.isArray(msg.content)) {
-    // Convert array content to string representation for AI SDK
+    // For image messages, create proper content array
+    const textContent = msg.content
+      .filter(item => item.type === 'text')
+      .map(item => (item as TextContent).text)
+      .join('\n')
+
+    const imageContent = msg.content
+      .filter(item => item.type === 'image')
+      .map(item => `![Image](data:${(item as any).image.mime_type};base64,${(item as any).image.data})`)
+      .join('\n')
+
     return {
       id: msg.id,
       role: msg.role,
-      content: msg.content
-        .map(item => {
-          if (item.type === 'text') return item.text
-          if (item.type === 'image') return `[Image: ${item.image.mime_type}]`
-          return ''
-        })
-        .filter(Boolean)
-        .join('\n'),
+      content: [textContent, imageContent].filter(Boolean).join('\n'),
       createdAt: msg.createdAt
     }
   }
+  
   return {
     id: msg.id,
     role: msg.role,
-    content: msg.content,
+    content: msg.content || '',
     createdAt: msg.createdAt
   }
 }
@@ -634,7 +638,7 @@ export function AnimatedChatInput() {
   const [selectedImage, setSelectedImage] = React.useState<File | null>(null)
   const [imagePreview, setImagePreview] = React.useState<string | null>(null)
   
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput } = useChat({
     api: "/api/chat",
     initialMessages: [],
     id: React.useId(), // Unique chat ID
@@ -726,6 +730,7 @@ export function AnimatedChatInput() {
 
           handleImageRemove()
           setIsDialogOpen(true)
+          setInput?.('')
 
           // Add user message to chat
           const aiMessage = convertToAIMessage(imageMessage)
@@ -754,10 +759,18 @@ export function AnimatedChatInput() {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                messages: [...messages, imageMessage].map(msg => ({
-                  ...msg,
-                  createdAt: undefined
-                }))
+                messages: [
+                  ...messages.map(msg => ({
+                    role: msg.role,
+                    content: Array.isArray(msg.content) 
+                      ? convertToAIMessage(msg as Message).content 
+                      : msg.content
+                  })),
+                  {
+                    role: imageMessage.role,
+                    content: convertToAIMessage(imageMessage).content
+                  }
+                ].filter(msg => msg.role !== 'assistant' || msg.content)
               }),
             })
 
@@ -788,19 +801,17 @@ export function AnimatedChatInput() {
                     if (event.choices?.[0]?.delta?.content) {
                       responseText += event.choices[0].delta.content
                       // Update the assistant message content incrementally
-                      setMessages(prevMessages => {
-                        const lastMessage = prevMessages[prevMessages.length - 1]
-                        if (lastMessage.role === 'assistant') {
-                          return [
-                            ...prevMessages.slice(0, -1),
-                            {
-                              ...lastMessage,
-                              content: responseText
-                            }
-                          ]
-                        }
-                        return prevMessages
-                      })
+                      const updatedAssistantMessage = {
+                        ...assistantMessage,
+                        content: responseText
+                      }
+                      setMessages(prevMessages => 
+                        prevMessages.map(msg => 
+                          msg.id === assistantMessage.id 
+                            ? convertToAIMessage(updatedAssistantMessage)
+                            : convertToAIMessage(msg as Message)
+                        )
+                      )
                     }
                   } catch (e) {
                     console.warn('[Chat Client] Failed to parse SSE event:', e)
@@ -810,28 +821,26 @@ export function AnimatedChatInput() {
             }
 
             // Save the final chat history
-            localStorage.setItem('chatHistory', JSON.stringify([
-              ...messages, 
-              imageMessage,
-              { ...assistantMessage, content: responseText }
-            ]))
+            const finalMessages = [
+              ...messages.map(msg => convertToAIMessage(msg as Message)),
+              convertToAIMessage(imageMessage),
+              convertToAIMessage({ ...assistantMessage, content: responseText })
+            ]
+            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
 
           } catch (error) {
             console.error('[Chat Client] Error:', error)
-            // Update the assistant message to show the error
-            setMessages(prevMessages => {
-              const lastMessage = prevMessages[prevMessages.length - 1]
-              if (lastMessage.role === 'assistant') {
-                return [
-                  ...prevMessages.slice(0, -1),
-                  {
-                    ...lastMessage,
-                    content: 'Sorry, I encountered an error processing your request.'
-                  }
-                ]
-              }
-              return prevMessages
-            })
+            const errorMessage = {
+              ...assistantMessage,
+              content: 'Sorry, I encountered an error processing your request.'
+            }
+            setMessages(prevMessages => 
+              prevMessages.map(msg => 
+                msg.id === assistantMessage.id 
+                  ? convertToAIMessage(errorMessage)
+                  : convertToAIMessage(msg as Message)
+              )
+            )
           }
         } catch (error) {
           console.error('[Chat Client] Error in image processing:', error)
