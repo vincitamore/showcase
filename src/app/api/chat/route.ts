@@ -27,8 +27,6 @@ export async function OPTIONS(req: NextRequest) {
   })
 }
 
-export const runtime = 'edge'
-
 async function uploadImage(image: { data: string, mime_type: string }, origin: string) {
   const response = await fetch(`${origin}/api/upload`, {
     method: 'POST',
@@ -62,47 +60,41 @@ export async function POST(req: Request) {
     const apiMessages = await Promise.all(messages.map(async (msg: MessageType) => {
       // Handle array content (image + text)
       if (Array.isArray(msg.content)) {
-        const formattedContent = []
+        let formattedContent = ''
+        const imageUrls: string[] = []
         
-        // Add text content first if it exists
+        // Process text content
         const textItems = msg.content.filter(item => item.type === 'text')
         if (textItems.length > 0) {
-          const text = textItems
+          formattedContent = textItems
             .map(item => (item as { type: 'text', text: string }).text)
             .join('\n')
-          formattedContent.push({
-            type: 'text',
-            text
-          })
         }
         
-        // Add image content
+        // Process image content
         const imageItems = msg.content.filter(item => item.type === 'image')
         for (const item of imageItems) {
           const imageData = (item as { type: 'image', image: { mime_type: string, data: string } }).image
           const url = await uploadImage(imageData, origin)
-          formattedContent.push({
-            type: 'image_url',
-            image_url: {
-              url,
-              detail: 'high'
-            }
-          })
+          imageUrls.push(url)
         }
+        
+        // Combine text and image URLs in the content
+        const fullContent = [
+          formattedContent,
+          ...imageUrls.map(url => `![Image](${url})`)
+        ].filter(Boolean).join('\n')
         
         return {
           role: msg.role,
-          content: formattedContent
+          content: fullContent
         }
       }
       
       // Handle simple text messages
       return {
         role: msg.role,
-        content: [{
-          type: 'text',
-          text: msg.content
-        }]
+        content: msg.content
       }
     }))
 
@@ -110,10 +102,7 @@ export async function POST(req: Request) {
     const messagesWithSystem = [
       {
         role: 'system',
-        content: [{
-          type: 'text',
-          text: systemPrompt
-        }]
+        content: systemPrompt
       },
       ...apiMessages
     ]
