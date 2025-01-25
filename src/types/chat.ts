@@ -1,11 +1,11 @@
 import type { Message as AIMessage } from 'ai'
 
-type TextContent = {
+export type TextContent = {
   type: 'text'
   text: string
 }
 
-type ImageContent = {
+export type ImageContent = {
   type: 'image'
   image: {
     data: string
@@ -13,11 +13,8 @@ type ImageContent = {
   }
 }
 
-type MessageContent = TextContent | ImageContent
+export type MessageContent = TextContent | ImageContent
 
-export interface Message extends Omit<AIMessage, 'content' | 'createdAt'> {
+export interface Message extends Omit<AIMessage, 'content'> {
   content: string | MessageContent[]
-  createdAt?: Date
-}
-
-export type { Message } 
+} 

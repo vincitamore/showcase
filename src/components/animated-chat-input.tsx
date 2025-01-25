@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useChat } from "ai/react"
-import type { Message, MessageContent } from "@/types/chat"
+import type { Message as AIMessage } from 'ai'
+import type { Message, MessageContent, TextContent } from "@/types/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog"
 import { Send, Loader2, History, Heart, ThumbsUp, ThumbsDown, MoreVertical, Copy, Quote, Trash2, Download, Upload, Image as ImageIcon, X } from "lucide-react"
@@ -599,6 +600,31 @@ function ChatInput({
   )
 }
 
+function convertToAIMessage(msg: Message): AIMessage {
+  if (Array.isArray(msg.content)) {
+    // Convert array content to string representation for AI SDK
+    return {
+      id: msg.id,
+      role: msg.role,
+      content: msg.content
+        .map(item => {
+          if (item.type === 'text') return item.text
+          if (item.type === 'image') return `[Image: ${item.image.mime_type}]`
+          return ''
+        })
+        .filter(Boolean)
+        .join('\n'),
+      createdAt: msg.createdAt
+    }
+  }
+  return {
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    createdAt: msg.createdAt
+  }
+}
+
 export function AnimatedChatInput() {
   const [mounted, setMounted] = React.useState(false)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -674,16 +700,13 @@ export function AnimatedChatInput() {
     
     if (selectedImage) {
       console.log('[Chat Client] Starting image upload process')
-      // Convert image to base64
       const reader = new FileReader()
       reader.onloadend = async () => {
         try {
           console.log('[Chat Client] Image loaded, converting to base64')
           const base64Image = reader.result as string
-          const base64Data = base64Image.split(',')[1] // Remove data URL prefix
+          const base64Data = base64Image.split(',')[1]
 
-          // Create message with image for xAI
-          console.log('[Chat Client] Creating image message')
           const imageMessage: Message = {
             id: crypto.randomUUID(),
             role: 'user',
@@ -700,15 +723,15 @@ export function AnimatedChatInput() {
             createdAt: new Date()
           }
 
-          // Clear the input and image
           handleImageRemove()
           
           try {
-            // Add the message to the chat
             console.log('[Chat Client] Adding message to chat')
-            setMessages(prevMessages => [...prevMessages, imageMessage])
+            const aiMessage = convertToAIMessage(imageMessage)
+            setMessages(prevMessages => 
+              prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiMessage)
+            )
             
-            // Trigger the API call manually since we're handling the message update ourselves
             console.log('[Chat Client] Sending request to API')
             const response = await fetch('/api/chat', {
               method: 'POST',
@@ -718,7 +741,7 @@ export function AnimatedChatInput() {
               body: JSON.stringify({
                 messages: [...messages, imageMessage].map(msg => ({
                   ...msg,
-                  createdAt: undefined // Remove createdAt as it's not needed by the API
+                  createdAt: undefined
                 }))
               }),
             })
@@ -747,7 +770,6 @@ export function AnimatedChatInput() {
               console.log('[Chat Client] Received chunk:', chunk)
             }
 
-            // Add the assistant's response
             console.log('[Chat Client] Creating assistant message')
             const assistantMessage: Message = {
               id: crypto.randomUUID(),
@@ -757,9 +779,11 @@ export function AnimatedChatInput() {
             }
 
             console.log('[Chat Client] Updating messages with assistant response')
-            setMessages(prevMessages => [...prevMessages, assistantMessage])
+            const aiAssistantMessage = convertToAIMessage(assistantMessage)
+            setMessages(prevMessages => 
+              prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiAssistantMessage)
+            )
             
-            // Save to localStorage
             localStorage.setItem('chatHistory', JSON.stringify([...messages, imageMessage, assistantMessage]))
           } catch (error) {
             console.error('[Chat Client] Error details:', {
@@ -768,7 +792,6 @@ export function AnimatedChatInput() {
               stack: error instanceof Error ? error.stack : undefined,
               cause: error instanceof Error ? error.cause : undefined
             })
-            // You might want to show an error toast here
           }
           
           setIsDialogOpen(true)
