@@ -111,3 +111,13 @@ model TwitterRateLimit {
   @@unique([endpoint])
   @@index([endpoint, resetAt])
 }
+
+model TempImage {
+  id        String   @id @default(cuid())
+  data      String   @db.Text
+  mimeType  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
