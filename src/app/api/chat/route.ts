@@ -9,8 +9,10 @@ import {
   type ChatMessage 
 } from '@/lib/chat-config'
 import { xai } from '@ai-sdk/xai'
-import { streamText, type Message as AIMessage } from 'ai'
-import type { Message, MessageContent, TextContent } from '@/types/chat'
+import { streamText } from 'ai'
+import type { Message, MessageContent, TextContent, AIMessage } from '@/types/chat'
+import { AIMessage as AI_SDK_AIMessage, convertToAIMessage } from '@/types/chat'
+import { Message as AI_SDK_Message } from '@ai-sdk/ui-utils'
 
 // Define xAI specific types
 interface XAITextContent {
@@ -66,103 +68,35 @@ async function uploadImage(image: { data: string, mime_type: string }, origin: s
 // Add debug logging to track request processing
 export async function POST(req: Request) {
   try {
-    console.log('----------------------------------------')
-    console.log('[Chat API] Starting request processing')
-    
+    console.log('Starting request processing')
     const { messages } = await req.json()
-    
-    // Get system prompt
-    const systemPrompt = await getSystemPrompt()
-    
-    // Format messages for xAI
-    const xaiMessages: XAIMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt
-      }
-    ]
 
-    // Add all messages
-    messages.forEach((msg: Message) => {
-      if (msg.role === 'user' || msg.role === 'assistant') {
-        xaiMessages.push({
-          role: msg.role,
-          content: msg.content // Keep the content as-is, whether string or array
-        })
-      }
+    // Convert messages to AI SDK format
+    const xaiMessages = messages.map((message: Message) => convertToAIMessage(message))
+
+    console.log('Formatted messages:', JSON.stringify(xaiMessages, null, 2))
+
+    const response = await fetch('http://localhost:3001/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'grok-2-vision-latest',
+        messages: xaiMessages,
+        stream: true,
+      }),
     })
 
-    console.log('[Chat API] Creating stream with model: grok-2-vision-latest')
-    console.log('[Chat API] Final formatted messages:', JSON.stringify(xaiMessages, null, 2))
-
-    try {
-      // Convert messages to AI SDK format without stringifying arrays
-      const aiMessages = xaiMessages.map(msg => ({
-        id: crypto.randomUUID(),
-        role: msg.role,
-        content: msg.content, // Don't stringify, keep the structure
-        createdAt: new Date()
-      })) as AIMessage[]
-
-      const stream = streamText({
-        model: xai('grok-2-vision-latest'),
-        messages: aiMessages
-      })
-
-      // Create a new stream that logs chunks as they come in
-      const loggedStream = new ReadableStream({
-        async start(controller) {
-          try {
-            const reader = stream.toDataStreamResponse().body?.getReader()
-            if (!reader) {
-              throw new Error('No reader available')
-            }
-
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) {
-                console.log('[Chat API] Stream complete')
-                controller.close()
-                break
-              }
-              
-              const text = new TextDecoder().decode(value)
-              // Parse the SSE format to get the actual message
-              const match = text.match(/\d+:"(.+)"/)
-              if (match) {
-                console.log('[Chat API] Received message:', match[1])
-              } else {
-                console.log('[Chat API] Received raw chunk:', text)
-              }
-              controller.enqueue(value)
-            }
-          } catch (error) {
-            console.error('[Chat API] Error in stream:', error)
-            controller.error(error)
-          }
-        }
-      })
-
-      console.log('[Chat API] Stream created, returning response')
-      return new Response(loggedStream, {
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'X-Vercel-AI-Data-Stream': 'v1'
-        }
-      })
-    } catch (error) {
-      console.error('[Chat API] Error creating stream:', error)
-      throw error
-    }
-
-  } catch (error: any) {
-    console.error('[Chat API] Error details:', error)
-    return NextResponse.json(
-      { 
-        error: 'Internal server error', 
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
-      { status: 500 }
-    )
+    return new Response(response.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
+  } catch (error) {
+    console.error('Error in chat route:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 } 

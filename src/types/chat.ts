@@ -1,4 +1,9 @@
-import { Message as AIMessage } from '@ai-sdk/ui-utils'
+import { Message as BaseAIMessage } from '@ai-sdk/ui-utils'
+
+// Extend the base AIMessage type to support array content
+export interface AIMessage extends Omit<BaseAIMessage, 'content'> {
+  content: string | MessageContent[]
+}
 
 export interface TextContent {
   type: 'text'
@@ -25,48 +30,24 @@ export interface CustomMessage {
 export type Message = CustomMessage
 
 export function convertToAIMessage(message: CustomMessage): AIMessage {
-  if (Array.isArray(message.content)) {
-    // Convert our message format to xAI's format
-    const content = message.content.map(c => {
-      if (c.type === 'text') {
-        return {
-          type: 'text',
-          text: c.text
-        }
-      } else if (c.type === 'image_url') {
-        return {
-          type: 'image_url',
-          image_url: c.image_url
-        }
-      }
-      return c
-    })
-    return {
-      id: message.id,
-      role: message.role,
-      content: JSON.stringify(content)
-    }
-  }
-  
   return {
     id: message.id,
     role: message.role,
-    content: message.content
+    content: message.content // Keep the content as-is, whether string or array
   }
 }
 
 export function convertFromAIMessage(message: AIMessage): CustomMessage {
   let content: string | MessageContent[]
-  try {
-    // Try to parse the content as JSON in case it's a structured message
-    const parsed = JSON.parse(message.content)
-    if (Array.isArray(parsed)) {
-      content = parsed
-    } else {
+  
+  // If the content is a stringified array, parse it
+  if (typeof message.content === 'string' && message.content.startsWith('[')) {
+    try {
+      content = JSON.parse(message.content)
+    } catch {
       content = message.content
     }
-  } catch {
-    // If parsing fails, use the content as-is
+  } else {
     content = message.content
   }
 
