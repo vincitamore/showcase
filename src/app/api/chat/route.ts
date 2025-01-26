@@ -78,9 +78,27 @@ export async function POST(req: Request) {
     const xaiMessages = [
       {
         role: 'system',
-        content: systemPrompt
+        content: systemPrompt,
+        id: 'system-1'
       },
-      ...messages.map((message: Message) => convertToAIMessage(message))
+      ...messages.map((message: Message) => {
+        let content = message.content
+        
+        // If content is a string and looks like a stringified array, parse it
+        if (typeof content === 'string' && content.startsWith('[')) {
+          try {
+            content = JSON.parse(content)
+          } catch {
+            // If parsing fails, keep it as a string
+          }
+        }
+
+        return {
+          id: message.id,
+          role: message.role,
+          content
+        }
+      })
     ]
 
     console.log('Formatted messages:', JSON.stringify(xaiMessages, null, 2))
