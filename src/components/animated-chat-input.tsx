@@ -44,17 +44,22 @@ interface MessageReaction {
 }
 
 const markdownComponents: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  p: ({ children }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
   code: ({ className, children, inline }: CodeProps) => (
     <code
       className={cn(
-        "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm",
+        "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm whitespace-pre-wrap",
         inline ? "inline" : "block p-2",
         className
       )}
     >
       {children}
     </code>
+  ),
+  pre: ({ children }) => (
+    <pre className="mb-2 overflow-x-auto rounded bg-primary/10 p-2 font-mono text-sm">
+      {children}
+    </pre>
   ),
   ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 list-decimal pl-4 last:mb-0">{children}</ol>,
@@ -417,7 +422,7 @@ const ChatBubble = ({
         {textContent && (
           <ReactMarkdown
             components={markdownComponents}
-            className="prose dark:prose-invert prose-sm break-words"
+            className="prose dark:prose-invert prose-sm break-words whitespace-pre-wrap"
           >
             {textContent}
           </ReactMarkdown>
@@ -771,15 +776,20 @@ export function AnimatedChatInput() {
               if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
               // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
                 .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
                 .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
                 .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
+                .replace(/\\t/g, '    ') // Convert tabs to spaces
               
               // Process actual content
-              // Add a newline if this isn't the first line of content
-              responseText += (responseText && cleanedText ? '\n' : '') + cleanedText
+              // Only add newline if we're not at the start of a markdown block
+              const isStartOfBlock = cleanedText.startsWith('#') || 
+                                   cleanedText.startsWith('*') || 
+                                   cleanedText.startsWith('-') ||
+                                   cleanedText.startsWith('```')
+              
+              responseText += (responseText && !isStartOfBlock ? '\n' : '') + cleanedText
               
               // Update the assistant's message with the accumulated response
               setLocalMessages(prev => {
@@ -871,15 +881,20 @@ export function AnimatedChatInput() {
               if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
               // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
                 .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
                 .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
                 .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
+                .replace(/\\t/g, '    ') // Convert tabs to spaces
               
               // Process actual content
-              // Add a newline if this isn't the first line of content
-              responseText += (responseText && cleanedText ? '\n' : '') + cleanedText
+              // Only add newline if we're not at the start of a markdown block
+              const isStartOfBlock = cleanedText.startsWith('#') || 
+                                   cleanedText.startsWith('*') || 
+                                   cleanedText.startsWith('-') ||
+                                   cleanedText.startsWith('```')
+              
+              responseText += (responseText && !isStartOfBlock ? '\n' : '') + cleanedText
               
               // Update the assistant's message with the accumulated response
               setLocalMessages(prev => {
