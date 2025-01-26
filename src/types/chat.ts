@@ -1,9 +1,4 @@
-import { Message as BaseAIMessage } from '@ai-sdk/ui-utils'
-
-// Extend the base AIMessage type to support array content
-export interface AIMessage extends Omit<BaseAIMessage, 'content'> {
-  content: string | MessageContent[]
-}
+import { Message as AIMessage } from '@ai-sdk/ui-utils'
 
 export interface TextContent {
   type: 'text'
@@ -30,35 +25,48 @@ export interface CustomMessage {
 export type Message = CustomMessage
 
 export function convertToAIMessage(message: CustomMessage): AIMessage {
-  let content = message.content
-  
-  // If content is a string and looks like a stringified array, parse it
-  if (typeof content === 'string' && content.startsWith('[')) {
-    try {
-      content = JSON.parse(content)
-    } catch {
-      // If parsing fails, keep it as a string
+  if (Array.isArray(message.content)) {
+    // Convert our message format to xAI's format
+    const content = message.content.map(c => {
+      if (c.type === 'text') {
+        return {
+          type: 'text',
+          text: c.text
+        }
+      } else if (c.type === 'image_url') {
+        return {
+          type: 'image_url',
+          image_url: c.image_url
+        }
+      }
+      return c
+    })
+    return {
+      id: message.id,
+      role: message.role,
+      content: JSON.stringify(content)
     }
   }
-
+  
   return {
     id: message.id,
     role: message.role,
-    content // Will be either parsed array or original content
+    content: message.content
   }
 }
 
 export function convertFromAIMessage(message: AIMessage): CustomMessage {
   let content: string | MessageContent[]
-  
-  // If the content is a stringified array, parse it
-  if (typeof message.content === 'string' && message.content.startsWith('[')) {
-    try {
-      content = JSON.parse(message.content)
-    } catch {
+  try {
+    // Try to parse the content as JSON in case it's a structured message
+    const parsed = JSON.parse(message.content)
+    if (Array.isArray(parsed)) {
+      content = parsed
+    } else {
       content = message.content
     }
-  } else {
+  } catch {
+    // If parsing fails, use the content as-is
     content = message.content
   }
 
