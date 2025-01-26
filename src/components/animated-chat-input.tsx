@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useChat } from "ai/react"
 import type { Message as AIMessage } from 'ai'
-import type { Message, MessageContent, TextContent } from "@/types/chat"
+import type { Message, MessageContent, TextContent, ImageUrlContent } from "@/types/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog"
 import { Send, Loader2, History, Heart, ThumbsUp, ThumbsDown, MoreVertical, Copy, Quote, Trash2, Download, Upload, Image as ImageIcon, X } from "lucide-react"
@@ -29,6 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useState } from "react"
+import { convertToAIMessage, convertFromAIMessage } from "@/types/chat"
 
 interface CodeProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean
@@ -59,6 +61,20 @@ const markdownComponents: Components = {
   li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
   h3: ({ children }) => <h3 className="mb-2 text-lg font-semibold last:mb-0">{children}</h3>,
   h4: ({ children }) => <h4 className="mb-2 text-base font-semibold last:mb-0">{children}</h4>,
+  img: ({ src, alt }) => (
+    <div className="relative w-full max-w-[300px] my-4">
+      <img 
+        src={src} 
+        alt={alt || 'Chat image'} 
+        className="rounded-lg w-full h-auto object-contain"
+        loading="lazy"
+        onError={(e) => {
+          console.error('[Chat Client] Image failed to load:', e)
+          e.currentTarget.alt = 'Failed to load image'
+        }}
+      />
+    </div>
+  ),
 }
 
 function ChatSkeleton() {
@@ -317,65 +333,45 @@ function ExportOptionsDialog({
 
 function MessageActions({ 
   message, 
-  isAssistant,
+  isUser,
   onQuote 
 }: { 
   message: Message
-  isAssistant: boolean
+  isUser: boolean
   onQuote: (content: string) => void
 }) {
-  const [isQuoteModalOpen, setIsQuoteModalOpen] = React.useState(false)
-  
-  const getMessageText = (content: string | MessageContent[]): string => {
-    if (typeof content === 'string') return content
-    return content
-      .filter(item => item.type === 'text')
-      .map(item => (item as TextContent).text)
-      .join('\n')
-  }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(getMessageText(message.content))
+  const handleCopy = async () => {
+    const text = Array.isArray(message.content) 
+      ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
+      : message.content
+    await navigator.clipboard.writeText(text)
   }
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-6 w-6 rounded-full p-0 opacity-0 group-hover:opacity-100 transition-opacity",
-              isAssistant ? "ml-auto" : "mr-auto"
-            )}
-          >
-            <MoreVertical className="h-3 w-3" />
-            <span className="sr-only">More options</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align={isAssistant ? "end" : "start"} className="w-[160px]">
-          <DropdownMenuItem onClick={handleCopy}>
-            <Copy className="mr-2 h-3.5 w-3.5" />
-            Copy message
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setIsQuoteModalOpen(true)}>
-            <Quote className="mr-2 h-3.5 w-3.5" />
-            Quote message
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <QuoteModal
-        content={getMessageText(message.content)}
-        isOpen={isQuoteModalOpen}
-        onClose={() => setIsQuoteModalOpen(false)}
-        onQuote={onQuote}
-      />
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+          <MoreVertical className="h-4 w-4" />
+          <span className="sr-only">Message actions</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={handleCopy}>
+          <Copy className="mr-2 h-4 w-4" />
+          Copy
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onQuote(Array.isArray(message.content) 
+          ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
+          : message.content)}>
+          <Quote className="mr-2 h-4 w-4" />
+          Quote
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
-function ChatBubble({ 
+const ChatBubble = ({ 
   message, 
   isLoading,
   onQuote,
@@ -385,115 +381,89 @@ function ChatBubble({
   isLoading?: boolean
   onQuote: (content: string) => void
   onReactionChange: (messageId: string, type: 'heart' | 'thumbsDown', active: boolean) => void
-}) {
-  const isAssistant = message.role === "assistant"
-  
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en', { 
-      hour: 'numeric', 
-      minute: 'numeric',
-      hour12: true 
-    }).format(date)
+}): JSX.Element => {
+  const [showActions, setShowActions] = useState(false)
+  const [showQuoteModal, setShowQuoteModal] = useState(false)
+  const isUser = message.role === 'user'
+
+  // Extract text and image content
+  const textContent = Array.isArray(message.content) 
+    ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
+    : message.content
+
+  const imageContent = Array.isArray(message.content)
+    ? message.content.find(c => c.type === 'image_url') as ImageUrlContent | undefined
+    : null
+
+  const formatTime = (date: Date | string | number | undefined): string => {
+    if (!date) return ''
+    const d = new Date(date)
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   }
 
-  const renderContent = () => {
-    if (Array.isArray(message.content)) {
-      return (
-        <div className="space-y-4">
-          {message.content.map((item, index) => {
-            if (item.type === 'text') {
-              return (
-                <div key={index}>
-                  {isAssistant ? (
-                    <ReactMarkdown components={markdownComponents}>
-                      {item.text || " "}
-                    </ReactMarkdown>
-                  ) : (
-                    item.text
-                  )}
-                </div>
-              )
-            } else if (item.type === 'image') {
-              return (
-                <img
-                  key={index}
-                  src={`data:${item.image.mime_type};base64,${item.image.data}`}
-                  alt="Uploaded content"
-                  className="rounded-lg max-h-64 w-auto"
-                />
-              )
-            }
-            return null
-          })}
-        </div>
-      )
-    }
-
-    return isAssistant ? (
-      <ReactMarkdown components={markdownComponents}>
-        {message.content || " "}
-      </ReactMarkdown>
-    ) : (
-      message.content
-    )
-  }
-  
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
+    <div
       className={cn(
-        "flex w-full",
-        isAssistant ? "justify-start" : "justify-end"
+        "group relative mb-4 flex items-start",
+        message.role === "user" ? "justify-end" : "justify-start"
       )}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
-      <div
-        className={cn(
-          "flex flex-col space-y-2 max-w-[80%]",
-          isAssistant ? "items-start" : "items-end"
+      <div className={cn(
+        "rounded-lg px-4 py-2 max-w-[85%] space-y-2 relative group",
+        isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+      )}>
+        {textContent && (
+          <ReactMarkdown
+            components={markdownComponents}
+            className="prose dark:prose-invert prose-sm break-words"
+          >
+            {textContent}
+          </ReactMarkdown>
         )}
-      >
-        <div className="flex items-center gap-2">
-          <div className="text-sm font-medium text-muted-foreground">
-            {isAssistant ? "AI Assistant" : "You"}
-          </div>
-          {isLoading && <TypingIndicator />}
-        </div>
-        <div
-          className={cn(
-            "group rounded-2xl px-4 py-2 shadow-sm relative",
-            isAssistant 
-              ? "bg-muted text-foreground rounded-tl-none" 
-              : "bg-primary text-primary-foreground rounded-tr-none"
-          )}
-        >
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            {renderContent()}
-          </div>
-          <div className={cn(
-            "absolute top-2",
-            isAssistant ? "right-2" : "left-2"
-          )}>
-            <MessageActions 
-              message={message} 
-              isAssistant={isAssistant}
-              onQuote={onQuote}
+        
+        {imageContent && (
+          <div className="relative w-full max-w-[300px] my-4">
+            <img 
+              src={imageContent.image_url.url}
+              alt="Uploaded image"
+              className="rounded-lg w-full h-auto object-contain"
+              loading="lazy"
+              onError={(e) => {
+                console.error('[Chat Client] Image failed to load:', e)
+                e.currentTarget.alt = 'Failed to load image'
+              }}
             />
           </div>
+        )}
+
+        {isLoading && (
+          <div className="h-4 flex items-center justify-center">
+            <TypingIndicator />
+          </div>
+        )}
+
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <MessageActions 
+            message={message}
+            isUser={isUser}
+            onQuote={onQuote}
+          />
         </div>
-        <div className="flex flex-col gap-1">
+
+        <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground/60">
           <MessageReactions 
-            isAssistant={isAssistant}
+            isAssistant={!isUser}
             messageId={message.id}
             onReactionChange={onReactionChange}
           />
-          <time className="text-xs text-muted-foreground/60">
-            {formatTime(new Date(message.createdAt || Date.now()))}
+          <time>
+            {formatTime(message.createdAt)}
           </time>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
@@ -523,35 +493,29 @@ function ChatInput({
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        alert('Image size must be less than 10MB')
-        return
-      }
       onImageSelect(file)
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className={cn("relative", className)}>
-      <div className="relative rounded-lg border bg-background shadow-glow transition-all duration-300">
+      <div className="relative rounded-lg border bg-background">
         {imagePreview && (
           <div className="p-2 border-b">
-            <div className="relative inline-block">
-              <img 
-                src={imagePreview} 
-                alt="Preview" 
-                className="max-h-32 rounded-lg"
+            <div className="relative w-32 h-32">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-full object-cover rounded-lg"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-foreground/10 hover:bg-foreground/20"
                 onClick={onImageRemove}
+                className="absolute -top-2 -right-2 p-1 rounded-full bg-background border"
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" />
                 <span className="sr-only">Remove image</span>
-              </Button>
+              </button>
             </div>
           </div>
         )}
@@ -600,33 +564,65 @@ function ChatInput({
   )
 }
 
-function convertToAIMessage(msg: Message): AIMessage {
-  if (Array.isArray(msg.content)) {
-    // For image messages, create proper content array
-    const textContent = msg.content
-      .filter(item => item.type === 'text')
-      .map(item => (item as TextContent).text)
-      .join('\n')
+async function convertToJpeg(file: File) {
+  console.log('[Chat Client] Converting image:', {
+    originalSize: file.size,
+    type: file.type
+  })
 
-    const imageContent = msg.content
-      .filter(item => item.type === 'image')
-      .map(item => `![Image](data:${(item as any).image.mime_type};base64,${(item as any).image.data})`)
-      .join('\n')
+  return new Promise<{ data: string, mimeType: string }>((resolve, reject) => {
+    const img = new Image()
+    const reader = new FileReader()
 
-    return {
-      id: msg.id,
-      role: msg.role,
-      content: [textContent, imageContent].filter(Boolean).join('\n'),
-      createdAt: msg.createdAt
+    reader.onload = (e) => {
+      img.src = e.target?.result as string
     }
-  }
-  
-  return {
-    id: msg.id,
-    role: msg.role,
-    content: msg.content || '',
-    createdAt: msg.createdAt
-  }
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'))
+        return
+      }
+
+      // Use crisp rendering
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+
+      // Draw with white background to handle transparency
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      
+      // Use a higher quality (0.92) for better image quality
+      const jpegData = canvas.toDataURL('image/jpeg', 0.92)
+      
+      // Log the converted size
+      const base64Data = jpegData.split(',')[1]
+      console.log('[Chat Client] Converted image:', {
+        originalSize: file.size,
+        convertedSize: Math.round(base64Data.length * 0.75), // base64 is ~4/3 the size of binary
+        width: img.width,
+        height: img.height
+      })
+
+      resolve({
+        data: base64Data,
+        mimeType: 'image/jpeg'
+      })
+    }
+
+    img.onerror = () => {
+      reject(new Error('Failed to load image'))
+    }
+
+    reader.readAsDataURL(file)
+  })
 }
 
 export function AnimatedChatInput() {
@@ -637,17 +633,278 @@ export function AnimatedChatInput() {
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [selectedImage, setSelectedImage] = React.useState<File | null>(null)
   const [imagePreview, setImagePreview] = React.useState<string | null>(null)
+  const [localMessages, setLocalMessages] = React.useState<Message[]>([])
   
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput } = useChat({
+  const { 
+    messages: aiMessages, 
+    input, 
+    handleInputChange, 
+    handleSubmit: originalHandleSubmit, 
+    isLoading, 
+    setInput 
+  } = useChat({
     api: "/api/chat",
+    body: {
+      model: "grok-2-vision-latest"
+    },
     initialMessages: [],
-    id: React.useId(), // Unique chat ID
+    id: React.useId(),
     onFinish: (message) => {
-      // Save to localStorage whenever a message is added
-      const updatedMessages = [...messages, message]
-      localStorage.setItem('chatHistory', JSON.stringify(updatedMessages))
+      // Don't update messages here, we'll handle it in the stream
     }
   })
+
+  // Use localMessages for rendering
+  const messages = localMessages
+
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsDialogOpen(true)
+    
+    if (isLoading) return
+
+    try {
+      if (selectedImage) {
+        console.log('[Chat Client] Starting image upload process')
+        
+        // Convert image to JPEG with error handling
+        let base64Data: string, mimeType: string
+        try {
+          const result = await convertToJpeg(selectedImage)
+          base64Data = result.data
+          mimeType = result.mimeType
+          console.log('[Chat Client] Image converted to JPEG successfully')
+        } catch (error) {
+          console.error('[Chat Client] Failed to convert image:', error)
+          throw new Error('Failed to process image')
+        }
+
+        // Upload image to get URL
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: {
+              data: base64Data,
+              mime_type: mimeType
+            }
+          })
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload image')
+        }
+
+        const { url: imageUrl } = await uploadResponse.json()
+
+        // Create message with image content
+        const imageMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageUrl,
+                detail: 'high'
+              }
+            },
+            {
+              type: 'text',
+              text: input || 'What is in this image?'
+            }
+          ],
+          createdAt: new Date()
+        }
+
+        // Add message to chat immediately
+        const updatedMessages = [...localMessages, imageMessage]
+        setLocalMessages(updatedMessages)
+        
+        try {
+          // Send message with image URL
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: updatedMessages.map(msg => convertToAIMessage(msg))
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+          }
+
+          // Create a placeholder for the assistant's response
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            createdAt: new Date()
+          }
+
+          setLocalMessages([...updatedMessages, assistantMessage])
+
+          // Process the streaming response
+          const reader = response.body?.getReader()
+          const decoder = new TextDecoder()
+          let responseText = ''
+
+          while (reader) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value)
+            console.log('[Chat Client] Raw chunk:', chunk)
+            
+            // Split into lines and process each line
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (!line.trim()) continue
+              
+              // Handle different message types
+              if (line.startsWith('f:')) continue // Skip function call messages
+              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
+              
+              // Clean up the response text
+              // Remove the "0:" prefix and any surrounding quotes
+              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+              
+              // Process actual content
+              responseText += cleanedText
+              
+              // Update the assistant's message with the accumulated response
+              setLocalMessages(prev => {
+                const updated = [...prev]
+                const lastMessage = updated[updated.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant') {
+                  lastMessage.content = responseText
+                }
+                return [...updated]
+              })
+            }
+          }
+
+          // Save to localStorage after the stream is complete
+          localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
+            ...assistantMessage,
+            content: responseText
+          }]))
+
+          console.log('[Chat Client] Image message sent and response received successfully')
+        } catch (error) {
+          console.error('[Chat Client] Failed to send image message:', error)
+          throw error
+        }
+
+        // Reset states
+        setSelectedImage(null)
+        setImagePreview(null)
+        setInput?.('')
+        
+      } else {
+        // For text-only messages
+        const textMessage: Message = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: input,
+          createdAt: new Date()
+        }
+
+        // Add user message to local state
+        const updatedMessages = [...localMessages, textMessage]
+        setLocalMessages(updatedMessages)
+
+        try {
+          // Send message
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: updatedMessages.map(msg => convertToAIMessage(msg))
+            })
+          })
+
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+          }
+
+          // Create a placeholder for the assistant's response
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            createdAt: new Date()
+          }
+
+          setLocalMessages([...updatedMessages, assistantMessage])
+
+          // Process the streaming response
+          const reader = response.body?.getReader()
+          const decoder = new TextDecoder()
+          let responseText = ''
+
+          while (reader) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value)
+            console.log('[Chat Client] Raw chunk:', chunk)
+            
+            // Split into lines and process each line
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (!line.trim()) continue
+              
+              // Handle different message types
+              if (line.startsWith('f:')) continue // Skip function call messages
+              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
+              
+              // Clean up the response text
+              // Remove the "0:" prefix and any surrounding quotes
+              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+              
+              // Process actual content
+              responseText += cleanedText
+              
+              // Update the assistant's message with the accumulated response
+              setLocalMessages(prev => {
+                const updated = [...prev]
+                const lastMessage = updated[updated.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant') {
+                  lastMessage.content = responseText
+                }
+                return [...updated]
+              })
+            }
+          }
+
+          // Save to localStorage after the stream is complete
+          localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
+            ...assistantMessage,
+            content: responseText
+          }]))
+
+          console.log('[Chat Client] Text message sent and response received successfully')
+        } catch (error) {
+          console.error('[Chat Client] Failed to send text message:', error)
+          throw error
+        }
+
+        // Reset input
+        setInput?.('')
+      }
+    } catch (error) {
+      console.error('[Chat Client] Error in handleFormSubmit:', error)
+      // TODO: Add error toast notification here
+    }
+  }
 
   // Load chat history from localStorage on mount
   React.useEffect(() => {
@@ -655,15 +912,15 @@ export function AnimatedChatInput() {
     if (savedHistory) {
       try {
         const parsedHistory = JSON.parse(savedHistory)
-        setMessages(parsedHistory)
+        setLocalMessages(parsedHistory)
       } catch (error) {
         console.error('Failed to parse chat history:', error)
       }
     }
-  }, [setMessages])
+  }, [])
 
   const handleClearHistory = () => {
-    setMessages([])
+    setLocalMessages([])
     localStorage.removeItem('chatHistory')
     setIsAlertOpen(false)
   }
@@ -677,7 +934,7 @@ export function AnimatedChatInput() {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages])
+  }, [localMessages])
 
   const [text] = useTypewriter({
     words: ['How can I help you today?', 'Ask me about my skills...', 'Learn about my experience...', 'Discover my projects...'],
@@ -699,164 +956,11 @@ export function AnimatedChatInput() {
     setImagePreview(null)
   }
 
-  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    
-    if (selectedImage) {
-      console.log('[Chat Client] Starting image upload process')
-      const reader = new FileReader()
-      reader.onloadend = async () => {
-        try {
-          console.log('[Chat Client] Image loaded, converting to base64')
-          const base64Image = reader.result as string
-          const base64Data = base64Image.split(',')[1]
-
-          // Create and add the user's message immediately
-          const imageMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'user',
-            content: [
-              { type: 'text', text: input || 'What do you see in this image?' },
-              {
-                type: 'image',
-                image: {
-                  data: base64Data,
-                  mime_type: selectedImage.type || 'image/jpeg'
-                }
-              }
-            ],
-            createdAt: new Date()
-          }
-
-          handleImageRemove()
-          setIsDialogOpen(true)
-          setInput?.('')
-
-          // Add user message to chat
-          const aiMessage = convertToAIMessage(imageMessage)
-          setMessages(prevMessages => 
-            prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiMessage)
-          )
-
-          // Create assistant message placeholder
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            createdAt: new Date()
-          }
-
-          // Add empty assistant message to chat
-          const aiAssistantMessage = convertToAIMessage(assistantMessage)
-          setMessages(prevMessages => 
-            prevMessages.map(msg => convertToAIMessage(msg as Message)).concat(aiAssistantMessage)
-          )
-
-          try {
-            const response = await fetch('/api/chat', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                messages: [
-                  ...messages.map(msg => ({
-                    role: msg.role,
-                    content: Array.isArray(msg.content) 
-                      ? convertToAIMessage(msg as Message).content 
-                      : msg.content
-                  })),
-                  {
-                    role: imageMessage.role,
-                    content: convertToAIMessage(imageMessage).content
-                  }
-                ].filter(msg => msg.role !== 'assistant' || msg.content)
-              }),
-            })
-
-            if (!response.ok) {
-              throw new Error(`API Error: ${response.status} ${response.statusText}`)
-            }
-
-            const reader = response.body?.getReader()
-            if (!reader) throw new Error('No response reader')
-
-            let responseText = ''
-            const decoder = new TextDecoder()
-
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
-              
-              const chunk = decoder.decode(value)
-              const lines = chunk.split('\n')
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6)
-                  if (data === '[DONE]') continue
-
-                  try {
-                    const event = JSON.parse(data)
-                    if (event.choices?.[0]?.delta?.content) {
-                      responseText += event.choices[0].delta.content
-                      // Update the assistant message content incrementally
-                      const updatedAssistantMessage = {
-                        ...assistantMessage,
-                        content: responseText
-                      }
-                      setMessages(prevMessages => 
-                        prevMessages.map(msg => 
-                          msg.id === assistantMessage.id 
-                            ? convertToAIMessage(updatedAssistantMessage)
-                            : convertToAIMessage(msg as Message)
-                        )
-                      )
-                    }
-                  } catch (e) {
-                    console.warn('[Chat Client] Failed to parse SSE event:', e)
-                  }
-                }
-              }
-            }
-
-            // Save the final chat history
-            const finalMessages = [
-              ...messages.map(msg => convertToAIMessage(msg as Message)),
-              convertToAIMessage(imageMessage),
-              convertToAIMessage({ ...assistantMessage, content: responseText })
-            ]
-            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
-
-          } catch (error) {
-            console.error('[Chat Client] Error:', error)
-            const errorMessage = {
-              ...assistantMessage,
-              content: 'Sorry, I encountered an error processing your request.'
-            }
-            setMessages(prevMessages => 
-              prevMessages.map(msg => 
-                msg.id === assistantMessage.id 
-                  ? convertToAIMessage(errorMessage)
-                  : convertToAIMessage(msg as Message)
-              )
-            )
-          }
-        } catch (error) {
-          console.error('[Chat Client] Error in image processing:', error)
-        }
-      }
-      reader.readAsDataURL(selectedImage)
-    } else {
-      handleSubmit(e)
-    }
-  }
-
   const handleQuote = React.useCallback((content: string) => {
-    handleSubmit({
-      preventDefault: () => {},
-    } as React.FormEvent<HTMLFormElement>)
-  }, [handleSubmit])
+    if (setInput) {
+      setInput(content)
+    }
+  }, [setInput])
 
   const [messageReactions, setMessageReactions] = React.useState<Record<string, { heart: boolean, thumbsDown: boolean }>>({})
 
@@ -877,11 +981,11 @@ export function AnimatedChatInput() {
     includeHearted: boolean
     excludeThumbsDown: boolean 
   }) => {
-    let filteredMessages = messages
+    let filteredMessages = localMessages
     
     if (!includeAll) {
       if (includeHearted) {
-        filteredMessages = messages.filter(m => messageReactions[m.id]?.heart)
+        filteredMessages = localMessages.filter(m => messageReactions[m.id]?.heart)
       }
     }
     
@@ -893,10 +997,10 @@ export function AnimatedChatInput() {
       messages: filteredMessages,
       exportDate: new Date().toISOString(),
       metadata: {
-        totalMessages: messages.length,
+        totalMessages: localMessages.length,
         exportedMessages: filteredMessages.length,
-        heartedMessages: messages.filter(m => messageReactions[m.id]?.heart).length,
-        thumbsDownMessages: messages.filter(m => messageReactions[m.id]?.thumbsDown).length
+        heartedMessages: localMessages.filter(m => messageReactions[m.id]?.heart).length,
+        thumbsDownMessages: localMessages.filter(m => messageReactions[m.id]?.thumbsDown).length
       }
     }
     
@@ -924,7 +1028,7 @@ export function AnimatedChatInput() {
       try {
         const importedData = JSON.parse(e.target?.result as string)
         if (Array.isArray(importedData.messages)) {
-          setMessages(importedData.messages)
+          setLocalMessages(importedData.messages)
           localStorage.setItem('chatHistory', JSON.stringify(importedData.messages))
         } else {
           throw new Error('Invalid file format')
@@ -1024,7 +1128,7 @@ export function AnimatedChatInput() {
                 variant="ghost"
                 size="icon"
                 onClick={handleExportClick}
-                disabled={messages.length === 0}
+                disabled={localMessages.length === 0}
                 className="h-8 w-8 rounded-full p-0 opacity-70 hover:opacity-100 hover:bg-primary/10 hover:text-primary"
                 title="Export chat history"
               >
@@ -1035,7 +1139,7 @@ export function AnimatedChatInput() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsAlertOpen(true)}
-                disabled={messages.length === 0}
+                disabled={localMessages.length === 0}
                 className="h-8 w-8 rounded-full p-0 opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
                 title="Clear chat history"
               >
@@ -1049,17 +1153,17 @@ export function AnimatedChatInput() {
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[600px] px-4">
               <div className="space-y-6 py-4">
-            {messages.length === 0 ? (
+            {localMessages.length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 No chat history yet. Start a conversation!
               </div>
             ) : (
                   <AnimatePresence initial={false}>
-                    {messages.map((message: Message) => (
+                    {localMessages.map((message: Message) => (
                       <ChatBubble 
-                  key={message.id}
+                        key={message.id}
                         message={message}
-                        isLoading={isLoading && message === messages[messages.length - 1]}
+                        isLoading={isLoading && message === localMessages[localMessages.length - 1]}
                         onQuote={handleQuote}
                         onReactionChange={handleReactionChange}
                       />
@@ -1120,9 +1224,9 @@ export function AnimatedChatInput() {
         isOpen={isExportOptionsOpen}
         onClose={() => setIsExportOptionsOpen(false)}
         onExport={handleExportWithOptions}
-        messageCount={messages.length}
-        heartedCount={messages.filter(m => messageReactions[m.id]?.heart).length}
-        thumbsDownCount={messages.filter(m => messageReactions[m.id]?.thumbsDown).length}
+        messageCount={localMessages.length}
+        heartedCount={localMessages.filter(m => messageReactions[m.id]?.heart).length}
+        thumbsDownCount={localMessages.filter(m => messageReactions[m.id]?.thumbsDown).length}
       />
     </>
   )
