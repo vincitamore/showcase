@@ -114,7 +114,7 @@ model TwitterRateLimit {
 
 model TempImage {
   id        String   @id @default(cuid())
-  data      String   @db.Text  // Base64 encoded image data
+  data      String   // Base64 encoded image data
   mimeType  String   // Always "image/jpeg"
   expiresAt DateTime // TTL for the image
   createdAt DateTime @default(now())

@@ -584,9 +584,28 @@ function ChatInput({
 async function convertToJpeg(file: File) {
   console.log('[Chat Client] Converting image:', {
     originalSize: file.size,
-    type: file.type
+    type: file.type,
+    name: file.name
   })
 
+  // Check if already a JPEG/JPG
+  if (file.type === 'image/jpeg' || file.type === 'image/jpg') {
+    console.log('[Chat Client] File is already JPEG, reading directly')
+    return new Promise<{ data: string, mimeType: string }>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64Data = (reader.result as string).split(',')[1]
+        resolve({
+          data: base64Data,
+          mimeType: 'image/jpeg'
+        })
+      }
+      reader.onerror = () => reject(new Error('Failed to read JPEG file'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // For non-JPEG images, convert to JPEG
   return new Promise<{ data: string, mimeType: string }>((resolve, reject) => {
     const img = new Image()
     const reader = new FileReader()
@@ -625,7 +644,9 @@ async function convertToJpeg(file: File) {
         originalSize: file.size,
         convertedSize: Math.round(base64Data.length * 0.75), // base64 is ~4/3 the size of binary
         width: img.width,
-        height: img.height
+        height: img.height,
+        originalType: file.type,
+        newType: 'image/jpeg'
       })
 
       resolve({
@@ -635,7 +656,7 @@ async function convertToJpeg(file: File) {
     }
 
     img.onerror = () => {
-      reject(new Error('Failed to load image'))
+      reject(new Error('Failed to load image for conversion'))
     }
 
     reader.readAsDataURL(file)
