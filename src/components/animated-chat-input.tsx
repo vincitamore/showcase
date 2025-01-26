@@ -753,68 +753,47 @@ export function AnimatedChatInput() {
           }
 
           setLocalMessages([...updatedMessages, assistantMessage])
-
+          
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let responseText = ''
-          let buffer = '' // Buffer to accumulate partial JSON
 
           while (reader) {
             const { done, value } = await reader.read()
             if (done) break
 
             const chunk = decoder.decode(value)
-            buffer += chunk
             
-            // Process complete lines
-            const lines = buffer.split('\n')
-            // Keep the last potentially incomplete line in the buffer
-            buffer = lines.pop() || ''
-
+            // Split into lines and process each line
+            const lines = chunk.split('\n')
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Skip non-content lines
+              // Skip function call messages
               if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
               
-              try {
-                // Extract the actual content from the line
-                const match = line.match(/^\d+:\s*(.+)/)
-                if (!match) continue
-                
-                let content = match[1]
-                try {
-                  // Try to parse as JSON if it's a JSON string
-                  content = JSON.parse(content)
-                } catch {
-                  // If it's not valid JSON, use as is
+              // Clean up the response text - just remove the prefix number
+              const cleanedText = line.replace(/^\d+:\s*/, '')
+              
+              // Accumulate the text
+              responseText += cleanedText
+              
+              // Update the assistant's message with the accumulated response
+              setLocalMessages(prev => {
+                const updated = [...prev]
+                const lastMessage = updated[updated.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant') {
+                  lastMessage.content = responseText
                 }
-
-                // Append to response text, maintaining proper spacing
-                if (responseText && !content.startsWith('#') && !content.startsWith('*') && !content.startsWith('-')) {
-                  responseText += '\n'
-                }
-                responseText += content
-                
-                // Update the assistant's message with the accumulated response
-                setLocalMessages(prev => {
-                  const updated = [...prev]
-                  const lastMessage = updated[updated.length - 1]
-                  if (lastMessage && lastMessage.role === 'assistant') {
-                    lastMessage.content = responseText
-                  }
-                  return [...updated]
-                })
-              } catch (error) {
-                console.error('[Chat Client] Error processing line:', error)
-              }
+                return [...updated]
+              })
             }
           }
 
           // Save to localStorage after the stream is complete
           localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...assistantMessage,
+            ...updatedMessages[updatedMessages.length - 1],
             content: responseText
           }]))
 
@@ -858,77 +837,46 @@ export function AnimatedChatInput() {
             throw new Error(`API request failed: ${response.status} ${response.statusText}`)
           }
 
-          // Create a placeholder for the assistant's response
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            createdAt: new Date()
-          }
-
-          setLocalMessages([...updatedMessages, assistantMessage])
-
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let responseText = ''
-          let buffer = '' // Buffer to accumulate partial JSON
 
           while (reader) {
             const { done, value } = await reader.read()
             if (done) break
 
             const chunk = decoder.decode(value)
-            buffer += chunk
             
-            // Process complete lines
-            const lines = buffer.split('\n')
-            // Keep the last potentially incomplete line in the buffer
-            buffer = lines.pop() || ''
-
+            // Split into lines and process each line
+            const lines = chunk.split('\n')
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Skip non-content lines
+              // Skip function call messages
               if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
               
-              try {
-                // Extract the actual content from the line
-                const match = line.match(/^\d+:\s*(.+)/)
-                if (!match) continue
-                
-                let content = match[1]
-                try {
-                  // Try to parse as JSON if it's a JSON string
-                  content = JSON.parse(content)
-                } catch {
-                  // If it's not valid JSON, use as is
+              // Clean up the response text - just remove the prefix number
+              const cleanedText = line.replace(/^\d+:\s*/, '')
+              
+              // Accumulate the text
+              responseText += cleanedText
+              
+              // Update the assistant's message with the accumulated response
+              setLocalMessages(prev => {
+                const updated = [...prev]
+                const lastMessage = updated[updated.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant') {
+                  lastMessage.content = responseText
                 }
-
-                // Append to response text, maintaining proper spacing
-                if (responseText && !content.startsWith('#') && !content.startsWith('*') && !content.startsWith('-')) {
-                  responseText += '\n'
-                }
-                responseText += content
-                
-                // Update the assistant's message with the accumulated response
-                setLocalMessages(prev => {
-                  const updated = [...prev]
-                  const lastMessage = updated[updated.length - 1]
-                  if (lastMessage && lastMessage.role === 'assistant') {
-                    lastMessage.content = responseText
-                  }
-                  return [...updated]
-                })
-              } catch (error) {
-                console.error('[Chat Client] Error processing line:', error)
-              }
+                return [...updated]
+              })
             }
           }
 
           // Save to localStorage after the stream is complete
           localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...assistantMessage,
+            ...updatedMessages[updatedMessages.length - 1],
             content: responseText
           }]))
 
