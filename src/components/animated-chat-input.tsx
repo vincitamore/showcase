@@ -3,7 +3,7 @@
 import * as React from "react"
 import { useChat } from "ai/react"
 import type { Message as AIMessage } from 'ai'
-import type { Message, MessageContent, TextContent, ImageUrlContent } from "@/types/chat"
+import type { Message, MessageContent, TextContent, ImageUrlContent, ExtendedAIMessage } from "@/types/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog"
 import { Send, Loader2, History, Heart, ThumbsUp, ThumbsDown, MoreVertical, Copy, Quote, Trash2, Download, Upload, Image as ImageIcon, X } from "lucide-react"
@@ -1089,22 +1089,22 @@ export function AnimatedChatInput() {
               handleInputChange={handleInputChange}
               handleSubmit={handleFormSubmit}
               isLoading={isLoading}
-                placeholder="What does your motto mean?"
+              placeholder="What does your motto mean?"
               onImageSelect={handleImageSelect}
               onImageRemove={handleImageRemove}
               imagePreview={imagePreview}
-              />
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => setIsDialogOpen(true)}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsDialogOpen(true)}
               className="absolute right-14 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-                  disabled={isLoading}
-                >
-                  <History className="h-4 w-4" />
-                  <span className="sr-only">View chat history</span>
-                </Button>
+              disabled={isLoading}
+            >
+              <History className="h-4 w-4" />
+              <span className="sr-only">View chat history</span>
+            </Button>
           </motion.div>
         </motion.div>
       </AnimatePresence>
@@ -1161,7 +1161,7 @@ export function AnimatedChatInput() {
                   <AnimatePresence initial={false}>
                     {localMessages.map((message: Message) => (
                       <ChatBubble 
-                  key={message.id}
+                        key={message.id}
                         message={message}
                         isLoading={isLoading && message === localMessages[localMessages.length - 1]}
                         onQuote={handleQuote}

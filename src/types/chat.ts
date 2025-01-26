@@ -22,29 +22,36 @@ export interface CustomMessage {
   createdAt: Date
 }
 
+// Define the AI message content type
+export type AIMessageContent = string | MessageContent[]
+
+// Extend the AI message type to support array content
+export interface ExtendedAIMessage extends Omit<AIMessage, 'content'> {
+  content: AIMessageContent
+}
+
 export type Message = CustomMessage
 
-export function convertToAIMessage(message: CustomMessage): AIMessage {
+export function convertToAIMessage(message: CustomMessage): ExtendedAIMessage {
   if (Array.isArray(message.content)) {
-    // Convert our message format to xAI's format
-    const content = message.content.map(c => {
-      if (c.type === 'text') {
-        return {
-          type: 'text',
-          text: c.text
-        }
-      } else if (c.type === 'image_url') {
-        return {
-          type: 'image_url',
-          image_url: c.image_url
-        }
-      }
-      return c
-    })
+    // Convert our message format to xAI's format but don't stringify the array
     return {
       id: message.id,
       role: message.role,
-      content: JSON.stringify(content)
+      content: message.content.map(c => {
+        if (c.type === 'text') {
+          return {
+            type: 'text',
+            text: c.text
+          }
+        } else if (c.type === 'image_url') {
+          return {
+            type: 'image_url',
+            image_url: c.image_url
+          }
+        }
+        return c
+      })
     }
   }
   
