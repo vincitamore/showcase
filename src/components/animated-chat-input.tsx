@@ -44,7 +44,19 @@ interface MessageReaction {
 }
 
 const markdownComponents: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  p: ({ children }) => {
+    if (typeof children === 'string') {
+      // Split by newlines and wrap each line in a paragraph
+      return (
+        <>
+          {children.split('\n').map((line, i) => (
+            <p key={i} className="mb-2 last:mb-0">{line}</p>
+          ))}
+        </>
+      )
+    }
+    return <p className="mb-2 last:mb-0">{children}</p>
+  },
   code: ({ className, children, inline }: CodeProps) => (
     <code
       className={cn(
@@ -771,8 +783,9 @@ export function AnimatedChatInput() {
               if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
               // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes
-              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+              // Remove the "0:" prefix and any surrounding quotes, preserve newlines
+              const cleanedText = line.replace(/^\d+:\s*"|"$/g, '')
+                           .replace(/\\n/g, '\n') // Convert escaped newlines to actual newlines
               
               // Process actual content
               responseText += cleanedText
@@ -867,8 +880,9 @@ export function AnimatedChatInput() {
               if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
               // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes
-              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+              // Remove the "0:" prefix and any surrounding quotes, preserve newlines
+              const cleanedText = line.replace(/^\d+:\s*"|"$/g, '')
+                           .replace(/\\n/g, '\n') // Convert escaped newlines to actual newlines
               
               // Process actual content
               responseText += cleanedText
