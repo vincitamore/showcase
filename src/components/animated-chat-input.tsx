@@ -400,8 +400,13 @@ const ChatBubble = ({
 
   // Extract text and image content
   const textContent = Array.isArray(message.content) 
-    ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
-    : message.content
+    ? message.content
+        .filter(c => c.type === 'text')
+        .map(c => (c as TextContent).text)
+        .join('\n')
+    : typeof message.content === 'string' 
+      ? message.content.replace(/\\n/g, '\n')  // Handle escaped newlines in string content
+      : message.content
 
   const imageContent = Array.isArray(message.content)
     ? message.content.find(c => c.type === 'image_url') as ImageUrlContent | undefined

@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const storedImage = await prisma.tempImage.create({
       data: {
         data: image.data,
-        mimeType: image.mime_type,
+        mimeType: 'image/jpeg', // Always store as JPEG
         // Delete after 1 hour
         expiresAt: new Date(Date.now() + 60 * 60 * 1000)
       }
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     // Return the URL that can be used to access this image
     return new Response(
       JSON.stringify({
-        url: `${req.nextUrl.origin}/api/images/${storedImage.id}`
+        url: `${req.nextUrl.origin}/api/images/${storedImage.id}.jpg`
       }),
       {
         status: 200,
