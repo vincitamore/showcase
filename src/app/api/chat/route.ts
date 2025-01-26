@@ -85,20 +85,10 @@ export async function POST(req: Request) {
     // Add all messages
     messages.forEach((msg: Message) => {
       if (msg.role === 'user' || msg.role === 'assistant') {
-        // If the content is a string, use it directly
-        if (typeof msg.content === 'string') {
-          xaiMessages.push({
-            role: msg.role,
-            content: msg.content
-          })
-        } 
-        // If the content is an array (image + text), keep the array structure
-        else if (Array.isArray(msg.content)) {
-          xaiMessages.push({
-            role: msg.role,
-            content: msg.content
-          })
-        }
+        xaiMessages.push({
+          role: msg.role,
+          content: msg.content // Keep the content as-is, whether string or array
+        })
       }
     })
 
@@ -106,11 +96,11 @@ export async function POST(req: Request) {
     console.log('[Chat API] Final formatted messages:', JSON.stringify(xaiMessages, null, 2))
 
     try {
-      // Convert messages to AI SDK format, preserving array structure for image messages
+      // Convert messages to AI SDK format without stringifying arrays
       const aiMessages = xaiMessages.map(msg => ({
         id: crypto.randomUUID(),
         role: msg.role,
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+        content: msg.content, // Don't stringify, keep the structure
         createdAt: new Date()
       })) as AIMessage[]
 
