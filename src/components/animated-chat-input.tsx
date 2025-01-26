@@ -773,6 +773,9 @@ export function AnimatedChatInput() {
               // Clean up the response text
               // Remove the "0:" prefix and any surrounding quotes
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
+                .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
               
               // Process actual content
               // Add a newline if this isn't the first line of content
@@ -870,6 +873,9 @@ export function AnimatedChatInput() {
               // Clean up the response text
               // Remove the "0:" prefix and any surrounding quotes
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
+                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
+                .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
+                .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
               
               // Process actual content
               // Add a newline if this isn't the first line of content
