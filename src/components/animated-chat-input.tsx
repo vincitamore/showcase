@@ -775,7 +775,8 @@ export function AnimatedChatInput() {
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
               
               // Process actual content
-              responseText += cleanedText
+              // Add a newline if this isn't the first line of content
+              responseText += (responseText && cleanedText ? '\n' : '') + cleanedText
               
               // Update the assistant's message with the accumulated response
               setLocalMessages(prev => {
@@ -871,7 +872,8 @@ export function AnimatedChatInput() {
               const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
               
               // Process actual content
-              responseText += cleanedText
+              // Add a newline if this isn't the first line of content
+              responseText += (responseText && cleanedText ? '\n' : '') + cleanedText
               
               // Update the assistant's message with the accumulated response
               setLocalMessages(prev => {
