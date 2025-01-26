@@ -44,22 +44,17 @@ interface MessageReaction {
 }
 
 const markdownComponents: Components = {
-  p: ({ children }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   code: ({ className, children, inline }: CodeProps) => (
     <code
       className={cn(
-        "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm whitespace-pre-wrap",
+        "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm",
         inline ? "inline" : "block p-2",
         className
       )}
     >
       {children}
     </code>
-  ),
-  pre: ({ children }) => (
-    <pre className="mb-2 overflow-x-auto rounded bg-primary/10 p-2 font-mono text-sm">
-      {children}
-    </pre>
   ),
   ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 list-decimal pl-4 last:mb-0">{children}</ol>,
@@ -422,7 +417,7 @@ const ChatBubble = ({
         {textContent && (
           <ReactMarkdown
             components={markdownComponents}
-            className="prose dark:prose-invert prose-sm break-words whitespace-pre-wrap"
+            className="prose dark:prose-invert prose-sm break-words"
           >
             {textContent}
           </ReactMarkdown>
@@ -710,15 +705,15 @@ export function AnimatedChatInput() {
           role: 'user',
           content: [
             {
-              type: 'text',
-              text: input || 'What is in this image?'
-            },
-            {
               type: 'image_url',
               image_url: {
                 url: imageUrl,
                 detail: 'high'
               }
+            },
+            {
+              type: 'text',
+              text: input || 'What is in this image?'
             }
           ],
           createdAt: new Date()
@@ -753,7 +748,7 @@ export function AnimatedChatInput() {
           }
 
           setLocalMessages([...updatedMessages, assistantMessage])
-          
+
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
@@ -764,19 +759,22 @@ export function AnimatedChatInput() {
             if (done) break
 
             const chunk = decoder.decode(value)
+            console.log('[Chat Client] Raw chunk:', chunk)
             
             // Split into lines and process each line
             const lines = chunk.split('\n')
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Skip function call messages
-              if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
+              // Handle different message types
+              if (line.startsWith('f:')) continue // Skip function call messages
+              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
-              // Clean up the response text - just remove the prefix number
-              const cleanedText = line.replace(/^\d+:\s*/, '')
+              // Clean up the response text
+              // Remove the "0:" prefix and any surrounding quotes
+              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
               
-              // Accumulate the text
+              // Process actual content
               responseText += cleanedText
               
               // Update the assistant's message with the accumulated response
@@ -793,7 +791,7 @@ export function AnimatedChatInput() {
 
           // Save to localStorage after the stream is complete
           localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...updatedMessages[updatedMessages.length - 1],
+            ...assistantMessage,
             content: responseText
           }]))
 
@@ -837,6 +835,16 @@ export function AnimatedChatInput() {
             throw new Error(`API request failed: ${response.status} ${response.statusText}`)
           }
 
+          // Create a placeholder for the assistant's response
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            createdAt: new Date()
+          }
+
+          setLocalMessages([...updatedMessages, assistantMessage])
+
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
@@ -847,19 +855,22 @@ export function AnimatedChatInput() {
             if (done) break
 
             const chunk = decoder.decode(value)
+            console.log('[Chat Client] Raw chunk:', chunk)
             
             // Split into lines and process each line
             const lines = chunk.split('\n')
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Skip function call messages
-              if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
+              // Handle different message types
+              if (line.startsWith('f:')) continue // Skip function call messages
+              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
               
-              // Clean up the response text - just remove the prefix number
-              const cleanedText = line.replace(/^\d+:\s*/, '')
+              // Clean up the response text
+              // Remove the "0:" prefix and any surrounding quotes
+              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
               
-              // Accumulate the text
+              // Process actual content
               responseText += cleanedText
               
               // Update the assistant's message with the accumulated response
@@ -876,7 +887,7 @@ export function AnimatedChatInput() {
 
           // Save to localStorage after the stream is complete
           localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...updatedMessages[updatedMessages.length - 1],
+            ...assistantMessage,
             content: responseText
           }]))
 
@@ -1078,22 +1089,22 @@ export function AnimatedChatInput() {
               handleInputChange={handleInputChange}
               handleSubmit={handleFormSubmit}
               isLoading={isLoading}
-              placeholder="What does your motto mean?"
+                placeholder="What does your motto mean?"
               onImageSelect={handleImageSelect}
               onImageRemove={handleImageRemove}
               imagePreview={imagePreview}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              onClick={() => setIsDialogOpen(true)}
+              />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setIsDialogOpen(true)}
               className="absolute right-14 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-              disabled={isLoading}
-            >
-              <History className="h-4 w-4" />
-              <span className="sr-only">View chat history</span>
-            </Button>
+                  disabled={isLoading}
+                >
+                  <History className="h-4 w-4" />
+                  <span className="sr-only">View chat history</span>
+                </Button>
           </motion.div>
         </motion.div>
       </AnimatePresence>
@@ -1142,15 +1153,15 @@ export function AnimatedChatInput() {
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[600px] px-4">
               <div className="space-y-6 py-4">
-                {localMessages.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    No chat history yet. Start a conversation!
-                  </div>
-                ) : (
+            {localMessages.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                No chat history yet. Start a conversation!
+              </div>
+            ) : (
                   <AnimatePresence initial={false}>
                     {localMessages.map((message: Message) => (
                       <ChatBubble 
-                        key={message.id}
+                  key={message.id}
                         message={message}
                         isLoading={isLoading && message === localMessages[localMessages.length - 1]}
                         onQuote={handleQuote}
@@ -1160,9 +1171,9 @@ export function AnimatedChatInput() {
                   </AnimatePresence>
                 )}
                 <div ref={messagesEndRef} />
-              </div>
-            </div>
-          </div>
+                  </div>
+                  </div>
+                </div>
 
           <div className="border-t p-4">
             <div className="mx-auto max-w-[600px]">
@@ -1175,7 +1186,7 @@ export function AnimatedChatInput() {
                 onImageRemove={handleImageRemove}
                 imagePreview={imagePreview}
               />
-            </div>
+              </div>
           </div>
         </DialogContent>
       </Dialog>
