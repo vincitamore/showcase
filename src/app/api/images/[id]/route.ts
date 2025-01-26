@@ -6,11 +6,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Remove .jpg extension if present
-    const imageId = params.id.replace(/\.jpg$/, '')
-
     const image = await prisma.tempImage.findUnique({
-      where: { id: imageId }
+      where: { id: params.id }
     })
 
     if (!image) {
@@ -20,7 +17,7 @@ export async function GET(
     // Check if image has expired
     if (image.expiresAt < new Date()) {
       await prisma.tempImage.delete({
-        where: { id: imageId }
+        where: { id: params.id }
       })
       return new Response('Image expired', { status: 404 })
     }

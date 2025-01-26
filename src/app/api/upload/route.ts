@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     // Return the URL that can be used to access this image
     return new Response(
       JSON.stringify({
-        url: `${req.nextUrl.origin}/api/images/${storedImage.id}.jpg`
+        url: `${req.nextUrl.origin}/api/images/${storedImage.id}`
       }),
       {
         status: 200,
