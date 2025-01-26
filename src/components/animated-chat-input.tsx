@@ -758,48 +758,57 @@ export function AnimatedChatInput() {
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let responseText = ''
+          let buffer = '' // Buffer to accumulate partial JSON
 
           while (reader) {
             const { done, value } = await reader.read()
             if (done) break
 
             const chunk = decoder.decode(value)
-            console.log('[Chat Client] Raw chunk:', chunk)
+            buffer += chunk
             
-            // Split into lines and process each line
-            const lines = chunk.split('\n')
+            // Process complete lines
+            const lines = buffer.split('\n')
+            // Keep the last potentially incomplete line in the buffer
+            buffer = lines.pop() || ''
+
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Handle different message types
-              if (line.startsWith('f:')) continue // Skip function call messages
-              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
+              // Skip non-content lines
+              if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
               
-              // Clean up the response text
-              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
-                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
-                .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
-                .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
-                .replace(/\\t/g, '    ') // Convert tabs to spaces
-              
-              // Process actual content
-              // Only add newline if we're not at the start of a markdown block
-              const isStartOfBlock = cleanedText.startsWith('#') || 
-                                   cleanedText.startsWith('*') || 
-                                   cleanedText.startsWith('-') ||
-                                   cleanedText.startsWith('```')
-              
-              responseText += (responseText && !isStartOfBlock ? '\n' : '') + cleanedText
-              
-              // Update the assistant's message with the accumulated response
-              setLocalMessages(prev => {
-                const updated = [...prev]
-                const lastMessage = updated[updated.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant') {
-                  lastMessage.content = responseText
+              try {
+                // Extract the actual content from the line
+                const match = line.match(/^\d+:\s*(.+)/)
+                if (!match) continue
+                
+                let content = match[1]
+                try {
+                  // Try to parse as JSON if it's a JSON string
+                  content = JSON.parse(content)
+                } catch {
+                  // If it's not valid JSON, use as is
                 }
-                return [...updated]
-              })
+
+                // Append to response text, maintaining proper spacing
+                if (responseText && !content.startsWith('#') && !content.startsWith('*') && !content.startsWith('-')) {
+                  responseText += '\n'
+                }
+                responseText += content
+                
+                // Update the assistant's message with the accumulated response
+                setLocalMessages(prev => {
+                  const updated = [...prev]
+                  const lastMessage = updated[updated.length - 1]
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    lastMessage.content = responseText
+                  }
+                  return [...updated]
+                })
+              } catch (error) {
+                console.error('[Chat Client] Error processing line:', error)
+              }
             }
           }
 
@@ -863,48 +872,57 @@ export function AnimatedChatInput() {
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
           let responseText = ''
+          let buffer = '' // Buffer to accumulate partial JSON
 
           while (reader) {
             const { done, value } = await reader.read()
             if (done) break
 
             const chunk = decoder.decode(value)
-            console.log('[Chat Client] Raw chunk:', chunk)
+            buffer += chunk
             
-            // Split into lines and process each line
-            const lines = chunk.split('\n')
+            // Process complete lines
+            const lines = buffer.split('\n')
+            // Keep the last potentially incomplete line in the buffer
+            buffer = lines.pop() || ''
+
             for (const line of lines) {
               if (!line.trim()) continue
               
-              // Handle different message types
-              if (line.startsWith('f:')) continue // Skip function call messages
-              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
+              // Skip non-content lines
+              if (line.startsWith('f:') || line.startsWith('e:') || line.startsWith('d:')) continue
               
-              // Clean up the response text
-              const cleanedText = line.replace(/^\d+:\s*"?|"?$/g, '')
-                .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
-                .replace(/\\"/g, '"')    // Convert escaped quotes to actual quotes
-                .replace(/\\\\/g, '\\')  // Convert escaped backslashes to single backslashes
-                .replace(/\\t/g, '    ') // Convert tabs to spaces
-              
-              // Process actual content
-              // Only add newline if we're not at the start of a markdown block
-              const isStartOfBlock = cleanedText.startsWith('#') || 
-                                   cleanedText.startsWith('*') || 
-                                   cleanedText.startsWith('-') ||
-                                   cleanedText.startsWith('```')
-              
-              responseText += (responseText && !isStartOfBlock ? '\n' : '') + cleanedText
-              
-              // Update the assistant's message with the accumulated response
-              setLocalMessages(prev => {
-                const updated = [...prev]
-                const lastMessage = updated[updated.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant') {
-                  lastMessage.content = responseText
+              try {
+                // Extract the actual content from the line
+                const match = line.match(/^\d+:\s*(.+)/)
+                if (!match) continue
+                
+                let content = match[1]
+                try {
+                  // Try to parse as JSON if it's a JSON string
+                  content = JSON.parse(content)
+                } catch {
+                  // If it's not valid JSON, use as is
                 }
-                return [...updated]
-              })
+
+                // Append to response text, maintaining proper spacing
+                if (responseText && !content.startsWith('#') && !content.startsWith('*') && !content.startsWith('-')) {
+                  responseText += '\n'
+                }
+                responseText += content
+                
+                // Update the assistant's message with the accumulated response
+                setLocalMessages(prev => {
+                  const updated = [...prev]
+                  const lastMessage = updated[updated.length - 1]
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    lastMessage.content = responseText
+                  }
+                  return [...updated]
+                })
+              } catch (error) {
+                console.error('[Chat Client] Error processing line:', error)
+              }
             }
           }
 
