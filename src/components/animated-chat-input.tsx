@@ -715,7 +715,6 @@ export function AnimatedChatInput() {
         }
 
         const { url: rawImageUrl } = await uploadResponse.json()
-        const imageUrl = `${rawImageUrl}.jpg`
 
         // Create message with image content
         const imageMessage: Message = {
@@ -725,7 +724,7 @@ export function AnimatedChatInput() {
             {
               type: 'image_url',
               image_url: {
-                url: imageUrl,
+                url: rawImageUrl,
                 detail: 'high'
               }
             },
