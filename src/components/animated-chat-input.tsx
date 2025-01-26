@@ -705,15 +705,15 @@ export function AnimatedChatInput() {
           role: 'user',
           content: [
             {
+              type: 'text',
+              text: input || 'What is in this image?'
+            },
+            {
               type: 'image_url',
               image_url: {
                 url: imageUrl,
                 detail: 'high'
               }
-            },
-            {
-              type: 'text',
-              text: input || 'What is in this image?'
             }
           ],
           createdAt: new Date()
@@ -1153,11 +1153,11 @@ export function AnimatedChatInput() {
           <div className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[600px] px-4">
               <div className="space-y-6 py-4">
-            {localMessages.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                No chat history yet. Start a conversation!
-              </div>
-            ) : (
+                {localMessages.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No chat history yet. Start a conversation!
+                  </div>
+                ) : (
                   <AnimatePresence initial={false}>
                     {localMessages.map((message: Message) => (
                       <ChatBubble 
@@ -1171,9 +1171,9 @@ export function AnimatedChatInput() {
                   </AnimatePresence>
                 )}
                 <div ref={messagesEndRef} />
-                  </div>
-                  </div>
-                </div>
+              </div>
+            </div>
+          </div>
 
           <div className="border-t p-4">
             <div className="mx-auto max-w-[600px]">
@@ -1186,7 +1186,7 @@ export function AnimatedChatInput() {
                 onImageRemove={handleImageRemove}
                 imagePreview={imagePreview}
               />
-              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
