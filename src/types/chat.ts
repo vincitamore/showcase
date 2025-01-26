@@ -30,10 +30,21 @@ export interface CustomMessage {
 export type Message = CustomMessage
 
 export function convertToAIMessage(message: CustomMessage): AIMessage {
+  let content = message.content
+  
+  // If content is a string and looks like a stringified array, parse it
+  if (typeof content === 'string' && content.startsWith('[')) {
+    try {
+      content = JSON.parse(content)
+    } catch {
+      // If parsing fails, keep it as a string
+    }
+  }
+
   return {
     id: message.id,
     role: message.role,
-    content: message.content // Keep the content as-is, whether string or array
+    content // Will be either parsed array or original content
   }
 }
 
