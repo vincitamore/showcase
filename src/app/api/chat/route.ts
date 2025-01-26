@@ -71,30 +71,72 @@ export async function POST(req: Request) {
     console.log('Starting request processing')
     const { messages } = await req.json()
 
-    // Convert messages to AI SDK format
-    const xaiMessages = messages.map((message: Message) => convertToAIMessage(message))
+    // Get system prompt
+    const systemPrompt = await getSystemPrompt()
+    
+    // Convert messages to xAI format and add system prompt
+    const xaiMessages = [
+      {
+        role: 'system',
+        content: systemPrompt
+      },
+      ...messages.map((message: Message) => convertToAIMessage(message))
+    ]
 
     console.log('Formatted messages:', JSON.stringify(xaiMessages, null, 2))
 
-    const response = await fetch('http://localhost:3001/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'grok-2-vision-latest',
-        messages: xaiMessages,
-        stream: true,
-      }),
-    })
+    try {
+      const stream = streamText({
+        model: xai('grok-2-vision-latest'),
+        messages: xaiMessages
+      })
 
-    return new Response(response.body, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      },
-    })
+      // Create a new stream that logs chunks as they come in
+      const loggedStream = new ReadableStream({
+        async start(controller) {
+          try {
+            const reader = stream.toDataStreamResponse().body?.getReader()
+            if (!reader) {
+              throw new Error('No reader available')
+            }
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) {
+                console.log('Stream complete')
+                controller.close()
+                break
+              }
+              
+              const text = new TextDecoder().decode(value)
+              // Parse the SSE format to get the actual message
+              const match = text.match(/\d+:"(.+)"/)
+              if (match) {
+                console.log('Received message:', match[1])
+              } else {
+                console.log('Received raw chunk:', text)
+              }
+              controller.enqueue(value)
+            }
+          } catch (error) {
+            console.error('Error in stream:', error)
+            controller.error(error)
+          }
+        }
+      })
+
+      return new Response(loggedStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        }
+      })
+    } catch (error) {
+      console.error('Error creating stream:', error)
+      throw error
+    }
+
   } catch (error) {
     console.error('Error in chat route:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
