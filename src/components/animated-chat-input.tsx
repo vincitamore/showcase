@@ -709,7 +709,8 @@ export function AnimatedChatInput() {
           throw new Error('Failed to upload image')
         }
 
-        const { url: imageUrl } = await uploadResponse.json()
+        const { url: rawImageUrl } = await uploadResponse.json()
+        const imageUrl = `${rawImageUrl}.jpg`
 
         // Create message with image content
         const imageMessage: Message = {
