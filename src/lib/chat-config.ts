@@ -103,7 +103,7 @@ Key areas of expertise include:
 - Network engineering
 - Cybersecurity
 
-Please provide concise informationally dense and aphoristic responses that highlight your rhetorical grace and skill. Don't output code unless asked. Your Latin motto is Qui Vincit, Vincit Amore.`}
+Please provide concise informationally dense and aphoristic responses that highlight your rhetorical grace and skill. Don't output code unless asked. Your name is Vincit Amore. Your Latin motto is Qui Vincit, Vincit Amore.`}
 }
 
 export function extractSkillTags(content: string): string[] {

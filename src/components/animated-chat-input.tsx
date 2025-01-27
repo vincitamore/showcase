@@ -621,12 +621,28 @@ export function AnimatedChatInput() {
               // Handle text content (0:)
               if (line.startsWith('0:')) {
                 try {
-                  // Extract the text content, removing the prefix and quotes
-                  const text = line.slice(2).replace(/^"|"$/g, '')
-                  textDeltaCount++
-                  responseText += text
+                  // Extract the text content, removing the prefix
+                  const text = line.slice(2)
                   
-                  // Update assistant message content
+                  // Unescape the JSON string properly
+                  const deltaText = JSON.parse(text)
+                  textDeltaCount++
+                  
+                  // Only add space if we're not dealing with markdown markers or split words
+                  const shouldAddSpace = responseText && 
+                    !responseText.endsWith(' ') && 
+                    !deltaText.startsWith(' ') &&
+                    !responseText.endsWith('*') && 
+                    !deltaText.startsWith('*') &&
+                    // Check if we're in the middle of a word (last char of previous + first of current are letters)
+                    !(responseText.match(/[a-zA-Z]$/) && deltaText.match(/^[a-zA-Z]/))
+                  
+                  if (shouldAddSpace) {
+                    responseText += ' '
+                  }
+                  responseText += deltaText
+                  
+                  // Update assistant message content with properly parsed markdown
                   setLocalMessages(prevMessages => 
                     prevMessages.map(msg => 
                       msg.id === assistantMessage.id 
@@ -642,8 +658,9 @@ export function AnimatedChatInput() {
                   )
                   
                   console.log('[Chat Client] Text delta processed:', {
-                    text,
-                    totalLength: responseText.length
+                    deltaText,
+                    totalLength: responseText.length,
+                    shouldAddSpace
                   })
                 } catch (error) {
                   console.error('[Chat Client] Error processing text chunk:', error)
@@ -844,12 +861,28 @@ export function AnimatedChatInput() {
               // Handle text content (0:)
               if (line.startsWith('0:')) {
                 try {
-                  // Extract the text content, removing the prefix and quotes
-                  const text = line.slice(2).replace(/^"|"$/g, '')
-                  textDeltaCount++
-                  responseText += text
+                  // Extract the text content, removing the prefix
+                  const text = line.slice(2)
                   
-                  // Update assistant message content
+                  // Unescape the JSON string properly
+                  const deltaText = JSON.parse(text)
+                  textDeltaCount++
+                  
+                  // Only add space if we're not dealing with markdown markers or split words
+                  const shouldAddSpace = responseText && 
+                    !responseText.endsWith(' ') && 
+                    !deltaText.startsWith(' ') &&
+                    !responseText.endsWith('*') && 
+                    !deltaText.startsWith('*') &&
+                    // Check if we're in the middle of a word (last char of previous + first of current are letters)
+                    !(responseText.match(/[a-zA-Z]$/) && deltaText.match(/^[a-zA-Z]/))
+                  
+                  if (shouldAddSpace) {
+                    responseText += ' '
+                  }
+                  responseText += deltaText
+                  
+                  // Update assistant message content with properly parsed markdown
                   setLocalMessages(prevMessages => 
                     prevMessages.map(msg => 
                       msg.id === assistantMessage.id 
@@ -865,8 +898,9 @@ export function AnimatedChatInput() {
                   )
                   
                   console.log('[Chat Client] Text delta processed:', {
-                    text,
-                    totalLength: responseText.length
+                    deltaText,
+                    totalLength: responseText.length,
+                    shouldAddSpace
                   })
                 } catch (error) {
                   console.error('[Chat Client] Error processing text chunk:', error)

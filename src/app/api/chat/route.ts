@@ -216,40 +216,51 @@ export async function POST(req: Request) {
     let formattedMessages
     if (modelConfig?.provider === 'anthropic') {
       console.log('[Chat API] Formatting messages for Anthropic')
-      formattedMessages = messages.map((msg: Message) => {
-        const formatted = {
-          role: msg.role === 'system' ? 'user' : msg.role,
-          content: Array.isArray(msg.content)
-            ? msg.content.map(c => {
-                if (c.type === 'text') {
-                  return { type: 'text', text: c.text }
-                }
-                if (c.type === 'image_url') {
-                  return {
-                    type: 'image',
-                    source: {
-                      type: 'url',
-                      url: c.image_url.url,
-                      media_type: 'image/jpeg'
+      const systemPrompt = await getSystemPrompt()
+      formattedMessages = [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: systemPrompt }]
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'I understand. I will act as described.' }]
+        },
+        ...messages.map((msg: Message) => {
+          const formatted = {
+            role: msg.role === 'system' ? 'user' : msg.role,
+            content: Array.isArray(msg.content)
+              ? msg.content.map(c => {
+                  if (c.type === 'text') {
+                    return { type: 'text', text: c.text }
+                  }
+                  if (c.type === 'image_url') {
+                    return {
+                      type: 'image',
+                      source: {
+                        type: 'url',
+                        url: c.image_url.url,
+                        media_type: 'image/jpeg'
+                      }
                     }
                   }
-                }
-                return null
-              }).filter(Boolean)
-            : [{ type: 'text', text: String(msg.content) }]
-        }
-        console.log('[Chat API] Formatted message:', {
-          original: {
-            role: msg.role,
-            contentPreview: JSON.stringify(msg.content).slice(0, 100)
-          },
-          formatted: {
-            role: formatted.role,
-            contentPreview: JSON.stringify(formatted.content).slice(0, 100)
+                  return null
+                }).filter(Boolean)
+              : [{ type: 'text', text: String(msg.content) }]
           }
+          console.log('[Chat API] Formatted message:', {
+            original: {
+              role: msg.role,
+              contentPreview: JSON.stringify(msg.content).slice(0, 100)
+            },
+            formatted: {
+              role: formatted.role,
+              contentPreview: JSON.stringify(formatted.content).slice(0, 100)
+            }
+          })
+          return formatted
         })
-        return formatted
-      })
+      ]
 
       logAnthropicRequest(formattedMessages, model)
     } else {

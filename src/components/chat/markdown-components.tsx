@@ -18,10 +18,13 @@ interface CodeBlockProps {
 export const markdownComponents: Components = {
   p: ({ children, ...props }) => {
     if (typeof children === 'string') {
+      const lines = children.split(/\n+/).filter(Boolean)
       return (
         <>
-          {children.split('\n').map((line, i) => (
-            <p key={i} className="mb-2 last:mb-0" {...props}>{line}</p>
+          {lines.map((line, i) => (
+            <p key={i} className="mb-2 last:mb-0" {...props}>
+              {line}
+            </p>
           ))}
         </>
       )
@@ -47,13 +50,19 @@ export const markdownComponents: Components = {
     <ol className="mb-2 list-decimal pl-4 last:mb-0" {...props}>{children}</ol>
   ),
   li: ({ children, ...props }) => (
-    <li className="mb-1 last:mb-0" {...props}>{children}</li>
+    <li className="mb-1 last:mb-0 marker:text-foreground" {...props}>{children}</li>
   ),
   h3: ({ children, ...props }) => (
     <h3 className="mb-2 text-lg font-semibold last:mb-0" {...props}>{children}</h3>
   ),
   h4: ({ children, ...props }) => (
     <h4 className="mb-2 text-base font-semibold last:mb-0" {...props}>{children}</h4>
+  ),
+  em: ({ children }) => (
+    <em className="italic">{children}</em>
+  ),
+  strong: ({ children }) => (
+    <strong className="font-semibold">{children}</strong>
   ),
   img: ({ src, alt, ...props }: MarkdownImageProps) => (
     <div className="relative w-full max-w-[300px] my-4">
