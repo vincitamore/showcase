@@ -3,22 +3,14 @@
 import * as React from "react"
 import { useChat } from "ai/react"
 import type { Message as AIMessage } from 'ai'
-import type { Message, MessageContent, TextContent, ImageUrlContent, ExtendedAIMessage } from "@/types/chat"
+import type { Message, MessageContent, TextContent, ImageUrlContent } from "@/types/chat"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogClose, DialogFooter } from "@/components/ui/dialog"
-import { Send, Loader2, History, Heart, ThumbsUp, ThumbsDown, MoreVertical, Copy, Quote, Trash2, Download, Upload, Image as ImageIcon, X } from "lucide-react"
+import { Send, Loader2, History, Image as ImageIcon, X, Upload, Download, Trash2, MoreVertical, Copy, Quote, Heart, ThumbsDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import ReactMarkdown from "react-markdown"
-import type { Components } from "react-markdown"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTypewriter, Cursor } from 'react-simple-typewriter'
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +21,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { convertToAIMessage, convertFromAIMessage } from "@/types/chat"
+import { ModelSelector, type ModelValue } from "@/components/model-selector"
+import { GrokTagline } from "@/components/grok-tagline"
+import {
+  ChatBubble,
+  ChatInput,
+  ExportOptionsDialog,
+} from "@/components/chat"
+import ReactMarkdown, { type Components } from "react-markdown"
 
-interface CodeProps extends React.HTMLAttributes<HTMLElement> {
+interface CodeComponentProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean
+  className?: string
+  children?: React.ReactNode
 }
 
 interface MessageReaction {
@@ -43,37 +51,58 @@ interface MessageReaction {
   type: 'heart' | 'thumbsDown'
 }
 
+interface MarkdownComponentProps extends React.HTMLAttributes<HTMLElement> {
+  inline?: boolean
+  className?: string
+  children?: React.ReactNode
+}
+
+interface MarkdownImageProps {
+  src?: string
+  alt?: string
+}
+
 const markdownComponents: Components = {
-  p: ({ children }) => {
+  p: ({ children, ...props }) => {
     if (typeof children === 'string') {
-      // Split by newlines and wrap each line in a paragraph
       return (
         <>
           {children.split('\n').map((line, i) => (
-            <p key={i} className="mb-2 last:mb-0">{line}</p>
+            <p key={i} className="mb-2 last:mb-0" {...props}>{line}</p>
           ))}
         </>
       )
     }
-    return <p className="mb-2 last:mb-0">{children}</p>
+    return <p className="mb-2 last:mb-0" {...props}>{children}</p>
   },
-  code: ({ className, children, inline }: CodeProps) => (
+  code: ({ className, children, inline, ...props }: CodeComponentProps) => (
     <code
       className={cn(
         "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm",
         inline ? "inline" : "block p-2",
         className
       )}
+      {...props}
     >
       {children}
     </code>
   ),
-  ul: ({ children }) => <ul className="mb-2 list-disc pl-4 last:mb-0">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2 list-decimal pl-4 last:mb-0">{children}</ol>,
-  li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
-  h3: ({ children }) => <h3 className="mb-2 text-lg font-semibold last:mb-0">{children}</h3>,
-  h4: ({ children }) => <h4 className="mb-2 text-base font-semibold last:mb-0">{children}</h4>,
-  img: ({ src, alt }) => (
+  ul: ({ children, ...props }) => (
+    <ul className="mb-2 list-disc pl-4 last:mb-0" {...props}>{children}</ul>
+  ),
+  ol: ({ children, ...props }) => (
+    <ol className="mb-2 list-decimal pl-4 last:mb-0" {...props}>{children}</ol>
+  ),
+  li: ({ children, ...props }) => (
+    <li className="mb-1 last:mb-0" {...props}>{children}</li>
+  ),
+  h3: ({ children, ...props }) => (
+    <h3 className="mb-2 text-lg font-semibold last:mb-0" {...props}>{children}</h3>
+  ),
+  h4: ({ children, ...props }) => (
+    <h4 className="mb-2 text-base font-semibold last:mb-0" {...props}>{children}</h4>
+  ),
+  img: ({ src, alt, ...props }: MarkdownImageProps) => (
     <div className="relative w-full max-w-[300px] my-4">
       <img 
         src={src} 
@@ -84,6 +113,7 @@ const markdownComponents: Components = {
           console.error('[Chat Client] Image failed to load:', e)
           e.currentTarget.alt = 'Failed to load image'
         }}
+        {...props}
       />
     </div>
   ),
@@ -256,93 +286,6 @@ function QuoteModal({
   )
 }
 
-function ExportOptionsDialog({
-  isOpen,
-  onClose,
-  onExport,
-  messageCount,
-  heartedCount,
-  thumbsDownCount
-}: {
-  isOpen: boolean
-  onClose: () => void
-  onExport: (options: { includeAll: boolean; includeHearted: boolean; excludeThumbsDown: boolean }) => void
-  messageCount: number
-  heartedCount: number
-  thumbsDownCount: number
-}) {
-  const [includeAll, setIncludeAll] = React.useState(true)
-  const [includeHearted, setIncludeHearted] = React.useState(false)
-  const [excludeThumbsDown, setExcludeThumbsDown] = React.useState(false)
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogTitle>Export Options</DialogTitle>
-        <div className="grid gap-4 py-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="includeAll"
-              checked={includeAll}
-              onChange={(e) => {
-                setIncludeAll(e.target.checked)
-                if (e.target.checked) {
-                  setIncludeHearted(false)
-                }
-              }}
-              className="h-4 w-4 rounded border-primary"
-            />
-            <label htmlFor="includeAll" className="text-sm font-medium">
-              Export all messages ({messageCount})
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="includeHearted"
-              checked={includeHearted}
-              onChange={(e) => {
-                setIncludeHearted(e.target.checked)
-                if (e.target.checked) {
-                  setIncludeAll(false)
-                }
-              }}
-              className="h-4 w-4 rounded border-primary"
-            />
-            <label htmlFor="includeHearted" className="text-sm font-medium">
-              Only export hearted messages ({heartedCount})
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="excludeThumbsDown"
-              checked={excludeThumbsDown}
-              onChange={(e) => setExcludeThumbsDown(e.target.checked)}
-              className="h-4 w-4 rounded border-primary"
-            />
-            <label htmlFor="excludeThumbsDown" className="text-sm font-medium">
-              Exclude thumbs down messages ({thumbsDownCount})
-            </label>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={() => {
-            onExport({ includeAll, includeHearted, excludeThumbsDown })
-            onClose()
-          }}>
-            Export
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function MessageActions({ 
   message, 
   isUser,
@@ -380,204 +323,6 @@ function MessageActions({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-const ChatBubble = ({ 
-  message, 
-  isLoading,
-  onQuote,
-  onReactionChange
-}: { 
-  message: Message
-  isLoading?: boolean
-  onQuote: (content: string) => void
-  onReactionChange: (messageId: string, type: 'heart' | 'thumbsDown', active: boolean) => void
-}): JSX.Element => {
-  const [showActions, setShowActions] = useState(false)
-  const [showQuoteModal, setShowQuoteModal] = useState(false)
-  const isUser = message.role === 'user'
-
-  // Extract text and image content
-  const textContent = Array.isArray(message.content) 
-    ? message.content
-        .filter(c => c.type === 'text')
-        .map(c => (c as TextContent).text)
-        .join('\n')
-    : typeof message.content === 'string' 
-      ? message.content.replace(/\\n/g, '\n')  // Handle escaped newlines in string content
-      : message.content
-
-  const imageContent = Array.isArray(message.content)
-    ? message.content.find(c => c.type === 'image_url') as ImageUrlContent | undefined
-    : null
-
-  const formatTime = (date: Date | string | number | undefined): string => {
-    if (!date) return ''
-    const d = new Date(date)
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-  }
-
-  return (
-    <div
-      className={cn(
-        "group relative mb-4 flex items-start",
-        message.role === "user" ? "justify-end" : "justify-start"
-      )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
-      <div className={cn(
-        "rounded-lg px-4 py-2 max-w-[85%] space-y-2 relative group",
-        isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-      )}>
-        {textContent && (
-          <ReactMarkdown
-            components={markdownComponents}
-            className="prose dark:prose-invert prose-sm break-words"
-          >
-            {textContent}
-          </ReactMarkdown>
-        )}
-        
-        {imageContent && (
-          <div className="relative w-full max-w-[300px] my-4">
-            <img 
-              src={imageContent.image_url.url}
-              alt="Uploaded image"
-              className="rounded-lg w-full h-auto object-contain"
-              loading="lazy"
-              onError={(e) => {
-                console.error('[Chat Client] Image failed to load:', e)
-                e.currentTarget.alt = 'Failed to load image'
-              }}
-            />
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="h-4 flex items-center justify-center">
-            <TypingIndicator />
-          </div>
-        )}
-
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <MessageActions 
-            message={message}
-            isUser={isUser}
-            onQuote={onQuote}
-          />
-        </div>
-
-        <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground/60">
-          <MessageReactions 
-            isAssistant={!isUser}
-            messageId={message.id}
-            onReactionChange={onReactionChange}
-          />
-          <time>
-            {formatTime(message.createdAt)}
-          </time>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ChatInput({ 
-  input, 
-  handleInputChange, 
-  handleSubmit, 
-  isLoading,
-  className,
-  placeholder = "Type a message...",
-  onImageSelect,
-  onImageRemove,
-  imagePreview
-}: { 
-  input: string
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void
-  isLoading: boolean
-  className?: string
-  placeholder?: string
-  onImageSelect: (file: File) => void
-  onImageRemove: () => void
-  imagePreview: string | null
-}) {
-  const imageInputRef = React.useRef<HTMLInputElement>(null)
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      onImageSelect(file)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className={cn("relative", className)}>
-      <div className="relative rounded-lg border bg-background">
-        {imagePreview && (
-          <div className="p-2 border-b">
-            <div className="relative w-32 h-32">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-full h-full object-cover rounded-lg"
-              />
-              <button
-                type="button"
-                onClick={onImageRemove}
-                className="absolute -top-2 -right-2 p-1 rounded-full bg-background border"
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Remove image</span>
-              </button>
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-2 px-4 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full"
-            onClick={() => imageInputRef.current?.click()}
-          >
-            <ImageIcon className="h-4 w-4" />
-            <span className="sr-only">Attach image</span>
-          </Button>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            placeholder={placeholder}
-            className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
-            disabled={isLoading}
-          />
-          <Button
-            type="submit"
-            size="icon"
-            variant="ghost"
-            disabled={(!input.trim() && !imagePreview) || isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageSelect}
-        className="hidden"
-        aria-label="Upload image"
-      />
-    </form>
   )
 }
 
@@ -667,6 +412,7 @@ export function AnimatedChatInput() {
   const [mounted, setMounted] = React.useState(false)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isAlertOpen, setIsAlertOpen] = React.useState(false)
+  const [selectedModel, setSelectedModel] = React.useState<ModelValue>("grok-2-vision-1212")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [selectedImage, setSelectedImage] = React.useState<File | null>(null)
@@ -683,7 +429,7 @@ export function AnimatedChatInput() {
   } = useChat({
     api: "/api/chat",
     body: {
-      model: "grok-2-vision-latest"
+      model: selectedModel
     },
     initialMessages: [],
     id: React.useId(),
@@ -767,72 +513,198 @@ export function AnimatedChatInput() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
             },
             body: JSON.stringify({
-              messages: updatedMessages.map(msg => convertToAIMessage(msg))
-            })
+              messages: updatedMessages.map(msg => ({
+                role: msg.role,
+                content: Array.isArray(msg.content)
+                  ? msg.content.map(c => {
+                      if (c.type === 'text') {
+                        return { type: 'text', text: c.text }
+                      }
+                      if (c.type === 'image_url') {
+                        return {
+                          type: 'image',
+                          source: {
+                            type: 'url',
+                            url: c.image_url.url,
+                            media_type: 'image/jpeg'
+                          }
+                        }
+                      }
+                      return null
+                    }).filter(Boolean)
+                  : String(msg.content)
+              })),
+              model: selectedModel,
+              data: {
+                text: input,
+                stream: true
+              }
+            }),
+            // Add signal for streaming
+            signal: AbortSignal.timeout(30000)
           })
 
-          if (!response.ok) {
+          if (!response.ok || !response.body) {
+            console.error('[Chat Client] API response not ok:', {
+              status: response.status,
+              statusText: response.statusText,
+              hasBody: !!response.body
+            })
             throw new Error(`API request failed: ${response.status} ${response.statusText}`)
           }
-
-          // Create a placeholder for the assistant's response
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            createdAt: new Date()
-          }
-
-          setLocalMessages([...updatedMessages, assistantMessage])
 
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
-          let responseText = ''
+          console.log('[Chat Client] Stream reader created:', !!reader)
+          console.log('[Chat Client] Decoder created')
 
-          while (reader) {
+          if (!reader) {
+            throw new Error('No reader available')
+          }
+
+          console.log('[Chat Client] Starting stream processing')
+          let responseText = ''
+          let chunkCount = 0
+          let lineCount = 0
+          let textDeltaCount = 0
+
+          // Create assistant message placeholder
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: [{
+              type: 'text' as const,
+              text: ''
+            }] as MessageContent[],
+            createdAt: new Date()
+          }
+          console.log('[Chat Client] Created assistant message:', {
+            id: assistantMessage.id,
+            role: assistantMessage.role,
+            contentLength: (assistantMessage.content[0] as TextContent).text.length
+          })
+
+          // Add assistant message to messages
+          setLocalMessages(prevMessages => [...prevMessages, assistantMessage])
+
+          console.log('[Chat Client] Entering stream processing loop')
+          while (true) {
             const { done, value } = await reader.read()
-            if (done) break
+            chunkCount++
+            
+            if (done) {
+              console.log('[Chat Client] Stream complete:', {
+                totalChunks: chunkCount,
+                totalLines: lineCount,
+                totalTextDeltas: textDeltaCount,
+                finalResponseLength: responseText.length
+              })
+              break
+            }
 
             const chunk = decoder.decode(value)
-            console.log('[Chat Client] Raw chunk:', chunk)
-            
-            // Split into lines and process each line
-            const lines = chunk.split('\n')
+            console.log('[Chat Client] Decoded chunk:', {
+              chunk,
+              length: chunk.length,
+              lines: chunk.split('\n').filter(Boolean)
+            })
+
+            // Split chunk into lines and process each line
+            const lines = chunk.split('\n').filter(Boolean)
             for (const line of lines) {
-              if (!line.trim()) continue
+              lineCount++
               
-              // Handle different message types
-              if (line.startsWith('f:')) continue // Skip function call messages
-              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
-              
-              // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes, preserve newlines
-              const cleanedText = line.replace(/^\d+:\s*"|"$/g, '')
-                           .replace(/\\n/g, '\n') // Convert escaped newlines to actual newlines
-              
-              // Process actual content
-              responseText += cleanedText
-              
-              // Update the assistant's message with the accumulated response
-              setLocalMessages(prev => {
-                const updated = [...prev]
-                const lastMessage = updated[updated.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant') {
-                  lastMessage.content = responseText
+              // Handle text content (0:)
+              if (line.startsWith('0:')) {
+                try {
+                  // Extract the text content, removing the prefix and quotes
+                  const text = line.slice(2).replace(/^"|"$/g, '')
+                  textDeltaCount++
+                  responseText += text
+                  
+                  // Update assistant message content
+                  setLocalMessages(prevMessages => 
+                    prevMessages.map(msg => 
+                      msg.id === assistantMessage.id 
+                        ? {
+                            ...msg,
+                            content: [{
+                              type: 'text' as const,
+                              text: responseText
+                            }]
+                          }
+                        : msg
+                    )
+                  )
+                  
+                  console.log('[Chat Client] Text delta processed:', {
+                    text,
+                    totalLength: responseText.length
+                  })
+                } catch (error) {
+                  console.error('[Chat Client] Error processing text chunk:', error)
                 }
-                return [...updated]
-              })
+              }
+              
+              // Handle end message (e:)
+              if (line.startsWith('e:')) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  console.log('[Chat Client] End message:', data)
+                } catch (error) {
+                  console.error('[Chat Client] Error parsing end message:', error)
+                }
+              }
+              
+              // Handle done message (d:)
+              if (line.startsWith('d:')) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  console.log('[Chat Client] Done message:', data)
+                } catch (error) {
+                  console.error('[Chat Client] Error parsing done message:', error)
+                }
+              }
             }
           }
 
-          // Save to localStorage after the stream is complete
-          localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...assistantMessage,
-            content: responseText
-          }]))
+          // Save final state
+          console.log('[Chat Client] Stream finished, saving final state')
+          setLocalMessages(prevMessages => {
+            const finalMessages = prevMessages.map(msg =>
+              msg.id === assistantMessage.id
+                ? {
+                    ...msg,
+                    content: [{
+                      type: 'text' as const,
+                      text: responseText
+                    }]
+                  }
+                : msg
+            )
+            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
+            return finalMessages
+          })
+
+          // Format messages for API request
+          const formattedMessages = updatedMessages.map(msg => ({
+            role: msg.role === 'system' ? 'user' : msg.role,
+            content: Array.isArray(msg.content)
+              ? msg.content.map(c => {
+                  if (c.type === 'text') {
+                    return c.text
+                  }
+                  if (c.type === 'image_url') {
+                    return `[Image: ${c.image_url.url}]`
+                  }
+                  return null
+                }).filter(Boolean).join('\n')
+              : msg.content
+          }))
 
           console.log('[Chat Client] Image message sent and response received successfully')
         } catch (error) {
@@ -859,77 +731,187 @@ export function AnimatedChatInput() {
         setLocalMessages(updatedMessages)
 
         try {
-          // Send message
+          // Send message with proper formatting for each provider
           const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
             },
             body: JSON.stringify({
-              messages: updatedMessages.map(msg => convertToAIMessage(msg))
-            })
+              messages: updatedMessages.map(msg => ({
+                role: msg.role,
+                content: Array.isArray(msg.content)
+                  ? msg.content.map(c => {
+                      if (c.type === 'text') {
+                        return { type: 'text', text: c.text }
+                      }
+                      if (c.type === 'image_url') {
+                        return {
+                          type: 'image',
+                          source: {
+                            type: 'url',
+                            url: c.image_url.url,
+                            media_type: 'image/jpeg'
+                          }
+                        }
+                      }
+                      return null
+                    }).filter(Boolean)
+                  : String(msg.content)
+              })),
+              model: selectedModel,
+              data: {
+                text: input,
+                stream: true
+              }
+            }),
+            // Add signal for streaming
+            signal: AbortSignal.timeout(30000)
           })
 
-          if (!response.ok) {
+          if (!response.ok || !response.body) {
+            console.error('[Chat Client] API response not ok:', {
+              status: response.status,
+              statusText: response.statusText,
+              hasBody: !!response.body
+            })
             throw new Error(`API request failed: ${response.status} ${response.statusText}`)
           }
-
-          // Create a placeholder for the assistant's response
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            createdAt: new Date()
-          }
-
-          setLocalMessages([...updatedMessages, assistantMessage])
 
           // Process the streaming response
           const reader = response.body?.getReader()
           const decoder = new TextDecoder()
-          let responseText = ''
+          console.log('[Chat Client] Stream reader created:', !!reader)
+          console.log('[Chat Client] Decoder created')
 
-          while (reader) {
+          if (!reader) {
+            throw new Error('No reader available')
+          }
+
+          console.log('[Chat Client] Starting stream processing')
+          let responseText = ''
+          let chunkCount = 0
+          let lineCount = 0
+          let textDeltaCount = 0
+
+          // Create assistant message placeholder
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: [{
+              type: 'text' as const,
+              text: ''
+            }] as MessageContent[],
+            createdAt: new Date()
+          }
+          console.log('[Chat Client] Created assistant message:', {
+            id: assistantMessage.id,
+            role: assistantMessage.role,
+            contentLength: (assistantMessage.content[0] as TextContent).text.length
+          })
+
+          // Add assistant message to messages
+          setLocalMessages(prevMessages => [...prevMessages, assistantMessage])
+
+          console.log('[Chat Client] Entering stream processing loop')
+          while (true) {
             const { done, value } = await reader.read()
-            if (done) break
+            chunkCount++
+            
+            if (done) {
+              console.log('[Chat Client] Stream complete:', {
+                totalChunks: chunkCount,
+                totalLines: lineCount,
+                totalTextDeltas: textDeltaCount,
+                finalResponseLength: responseText.length
+              })
+              break
+            }
 
             const chunk = decoder.decode(value)
-            console.log('[Chat Client] Raw chunk:', chunk)
-            
-            // Split into lines and process each line
-            const lines = chunk.split('\n')
+            console.log('[Chat Client] Decoded chunk:', {
+              chunk,
+              length: chunk.length,
+              lines: chunk.split('\n').filter(Boolean)
+            })
+
+            // Split chunk into lines and process each line
+            const lines = chunk.split('\n').filter(Boolean)
             for (const line of lines) {
-              if (!line.trim()) continue
+              lineCount++
               
-              // Handle different message types
-              if (line.startsWith('f:')) continue // Skip function call messages
-              if (line.startsWith('e:') || line.startsWith('d:')) continue // Skip end messages
-              
-              // Clean up the response text
-              // Remove the "0:" prefix and any surrounding quotes, preserve newlines
-              const cleanedText = line.replace(/^\d+:\s*"|"$/g, '')
-                           .replace(/\\n/g, '\n') // Convert escaped newlines to actual newlines
-              
-              // Process actual content
-              responseText += cleanedText
-              
-              // Update the assistant's message with the accumulated response
-              setLocalMessages(prev => {
-                const updated = [...prev]
-                const lastMessage = updated[updated.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant') {
-                  lastMessage.content = responseText
+              // Handle text content (0:)
+              if (line.startsWith('0:')) {
+                try {
+                  // Extract the text content, removing the prefix and quotes
+                  const text = line.slice(2).replace(/^"|"$/g, '')
+                  textDeltaCount++
+                  responseText += text
+                  
+                  // Update assistant message content
+                  setLocalMessages(prevMessages => 
+                    prevMessages.map(msg => 
+                      msg.id === assistantMessage.id 
+                        ? {
+                            ...msg,
+                            content: [{
+                              type: 'text' as const,
+                              text: responseText
+                            }]
+                          }
+                        : msg
+                    )
+                  )
+                  
+                  console.log('[Chat Client] Text delta processed:', {
+                    text,
+                    totalLength: responseText.length
+                  })
+                } catch (error) {
+                  console.error('[Chat Client] Error processing text chunk:', error)
                 }
-                return [...updated]
-              })
+              }
+              
+              // Handle end message (e:)
+              if (line.startsWith('e:')) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  console.log('[Chat Client] End message:', data)
+                } catch (error) {
+                  console.error('[Chat Client] Error parsing end message:', error)
+                }
+              }
+              
+              // Handle done message (d:)
+              if (line.startsWith('d:')) {
+                try {
+                  const data = JSON.parse(line.slice(2))
+                  console.log('[Chat Client] Done message:', data)
+                } catch (error) {
+                  console.error('[Chat Client] Error parsing done message:', error)
+                }
+              }
             }
           }
 
-          // Save to localStorage after the stream is complete
-          localStorage.setItem('chatHistory', JSON.stringify([...updatedMessages, {
-            ...assistantMessage,
-            content: responseText
-          }]))
+          // Save final state
+          console.log('[Chat Client] Stream finished, saving final state')
+          setLocalMessages(prevMessages => {
+            const finalMessages = prevMessages.map(msg =>
+              msg.id === assistantMessage.id
+                ? {
+                    ...msg,
+                    content: [{
+                      type: 'text' as const,
+                      text: responseText
+                    }]
+                  }
+                : msg
+            )
+            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
+            return finalMessages
+          })
 
           console.log('[Chat Client] Text message sent and response received successfully')
         } catch (error) {
@@ -1134,18 +1116,24 @@ export function AnimatedChatInput() {
               onImageRemove={handleImageRemove}
               imagePreview={imagePreview}
             />
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              onClick={() => setIsDialogOpen(true)}
-              className="absolute right-14 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100"
-              disabled={isLoading}
-            >
-              <History className="h-4 w-4" />
-              <span className="sr-only">View chat history</span>
-            </Button>
+            <div className="absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsDialogOpen(true)}
+                className="opacity-70 hover:opacity-100"
+                disabled={isLoading}
+              >
+                <History className="h-4 w-4" />
+                <span className="sr-only">View chat history</span>
+              </Button>
+            </div>
           </motion.div>
+          <GrokTagline 
+            selectedModel={selectedModel}
+            onModelChange={setSelectedModel}
+          />
         </motion.div>
       </AnimatePresence>
 

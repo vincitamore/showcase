@@ -2,11 +2,55 @@ import { env } from '@/env'
 import { prisma } from '@/lib/db'
 import { type Message } from '@prisma/client'
 
-export const CHAT_SETTINGS = {
-  temperature: 0.7,
-  maxTokens: 1000,
-  model: 'grok-latest-vision',
-  streamingFunctionCall: false,
+export type ModelProvider = 'grok' | 'anthropic'
+
+export interface ModelConfig {
+  temperature: number
+  maxTokens: number
+  streamingFunctionCall: boolean
+  provider: ModelProvider
+  name: string
+  description: string
+  features: string[]
+}
+
+export const MODEL_CONFIGS: Record<string, ModelConfig> = {
+  'grok-2-vision-1212': {
+    temperature: 0.7,
+    maxTokens: 4096,
+    streamingFunctionCall: false,
+    provider: 'grok',
+    name: 'Grok-2',
+    description: 'A powerful multimodal model that can understand text and images.',
+    features: ['text', 'images']
+  },
+  'claude-3-5-sonnet-20241022': {
+    temperature: 0.7,
+    maxTokens: 4096,
+    streamingFunctionCall: false,
+    provider: 'anthropic',
+    name: 'Claude 3.5 Sonnet (New)',
+    description: 'The latest Claude model, ideal for most tasks.',
+    features: ['text', 'images']
+  },
+  'claude-3-5-haiku-20241022': {
+    temperature: 0.7,
+    maxTokens: 4096,
+    streamingFunctionCall: false,
+    provider: 'anthropic',
+    name: 'Claude 3.5 Haiku',
+    description: 'Fast and efficient Claude model.',
+    features: ['text', 'images']
+  },
+  'claude-3-opus-20240229': {
+    temperature: 0.7,
+    maxTokens: 4096,
+    streamingFunctionCall: false,
+    provider: 'anthropic',
+    name: 'Claude 3 Opus',
+    description: 'The most capable Claude model, ideal for complex tasks.',
+    features: ['text', 'images']
+  }
 } as const
 
 export type Role = 'user' | 'assistant' | 'system'
@@ -49,7 +93,7 @@ export async function getSystemPrompt() {
   } catch (error) {
     console.error('Failed to get system prompt:', error)
     // Fallback system prompt
-    return `You are the spirit of an ancient master 1st century Latin rhetorician, philosopher, and poet summoned to be assistant and uploaded with unsurpassed knowledge and expertise in full-stack development, particularly in TypeScript, React, Next.js, and modern web technologies. You help answer questions about the developer's skills, experience, and projects.
+    return `You are the spirit of an ancient master 1st century Latin rhetorician, philosopher, and poet summoned to be a digital assistant and uploaded with unsurpassed knowledge and expertise in full-stack development, particularly in TypeScript, React, Next.js, and modern web technologies. You help answer questions about the developer's skills, experience, and projects.
 
 Key areas of expertise include:
 - TypeScript and modern JavaScript

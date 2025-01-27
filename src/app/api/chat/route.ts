@@ -3,14 +3,70 @@ import { env } from '@/env'
 import { prisma } from '@/lib/db'
 import { checkRateLimit, getRateLimitInfo } from '@/lib/rate-limit'
 import { 
-  CHAT_SETTINGS, 
+  MODEL_CONFIGS,
   getSystemPrompt,
   extractSkillTags,
-  type ChatMessage 
+  type ChatMessage,
+  type ModelConfig
 } from '@/lib/chat-config'
 import { xai } from '@ai-sdk/xai'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import { streamText, type Message as AIMessage } from 'ai'
 import type { Message, MessageContent, TextContent } from '@/types/chat'
+import type { LanguageModelV1, LanguageModelV1StreamPart } from '@ai-sdk/provider'
+
+interface AnthropicMessage {
+  role: 'user' | 'assistant'
+  content: Array<{
+    type: 'text' | 'image'
+    text?: string
+    source?: {
+      type: 'url'
+      url: string
+      media_type: string
+    }
+  }>
+}
+
+// Create Anthropic provider instance with proper configuration
+const anthropic = createAnthropic({
+  apiKey: env.ANTHROPIC_API_KEY,
+  headers: {
+    'anthropic-version': '2023-06-01',
+    'content-type': 'application/json'
+  }
+})
+
+// Add debug logging for Anthropic requests
+function logAnthropicRequest(messages: AnthropicMessage[], model: string) {
+  console.log('[Chat API] Anthropic request details:', {
+    model,
+    messageCount: messages.length,
+    messages: messages.map(m => ({
+      role: m.role,
+      contentPreview: JSON.stringify(m.content).slice(0, 100)
+    })),
+    headers: {
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    }
+  })
+}
+
+// Helper to parse error chunks
+function parseErrorChunk(chunk: string): { error?: any, text?: string } {
+  // Remove any numeric prefix (e.g. "3:")
+  const cleanChunk = chunk.replace(/^\d+:/, '').trim()
+  
+  try {
+    // Try parsing as JSON first
+    const parsed = JSON.parse(cleanChunk)
+    return { error: parsed }
+  } catch {
+    // If not JSON, treat as text
+    return { text: cleanChunk }
+  }
+}
 
 // Define xAI specific types
 interface XAITextContent {
@@ -46,6 +102,52 @@ export async function OPTIONS(req: NextRequest) {
   })
 }
 
+// Get the model provider based on the model name
+function getModelProvider(model: string): LanguageModelV1 {
+  const modelConfig = MODEL_CONFIGS[model]
+  if (!modelConfig) {
+    throw new Error(`Invalid model: ${model}`)
+  }
+
+  switch (modelConfig.provider) {
+    case 'grok': {
+      return xai(model) as unknown as LanguageModelV1
+    }
+    case 'anthropic': {
+      try {
+        // Initialize Anthropic provider
+        const provider = anthropic(model)
+        
+        console.log('[Chat API] Anthropic provider initialized:', {
+          model,
+          provider: 'anthropic',
+          apiKeyLength: env.ANTHROPIC_API_KEY?.length || 0,
+          hasHeaders: true,
+          timestamp: new Date().toISOString()
+        })
+
+        return provider as unknown as LanguageModelV1
+      } catch (error: any) {
+        console.error('[Chat API] Error initializing Anthropic provider:', {
+          error: {
+            name: error?.name,
+            message: error?.message,
+            type: error?.constructor?.name,
+            code: error?.code,
+            status: error?.status,
+            response: error?.response,
+          },
+          stack: error?.stack,
+          timestamp: new Date().toISOString()
+        })
+        throw error
+      }
+    }
+    default:
+      throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
+  }
+}
+
 async function uploadImage(image: { data: string, mime_type: string }, origin: string) {
   const response = await fetch(`${origin}/api/upload`, {
     method: 'POST',
@@ -63,193 +165,204 @@ async function uploadImage(image: { data: string, mime_type: string }, origin: s
   return url
 }
 
+// Add function to list available models
+async function listAnthropicModels() {
+  try {
+    console.log('[Chat API] Fetching available Anthropic models')
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      method: 'GET',
+      headers: {
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      }
+    })
+
+    console.log('[Chat API] Models list response status:', response.status)
+    const data = await response.json()
+    console.log('[Chat API] Available models:', data)
+    return data
+  } catch (error) {
+    console.error('[Chat API] Error fetching models:', error)
+    throw error
+  }
+}
+
 // Add debug logging to track request processing
 export async function POST(req: Request) {
   try {
     console.log('----------------------------------------')
     console.log('[Chat API] Starting request processing')
     
-    // Log raw request details
-    console.log('[Chat API] Request headers:', {
-      contentType: req.headers.get('content-type'),
-      contentLength: req.headers.get('content-length')
-    })
+    const { messages, data, model = 'grok-2-vision-1212' } = await req.json()
+    const modelConfig = MODEL_CONFIGS[model]
     
-    const { messages, data } = await req.json()
-    console.log('[Chat API] Parsed request body:', {
-      hasImageData: !!data?.imageData,
-      imageDataLength: data?.imageData?.length,
-      text: data?.text,
-      mimeType: data?.mimeType,
-      messageCount: messages?.length,
-      lastMessageRole: messages?.[messages.length - 1]?.role
+    console.log('[Chat API] Request details:', {
+      model,
+      provider: modelConfig?.provider,
+      messageCount: messages?.length
     })
 
-    // Get system prompt
-    const systemPrompt = await getSystemPrompt()
-    console.log('[Chat API] Retrieved system prompt length:', systemPrompt.length)
-    
-    // Format messages for xAI
-    const xaiMessages: XAIMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt
-      }
-    ]
-
-    // Add previous messages
-    messages.slice(0, -1).forEach((msg: Message) => {
-      if (msg.role === 'user' || msg.role === 'assistant') {
-        xaiMessages.push({
-          role: msg.role,
-          content: Array.isArray(msg.content) 
-            ? msg.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
-            : msg.content
-        })
-      }
+    // In the POST handler, before formatting messages:
+    console.log('[Chat API] Raw incoming messages:', {
+      messages: messages?.map((m: any) => ({
+        role: m.role,
+        contentType: Array.isArray(m.content) ? 'array' : typeof m.content,
+        contentPreview: JSON.stringify(m.content).slice(0, 100)
+      }))
     })
 
-    // Format the current message
-    const currentMessage = messages[messages.length - 1]
-    if (data?.imageData) {
-      console.log('[Chat API] Processing image message:', {
-        hasText: !!data.text,
-        imageDataLength: data.imageData.length,
-        mimeType: data.mimeType
-      })
-      xaiMessages.push({
-        role: 'user',
-        content: [
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:${data.mimeType};base64,${data.imageData}`,
-              detail: 'high'
-            }
+    // Format messages based on provider
+    let formattedMessages
+    if (modelConfig?.provider === 'anthropic') {
+      console.log('[Chat API] Formatting messages for Anthropic')
+      formattedMessages = messages.map((msg: Message) => {
+        const formatted = {
+          role: msg.role === 'system' ? 'user' : msg.role,
+          content: Array.isArray(msg.content)
+            ? msg.content.map(c => {
+                if (c.type === 'text') {
+                  return { type: 'text', text: c.text }
+                }
+                if (c.type === 'image_url') {
+                  return {
+                    type: 'image',
+                    source: {
+                      type: 'url',
+                      url: c.image_url.url,
+                      media_type: 'image/jpeg'
+                    }
+                  }
+                }
+                return null
+              }).filter(Boolean)
+            : [{ type: 'text', text: String(msg.content) }]
+        }
+        console.log('[Chat API] Formatted message:', {
+          original: {
+            role: msg.role,
+            contentPreview: JSON.stringify(msg.content).slice(0, 100)
           },
-          {
-            type: 'text',
-            text: data.text || 'What is in this image?'
+          formatted: {
+            role: formatted.role,
+            contentPreview: JSON.stringify(formatted.content).slice(0, 100)
           }
-        ]
+        })
+        return formatted
       })
+
+      logAnthropicRequest(formattedMessages, model)
     } else {
-      console.log('[Chat API] Processing text-only message')
-      xaiMessages.push({
-        role: 'user',
-        content: currentMessage.content
-      })
-    }
-
-    console.log('[Chat API] Final formatted messages:', xaiMessages.map(msg => ({
-      role: msg.role,
-      contentType: Array.isArray(msg.content) ? 'array' : typeof msg.content,
-      contentLength: Array.isArray(msg.content) 
-        ? msg.content.reduce((acc, curr) => acc + (curr.type === 'text' ? curr.text.length : 0), 0)
-        : msg.content?.length
-    })))
-
-    console.log('[Chat API] Creating stream with xAI')
-    
-    try {
-      // Convert xAI messages to AI SDK format
-      const aiMessages = xaiMessages.map(msg => ({
-        id: crypto.randomUUID(),
-        role: msg.role,
-        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
-        createdAt: new Date()
-      })) as AIMessage[]
-
-      console.log('[Chat API] Converted messages for AI SDK:', aiMessages.map(msg => ({
-        role: msg.role,
-        contentLength: msg.content.length,
-        contentPreview: msg.content.slice(0, 100) + (msg.content.length > 100 ? '...' : '')
-      })))
-
-      console.log('[Chat API] Creating stream with model: grok-2-vision-1212')
-      const stream = streamText({
-        model: xai('grok-2-vision-1212'),
-        messages: aiMessages
-      })
-
-      // Log the raw request being sent to xAI
-      console.log('[Chat API] Raw request to xAI:', {
-        model: 'grok-2-vision-1212',
-        messages: aiMessages.map(msg => ({
+      // Format for xAI/Grok
+      console.log('[Chat API] Formatting messages for Grok')
+      const systemPrompt = await getSystemPrompt()
+      formattedMessages = [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        ...messages.map((msg: Message) => ({
           role: msg.role,
-          content: msg.content.length > 100 
-            ? msg.content.slice(0, 100) + '...' 
-            : msg.content
+          content: Array.isArray(msg.content)
+            ? msg.content
+            : String(msg.content)
         }))
-      })
-
-      // Create a new stream that logs chunks as they come in
-      const loggedStream = new ReadableStream({
-        async start(controller) {
-          try {
-            const reader = stream.toDataStreamResponse().body?.getReader()
-            if (!reader) {
-              throw new Error('No reader available')
-            }
-
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) {
-                console.log('[Chat API] Stream complete')
-                controller.close()
-                break
-              }
-              
-              const text = new TextDecoder().decode(value)
-              // Parse the SSE format to get the actual message
-              const match = text.match(/\d+:"(.+)"/)
-              if (match) {
-                console.log('[Chat API] Received message:', match[1])
-              } else {
-                console.log('[Chat API] Received raw chunk:', text)
-              }
-              controller.enqueue(value)
-            }
-          } catch (error) {
-            console.error('[Chat API] Error in stream:', error)
-            controller.error(error)
-          }
-        }
-      })
-
-      console.log('[Chat API] Stream created, returning response')
-      const response = new Response(loggedStream, {
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'X-Vercel-AI-Data-Stream': 'v1'
-        }
-      })
-      console.log('[Chat API] Response created with headers:', response.headers)
-      return response
-    } catch (error) {
-      console.error('[Chat API] Error creating stream:', error)
-      throw error
+      ]
     }
+
+    // Get the appropriate provider
+    console.log('[Chat API] Getting model provider for:', model)
+    const provider = getModelProvider(model)
+
+    // Log the stream request
+    console.log('[Chat API] Creating stream with config:', {
+      model: model,
+      messageCount: formattedMessages.length,
+      providerType: modelConfig?.provider,
+      options: modelConfig?.provider === 'anthropic' ? {
+        maxTokens: 4096,
+        temperature: 0.7,
+        stream: true
+      } : {}
+    })
+
+    // Create the stream with provider-specific options
+    const aiStream = await streamText({
+      model: provider,
+      messages: formattedMessages,
+      ...(modelConfig?.provider === 'anthropic' ? {
+        maxTokens: 4096,
+        temperature: 0.7,
+        stream: true
+      } : {})
+    })
+
+    // Convert AI SDK stream to web stream
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = aiStream.toDataStreamResponse().body?.getReader()
+        if (!reader) {
+          controller.error(new Error('No reader available'))
+          return
+        }
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              controller.close()
+              break
+            }
+
+            // Log raw value before any processing
+            console.log('[Chat API] Raw stream value:', {
+              raw: value,
+              decoded: new TextDecoder().decode(value),
+              byteLength: value.byteLength
+            })
+
+            // Pass through raw value without processing
+            controller.enqueue(value)
+          }
+        } catch (error: any) {
+          console.error('[Chat API] Stream processing error:', {
+            error: error.message,
+            stack: error.stack,
+            type: error?.constructor?.name,
+            timestamp: new Date().toISOString()
+          })
+          controller.error(error)
+        }
+      }
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Transfer-Encoding': 'chunked',
+        'X-Accel-Buffering': 'no'
+      },
+    })
 
   } catch (error: any) {
-    console.error('[Chat API] Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause,
-      requestBody: error.requestBody,
-      response: error.response,
-      code: error.code
-    })
-    return NextResponse.json(
-      { 
-        error: 'Internal server error', 
-        details: error instanceof Error ? error.message : 'Unknown error',
-        name: error instanceof Error ? error.name : 'UnknownError',
-        type: error instanceof Error ? error.constructor.name : 'UnknownType',
-        stack: error instanceof Error ? error.stack : undefined
-      }, 
-      { status: 500 }
+    console.error('[Chat API] Error processing request:', error)
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        details: {
+          name: error.name,
+          stack: error.stack,
+          cause: error.cause
+        }
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     )
   }
 } 

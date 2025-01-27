@@ -1,8 +1,14 @@
 "use client"
 
 import { motion } from 'framer-motion'
+import { ModelSelector, type ModelValue } from "@/components/model-selector"
 
-export function GrokTagline() {
+interface GrokTaglineProps {
+  selectedModel: ModelValue
+  onModelChange: (value: ModelValue) => void
+}
+
+export function GrokTagline({ selectedModel, onModelChange }: GrokTaglineProps) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 5 }}
@@ -11,8 +17,10 @@ export function GrokTagline() {
       className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/80"
     >
       <span>Powered by</span>
-      <img src="/grok-home-logo.svg" alt="Grok AI" className="hidden h-3 dark:block" />
-      <img src="/grok-home-logo-dark.svg" alt="Grok AI" className="h-3 dark:hidden" />
+      <ModelSelector 
+        value={selectedModel}
+        onValueChange={onModelChange}
+      />
     </motion.div>
   )
 } 

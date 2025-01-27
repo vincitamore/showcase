@@ -1,4 +1,4 @@
-import { Message as AIMessage } from '@ai-sdk/ui-utils'
+import type { Message as AIMessage } from 'ai'
 
 export interface TextContent {
   type: 'text'
@@ -9,78 +9,105 @@ export interface ImageUrlContent {
   type: 'image_url'
   image_url: {
     url: string
-    detail: 'high' | 'low'
+    detail?: 'high' | 'low'
   }
 }
 
 export type MessageContent = TextContent | ImageUrlContent
+export type MessageRole = 'system' | 'user' | 'assistant'
 
-export interface CustomMessage {
+export interface Message {
   id: string
-  role: AIMessage['role']
+  role: MessageRole
   content: string | MessageContent[]
   createdAt: Date
 }
 
-// Define the AI message content type
-export type AIMessageContent = string | MessageContent[]
-
-// Extend the AI message type to support array content
-export interface ExtendedAIMessage extends Omit<AIMessage, 'content'> {
-  content: AIMessageContent
+// Extend AIMessage to support our content types
+export interface ExtendedAIMessage {
+  id: string
+  role: MessageRole
+  content: string | MessageContent[]
+  createdAt: Date
 }
 
-export type Message = CustomMessage
+export function convertToAIMessage(message: Message): ExtendedAIMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt
+  }
+}
 
-export function convertToAIMessage(message: CustomMessage): ExtendedAIMessage {
-  if (Array.isArray(message.content)) {
-    // Convert our message format to xAI's format but don't stringify the array
-    return {
-      id: message.id,
-      role: message.role,
-      content: message.content.map(c => {
-        if (c.type === 'text') {
-          return {
-            type: 'text',
-            text: c.text
-          }
-        } else if (c.type === 'image_url') {
-          return {
-            type: 'image_url',
-            image_url: c.image_url
+export function convertFromAIMessage(aiMessage: AIMessage): Message {
+  return {
+    id: aiMessage.id,
+    role: aiMessage.role as MessageRole,
+    content: aiMessage.content,
+    createdAt: aiMessage.createdAt || new Date()
+  }
+}
+
+// Helper function to check if content is in Anthropic format
+export function isAnthropicContent(content: any): boolean {
+  if (!Array.isArray(content)) return false
+  return content.every(item => 
+    typeof item === 'object' && 
+    (
+      (item.type === 'text' && typeof item.text === 'string') ||
+      (item.type === 'image' && typeof item.source?.url === 'string')
+    )
+  )
+}
+
+// Helper function to convert content to Anthropic format
+export function toAnthropicContent(content: string | MessageContent[]): any[] {
+  if (Array.isArray(content)) {
+    return content.map(item => {
+      if (item.type === 'text') {
+        return { type: 'text', text: item.text }
+      }
+      if (item.type === 'image_url') {
+        return {
+          type: 'image',
+          source: {
+            type: 'url',
+            url: item.image_url.url,
+            media_type: 'image/jpeg'
           }
         }
-        return c
-      })
-    }
+      }
+      return { type: 'text', text: '' }
+    })
   }
-  
-  return {
-    id: message.id,
-    role: message.role,
-    content: message.content
-  }
+  return [{ type: 'text', text: content }]
 }
 
-export function convertFromAIMessage(message: AIMessage): CustomMessage {
-  let content: string | MessageContent[]
-  try {
-    // Try to parse the content as JSON in case it's a structured message
-    const parsed = JSON.parse(message.content)
-    if (Array.isArray(parsed)) {
-      content = parsed
-    } else {
-      content = message.content
+// Helper function to convert Anthropic format to our format
+export function fromAnthropicContent(content: any[]): string | MessageContent[] {
+  if (!Array.isArray(content)) return ''
+  
+  const converted = content.map(item => {
+    if (item.type === 'text') {
+      return { type: 'text', text: item.text } as TextContent
     }
-  } catch {
-    // If parsing fails, use the content as-is
-    content = message.content
+    if (item.type === 'image') {
+      return {
+        type: 'image_url',
+        image_url: {
+          url: item.source.url,
+          detail: 'high'
+        }
+      } as ImageUrlContent
+    }
+    return { type: 'text', text: '' } as TextContent
+  })
+
+  // If all items are text, join them
+  if (converted.every(item => item.type === 'text')) {
+    return converted.map(item => (item as TextContent).text).join('\n')
   }
 
-  return {
-    id: message.id,
-    role: message.role,
-    content,
-    createdAt: new Date()
-  }
+  return converted
 } 

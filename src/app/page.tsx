@@ -9,11 +9,6 @@ const AnimatedChatInput = dynamic(() => import('@/components/animated-chat-input
   ssr: false
 });
 
-const GrokTagline = dynamic(() => import('@/components/grok-tagline').then(mod => mod.GrokTagline), {
-  loading: () => <div className="mt-2 opacity-0" />,
-  ssr: false
-});
-
 const ContactForm = dynamic(() => import('@/components/contact-form'), {
   loading: () => <div>Loading...</div>,
   ssr: false
@@ -72,7 +67,6 @@ export default function Home() {
               {/* Chat Input */}
               <div className="mt-16">
                 <AnimatedChatInput />
-                <GrokTagline />
               </div>
             </div>
           </div>
