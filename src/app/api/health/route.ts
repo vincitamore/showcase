@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { APIError, handleAPIError } from '@/lib/api-error'
+import { logger, withLogging } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'edge'
@@ -28,23 +29,47 @@ interface HealthStatus {
 async function checkDatabaseHealth(): Promise<HealthStatus['services']['database']> {
   const start = Date.now()
   try {
+    logger.debug('Checking database health', {
+      step: 'check-database',
+      startTime: start
+    })
+
     await prisma.$queryRaw`SELECT 1`
+    const latency = Date.now() - start
+
+    logger.info('Database health check successful', {
+      step: 'database-success',
+      latency
+    })
+
     return {
       status: 'ok',
-      latency: Date.now() - start
+      latency
     }
   } catch (error) {
+    const latency = Date.now() - start
+
+    logger.error('Database health check failed', {
+      step: 'database-error',
+      error,
+      latency
+    })
+
     return {
       status: 'error',
-      latency: Date.now() - start,
+      latency,
       error: error instanceof Error ? error.message : 'Unknown database error'
     }
   }
 }
 
-export async function GET() {
+async function handleHealthCheck(request: Request): Promise<Response> {
   try {
-    console.log('[Health] API request received')
+    logger.info('Processing health check request', {
+      step: 'init',
+      method: request.method,
+      url: request.url
+    })
     
     // Check database health
     const dbHealth = await checkDatabaseHealth()
@@ -57,6 +82,13 @@ export async function GET() {
       }
     }
 
+    logger.debug('Health check status', {
+      step: 'check-complete',
+      status: healthStatus.status,
+      dbStatus: dbHealth.status,
+      dbLatency: dbHealth.latency
+    })
+
     if (healthStatus.status === 'error') {
       throw new APIError(
         'One or more services are unhealthy',
@@ -67,6 +99,11 @@ export async function GET() {
 
     return NextResponse.json(healthStatus)
   } catch (error) {
+    logger.error('Health check failed', {
+      step: 'error',
+      error
+    })
+
     if (error instanceof APIError) {
       throw error
     }
@@ -79,19 +116,30 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+async function handleDetailedHealthCheck(request: Request): Promise<Response> {
   try {
-    console.log('[Health] POST request received')
+    logger.info('Processing detailed health check request', {
+      step: 'init',
+      method: request.method,
+      url: request.url
+    })
     
     // For POST requests, we'll do a more comprehensive health check
     const dbHealth = await checkDatabaseHealth()
+
+    logger.debug('Checking service configurations', {
+      step: 'check-services',
+      hasSmtpHost: !!process.env.SMTP_HOST,
+      hasSmtpPort: !!process.env.SMTP_PORT,
+      hasTwitterApiKey: !!process.env.TWITTER_API_KEY,
+      hasTwitterApiSecret: !!process.env.TWITTER_API_SECRET
+    })
     
     const healthStatus: HealthStatus = {
       status: dbHealth.status === 'ok' ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
       services: {
         database: dbHealth,
-        // Add more service checks here as needed
         smtp: {
           status: process.env.SMTP_HOST && process.env.SMTP_PORT ? 'ok' : 'error',
           error: !process.env.SMTP_HOST ? 'SMTP not configured' : undefined
@@ -103,6 +151,14 @@ export async function POST() {
       }
     }
 
+    logger.info('Detailed health check complete', {
+      step: 'complete',
+      status: healthStatus.status,
+      dbStatus: dbHealth.status,
+      smtpStatus: healthStatus.services.smtp?.status,
+      twitterStatus: healthStatus.services.twitter?.status
+    })
+
     if (healthStatus.status === 'error') {
       throw new APIError(
         'One or more services are unhealthy',
@@ -113,6 +169,14 @@ export async function POST() {
 
     return NextResponse.json(healthStatus)
   } catch (error) {
+    logger.error('Detailed health check failed', {
+      step: 'error',
+      error
+    })
+
     return handleAPIError(error)
   }
-} 
+}
+
+export const GET = withLogging(handleHealthCheck, 'api/health')
+export const POST = withLogging(handleDetailedHealthCheck, 'api/health') 

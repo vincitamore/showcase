@@ -1,18 +1,31 @@
 import { NextResponse } from "next/server"
 import { createTransport } from "nodemailer"
 import { APIError, handleAPIError } from '@/lib/api-error'
+import { logger, withLogging } from '@/lib/logger'
 
 // Force Node.js runtime and disable static optimization
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const preferredRegion = 'iad1'
 
-export async function POST(request: Request) {
+async function handleContact(request: Request): Promise<Response> {
   let parsedBody: { name?: string; email?: string; message?: string } = {}
   
   try {
+    logger.info('Processing contact form submission', {
+      step: 'init',
+      url: request.url
+    })
+
     parsedBody = await request.json()
     const { name, email, message } = parsedBody
+
+    logger.debug('Validating form fields', {
+      step: 'validate-fields',
+      hasName: !!name?.trim(),
+      hasEmail: !!email?.trim(),
+      hasMessage: !!message?.trim()
+    })
 
     // Validate required fields
     if (!name?.trim()) {
@@ -37,6 +50,11 @@ export async function POST(request: Request) {
       )
     }
 
+    logger.debug('Validating email format', {
+      step: 'validate-email',
+      email
+    })
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
@@ -46,6 +64,14 @@ export async function POST(request: Request) {
         'INVALID_EMAIL'
       )
     }
+
+    logger.debug('Checking SMTP configuration', {
+      step: 'check-smtp-config',
+      hasHost: !!process.env.SMTP_HOST,
+      hasPort: !!process.env.SMTP_PORT,
+      hasUser: !!process.env.SMTP_USER,
+      hasPass: !!process.env.SMTP_PASS
+    })
 
     // Validate SMTP configuration
     const smtpConfig = {
@@ -70,12 +96,31 @@ export async function POST(request: Request) {
       )
     }
 
+    logger.info('Creating SMTP transport', {
+      step: 'create-transport',
+      host: smtpConfig.host,
+      port: smtpConfig.port
+    })
+
     const transporter = createTransport(smtpConfig)
 
     // Verify SMTP connection
     try {
+      logger.debug('Verifying SMTP connection', {
+        step: 'verify-connection'
+      })
+
       await transporter.verify()
+      
+      logger.info('SMTP connection verified', {
+        step: 'verify-success'
+      })
     } catch (verifyError) {
+      logger.error('SMTP verification failed', {
+        step: 'verify-error',
+        error: verifyError
+      })
+
       throw new APIError(
         `Failed to connect to mail server: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
         500,
@@ -99,12 +144,29 @@ export async function POST(request: Request) {
 
     // Send email
     try {
+      logger.info('Sending email', {
+        step: 'send-email',
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject
+      })
+
       await transporter.sendMail(mailOptions)
+
+      logger.info('Email sent successfully', {
+        step: 'complete'
+      })
+
       return NextResponse.json(
         { message: 'Message sent successfully' },
         { status: 200 }
       )
     } catch (sendError) {
+      logger.error('Failed to send email', {
+        step: 'send-error',
+        error: sendError
+      })
+
       throw new APIError(
         `Failed to send email: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`,
         500,
@@ -112,6 +174,14 @@ export async function POST(request: Request) {
       )
     }
   } catch (error) {
+    logger.error('Contact form submission failed', {
+      step: 'error',
+      error,
+      parsedBody
+    })
+
     return handleAPIError(error)
   }
-} 
+}
+
+export const POST = withLogging(handleContact, 'api/contact') 
