@@ -30,7 +30,7 @@ const models = [
     description: "Anthropic's most capable model"
   },
   {
-    value: "grok-2-vision-1212",
+    value: "grok-2-latest",
     label: "Grok-2",
     description: "xAI's most capable vision model"
   },
@@ -69,11 +69,7 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
         align="start"
       >
         <Command shouldFilter>
-          <CommandInput 
-            placeholder="Search models..." 
-            className="h-9"
-            autoFocus={false}
-          />
+          <CommandInput placeholder="Search models..." className="h-9" />
           <CommandList>
             <CommandEmpty>No model found.</CommandEmpty>
             <CommandGroup>
