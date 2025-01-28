@@ -18,8 +18,28 @@ const envSchema = z.object({
   (data) => {
     // In production, require certain variables
     if (data.NODE_ENV === "production") {
-      return !!(data.DATABASE_URL && data.DIRECT_URL && 
+      console.log('[ENV Validation] Checking required environment variables:', {
+        hasDatabase: !!data.DATABASE_URL,
+        hasDirect: !!data.DIRECT_URL,
+        hasXAI: !!data.XAI_API_KEY,
+        hasAnthropic: !!data.ANTHROPIC_API_KEY,
+        hasCron: !!data.CRON_SECRET,
+        nodeEnv: data.NODE_ENV
+      });
+      
+      const isValid = !!(data.DATABASE_URL && data.DIRECT_URL && 
         (data.XAI_API_KEY || data.ANTHROPIC_API_KEY) && data.CRON_SECRET);
+      
+      if (!isValid) {
+        console.error('[ENV Validation] Missing required environment variables:', {
+          missingDatabase: !data.DATABASE_URL,
+          missingDirect: !data.DIRECT_URL,
+          missingBothAI: !data.XAI_API_KEY && !data.ANTHROPIC_API_KEY,
+          missingCron: !data.CRON_SECRET
+        });
+      }
+      
+      return isValid;
     }
     return true;
   },
@@ -43,5 +63,15 @@ const processEnv = {
   NEXT_PUBLIC_URL: process.env.NEXT_PUBLIC_URL,
   NEXT_PUBLIC_TWITTER_USERNAME: process.env.NEXT_PUBLIC_TWITTER_USERNAME
 } as const
+
+// Add debug logging for process.env values
+console.log('[ENV Debug] Environment variables present:', {
+  NODE_ENV: !!process.env.NODE_ENV,
+  DATABASE_URL: !!process.env.DATABASE_URL,
+  DIRECT_URL: !!process.env.DIRECT_URL,
+  XAI_API_KEY: !!process.env.XAI_API_KEY,
+  ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+  CRON_SECRET: !!process.env.CRON_SECRET,
+});
 
 export const env = envSchema.parse(processEnv) 
