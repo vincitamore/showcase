@@ -35,6 +35,7 @@ import {
   ChatBubble,
   ChatInput,
   ExportOptionsDialog,
+  MessageReactions,
 } from "@/components/chat"
 import ReactMarkdown, { type Components } from "react-markdown"
 import { MODEL_CONFIGS } from "@/lib/chat-config"
@@ -145,86 +146,6 @@ function TypingIndicator() {
         transition={{ repeat: Infinity, duration: 0.8, delay: 0.4, repeatDelay: 0.2 }}
       />
     </div>
-  )
-}
-
-function MessageReactions({ isAssistant, messageId, onReactionChange }: { 
-  isAssistant: boolean
-  messageId: string
-  onReactionChange: (messageId: string, type: 'heart' | 'thumbsDown', active: boolean) => void
-}) {
-  const [reactions, setReactions] = React.useState<MessageReaction[]>([
-    { 
-      emoji: (active: boolean) => active ? 
-        <Heart className="h-3 w-3 fill-red-500 text-red-500" /> : 
-        <Heart className="h-3 w-3" />,
-      count: 0, 
-      active: false,
-      type: 'heart' as const
-    },
-    { 
-      emoji: (active: boolean) => active ? 
-        <ThumbsDown className="h-3 w-3 fill-foreground text-foreground" /> : 
-        <ThumbsDown className="h-3 w-3" />,
-      count: 0, 
-      active: false,
-      type: 'thumbsDown' as const
-    },
-  ])
-
-  const handleReaction = (index: number) => {
-    setReactions(prev => prev.map((reaction, i) => {
-      if (i === index) {
-        const newActive = !reaction.active;
-        onReactionChange(messageId, reaction.type, newActive);
-        return {
-          ...reaction,
-          count: newActive ? reaction.count + 1 : reaction.count - 1,
-          active: newActive
-        }
-      }
-      return reaction
-    }))
-  }
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={cn(
-        "flex gap-0.5 -mt-1",
-        isAssistant ? "justify-start" : "justify-end"
-      )}
-    >
-      {reactions.map((reaction, index) => (
-        <Button
-          key={index}
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "h-6 w-6 rounded-full p-0 hover:bg-transparent",
-            !reaction.active && "text-muted-foreground/60 hover:text-muted-foreground"
-          )}
-          onClick={() => handleReaction(index)}
-        >
-          <motion.div
-            whileTap={{ scale: 0.8 }}
-            className="flex items-center gap-1"
-          >
-            {reaction.emoji(reaction.active)}
-            {reaction.count > 0 && (
-              <span className={cn(
-                "text-xs",
-                reaction.active && reaction.type === 'heart' && "text-red-500",
-                reaction.active && reaction.type === 'thumbsDown' && "text-foreground"
-              )}>
-                {reaction.count}
-              </span>
-            )}
-          </motion.div>
-        </Button>
-      ))}
-    </motion.div>
   )
 }
 
@@ -797,14 +718,52 @@ export function AnimatedChatInput() {
   const [messageReactions, setMessageReactions] = React.useState<Record<string, { heart: boolean, thumbsDown: boolean }>>({})
 
   const handleReactionChange = (messageId: string, type: 'heart' | 'thumbsDown', active: boolean) => {
-    setMessageReactions(prev => ({
-      ...prev,
-      [messageId]: {
-        ...prev[messageId] || { heart: false, thumbsDown: false },
-        [type]: active
+    setMessageReactions(prev => {
+      const updated = {
+        ...prev,
+        [messageId]: {
+          ...prev[messageId] || { heart: false, thumbsDown: false },
+          [type]: active
+        }
       }
-    }))
+      // Save reactions to localStorage
+      localStorage.setItem('messageReactions', JSON.stringify(updated))
+      return updated
+    })
   }
+
+  // Load saved reactions on mount
+  React.useEffect(() => {
+    const savedReactions = localStorage.getItem('messageReactions')
+    if (savedReactions) {
+      try {
+        setMessageReactions(JSON.parse(savedReactions))
+      } catch (error) {
+        console.error('Failed to parse saved reactions:', error)
+      }
+    }
+  }, [])
+
+  // Clean up reactions for deleted messages when messages change
+  React.useEffect(() => {
+    if (Object.keys(messageReactions).length > 0) {
+      const existingMessageIds = new Set(localMessages.map(m => m.id))
+      const updatedReactions = { ...messageReactions }
+      let hasChanges = false
+
+      Object.keys(messageReactions).forEach(messageId => {
+        if (!existingMessageIds.has(messageId)) {
+          delete updatedReactions[messageId]
+          hasChanges = true
+        }
+      })
+
+      if (hasChanges) {
+        setMessageReactions(updatedReactions)
+        localStorage.setItem('messageReactions', JSON.stringify(updatedReactions))
+      }
+    }
+  }, [localMessages, messageReactions])
 
   const [isExportOptionsOpen, setIsExportOptionsOpen] = React.useState(false)
 
@@ -945,6 +904,7 @@ export function AnimatedChatInput() {
   // Add modelCounts declaration before ExportOptionsDialog
   const [modelCounts, setModelCounts] = React.useState<Record<string, { total: number, hearted: number, thumbsDown: number }>>({})
 
+  // Update modelCounts when messages or reactions change
   React.useEffect(() => {
     const counts: Record<string, { total: number, hearted: number, thumbsDown: number }> = {}
     Object.keys(MODEL_CONFIGS).forEach(modelId => {
@@ -960,10 +920,13 @@ export function AnimatedChatInput() {
         } catch (error) {
           console.error(`Failed to parse history for model ${modelId}:`, error)
         }
+      } else {
+        // Initialize counts for models with no messages yet
+        counts[modelId] = { total: 0, hearted: 0, thumbsDown: 0 }
       }
     })
     setModelCounts(counts)
-  }, [messageReactions])
+  }, [messageReactions, localMessages]) // Add localMessages as a dependency
 
   if (!mounted) {
     return <ChatSkeleton />
@@ -1118,6 +1081,7 @@ export function AnimatedChatInput() {
                         isLoading={isLoading && message === localMessages[localMessages.length - 1]}
                         onQuote={handleQuote}
                         onReactionChange={handleReactionChange}
+                        messageReactions={messageReactions}
                       />
                     ))}
                   </AnimatePresence>

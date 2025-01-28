@@ -11,17 +11,21 @@ import {
   markdownComponents
 } from "."
 
-export function ChatBubble({ 
-  message,
-  isLoading,
-  onQuote,
-  onReactionChange
-}: {
+interface ChatBubbleProps {
   message: Message
   isLoading?: boolean
   onQuote: (content: string) => void
   onReactionChange: (messageId: string, type: 'heart' | 'thumbsDown', active: boolean) => void
-}) {
+  messageReactions: Record<string, { heart: boolean, thumbsDown: boolean }>
+}
+
+export function ChatBubble({ 
+  message,
+  isLoading,
+  onQuote,
+  onReactionChange,
+  messageReactions
+}: ChatBubbleProps) {
   const isAssistant = message.role === 'assistant'
   const [isQuoteModalOpen, setIsQuoteModalOpen] = React.useState(false)
 
@@ -89,6 +93,7 @@ export function ChatBubble({
                 isAssistant={isAssistant}
                 messageId={message.id}
                 onReactionChange={onReactionChange}
+                messageReactions={messageReactions}
               />
             </div>
           </div>
