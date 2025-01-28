@@ -202,17 +202,28 @@ export async function POST(req: Request) {
     console.log('[Chat API] Request details:', {
       model,
       provider: modelConfig?.provider,
-      messageCount: messages?.length
-    })
-
-    // In the POST handler, before formatting messages:
-    console.log('[Chat API] Raw incoming messages:', {
+      messageCount: messages?.length,
       messages: messages?.map((m: any) => ({
         role: m.role,
+        model: m.model,
         contentType: Array.isArray(m.content) ? 'array' : typeof m.content,
         contentPreview: JSON.stringify(m.content).slice(0, 100)
       }))
     })
+
+    // Validate that all messages are for the correct model
+    const invalidMessages = messages?.filter((m: Message) => m.model && m.model !== model)
+    if (invalidMessages?.length > 0) {
+      console.error('[Chat API] Found messages for incorrect model:', {
+        expectedModel: model,
+        invalidMessages: invalidMessages.map((m: Message) => ({
+          id: m.id,
+          model: m.model,
+          role: m.role
+        }))
+      })
+      throw new Error('Request contains messages for incorrect model')
+    }
 
     // Format messages based on provider
     let formattedMessages

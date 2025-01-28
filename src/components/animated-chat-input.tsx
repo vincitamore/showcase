@@ -503,522 +503,228 @@ export function AnimatedChatInput() {
     if (isLoading) return
 
     try {
-      if (selectedImage) {
-        console.log('[Chat Client] Starting image upload process')
+      // Create the new message
+      const textMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: input,
+        createdAt: new Date(),
+        model: selectedModel
+      }
+
+      // Get ONLY the messages for the current model
+      const modelMessages = localMessages
+        .filter(msg => msg.model === selectedModel)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+
+      // Add the new message to the filtered list
+      const updatedModelMessages = [
+        ...modelMessages,
+        {
+          role: textMessage.role,
+          content: textMessage.content
+        }
+      ]
+
+      console.log('Sending request with messages:', {
+        selectedModel,
+        messageCount: updatedModelMessages.length,
+        messages: updatedModelMessages
+      })
+
+      // Add to local state (with all message properties)
+      setLocalMessages(prev => [...prev, textMessage])
+
+      // Send message
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify({
+          messages: updatedModelMessages,
+          model: selectedModel,
+          data: {
+            text: input,
+            stream: true
+          }
+        }),
+        signal: AbortSignal.timeout(30000)
+      })
+
+      if (!response.ok || !response.body) {
+        console.error('[Chat Client] API response not ok:', {
+          status: response.status,
+          statusText: response.statusText,
+          hasBody: !!response.body
+        })
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`)
+      }
+
+      // Process the streaming response
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      console.log('[Chat Client] Stream reader created:', !!reader)
+      console.log('[Chat Client] Decoder created')
+
+      if (!reader) {
+        throw new Error('No reader available')
+      }
+
+      console.log('[Chat Client] Starting stream processing')
+      let responseText = ''
+      let chunkCount = 0
+      let lineCount = 0
+      let textDeltaCount = 0
+
+      // Create assistant message placeholder
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: [{
+          type: 'text' as const,
+          text: ''
+        }] as MessageContent[],
+        createdAt: new Date(),
+        model: selectedModel
+      }
+      console.log('[Chat Client] Created assistant message:', {
+        id: assistantMessage.id,
+        role: assistantMessage.role,
+        contentLength: (assistantMessage.content[0] as TextContent).text.length
+      })
+
+      // Add assistant message to messages
+      setLocalMessages(prevMessages => [...prevMessages, assistantMessage])
+
+      console.log('[Chat Client] Entering stream processing loop')
+      while (true) {
+        const { done, value } = await reader.read()
+        chunkCount++
         
-        // Convert image to JPEG with error handling
-        let base64Data: string, mimeType: string
-        try {
-          const result = await convertToJpeg(selectedImage)
-          base64Data = result.data
-          mimeType = result.mimeType
-          console.log('[Chat Client] Image converted to JPEG successfully')
-        } catch (error) {
-          console.error('[Chat Client] Failed to convert image:', error)
-          throw new Error('Failed to process image')
+        if (done) {
+          console.log('[Chat Client] Stream complete:', {
+            totalChunks: chunkCount,
+            totalLines: lineCount,
+            totalTextDeltas: textDeltaCount,
+            finalResponseLength: responseText.length
+          })
+          break
         }
 
-        // Upload image to get URL
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image: {
-              data: base64Data,
-              mime_type: mimeType
-            }
-          })
+        const chunk = decoder.decode(value)
+        console.log('[Chat Client] Decoded chunk:', {
+          chunk,
+          length: chunk.length,
+          lines: chunk.split('\n').filter(Boolean)
         })
 
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload image')
-        }
-
-        const { url: rawImageUrl } = await uploadResponse.json()
-
-        // Create message with image content
-        const imageMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: rawImageUrl,
-                detail: 'high'
+        // Split chunk into lines and process each line
+        const lines = chunk.split('\n').filter(Boolean)
+        for (const line of lines) {
+          lineCount++
+          
+          // Handle text content (0:)
+          if (line.startsWith('0:')) {
+            try {
+              // Extract the text content, removing the prefix
+              const text = line.slice(2)
+              
+              // Unescape the JSON string properly
+              const deltaText = JSON.parse(text)
+              textDeltaCount++
+              
+              // Only add space if we're not dealing with markdown markers or split words
+              const shouldAddSpace = responseText && 
+                !responseText.endsWith(' ') && 
+                !deltaText.startsWith(' ') &&
+                !responseText.endsWith('*') && 
+                !deltaText.startsWith('*') &&
+                // Check if we're in the middle of a word (last char of previous + first of current are letters)
+                !(responseText.match(/[a-zA-Z]$/) && deltaText.match(/^[a-zA-Z]/))
+              
+              if (shouldAddSpace) {
+                responseText += ' '
               }
-            },
-            {
-              type: 'text',
-              text: input || 'What is in this image?'
-            }
-          ],
-          createdAt: new Date(),
-          model: selectedModel
-        }
-
-        // Add message to chat immediately
-        const updatedMessages = [...localMessages, imageMessage]
-        setLocalMessages(updatedMessages)
-        
-        try {
-          // Send message with image URL
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream',
-            },
-            body: JSON.stringify({
-              messages: updatedMessages.map(msg => ({
-                role: msg.role,
-                content: Array.isArray(msg.content)
-                  ? msg.content.map(c => {
-                      if (c.type === 'text') {
-                        return { type: 'text', text: c.text }
+              responseText += deltaText
+              
+              // Update assistant message content with properly parsed markdown
+              setLocalMessages(prevMessages => 
+                prevMessages.map(msg => 
+                  msg.id === assistantMessage.id 
+                    ? {
+                        ...msg,
+                        content: [{
+                          type: 'text' as const,
+                          text: responseText
+                        }]
                       }
-                      if (c.type === 'image_url') {
-                        return {
-                          type: 'image',
-                          source: {
-                            type: 'url',
-                            url: c.image_url.url,
-                            media_type: 'image/jpeg'
-                          }
-                        }
-                      }
-                      return null
-                    }).filter(Boolean)
-                  : String(msg.content)
-              })),
-              model: selectedModel,
-              data: {
-                text: input,
-                stream: true
-              }
-            }),
-            // Add signal for streaming
-            signal: AbortSignal.timeout(30000)
-          })
-
-          if (!response.ok || !response.body) {
-            console.error('[Chat Client] API response not ok:', {
-              status: response.status,
-              statusText: response.statusText,
-              hasBody: !!response.body
-            })
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-          }
-
-          // Process the streaming response
-          const reader = response.body?.getReader()
-          const decoder = new TextDecoder()
-          console.log('[Chat Client] Stream reader created:', !!reader)
-          console.log('[Chat Client] Decoder created')
-
-          if (!reader) {
-            throw new Error('No reader available')
-          }
-
-          console.log('[Chat Client] Starting stream processing')
-          let responseText = ''
-          let chunkCount = 0
-          let lineCount = 0
-          let textDeltaCount = 0
-
-          // Create assistant message placeholder
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: [{
-              type: 'text' as const,
-              text: ''
-            }] as MessageContent[],
-            createdAt: new Date(),
-            model: selectedModel
-          }
-          console.log('[Chat Client] Created assistant message:', {
-            id: assistantMessage.id,
-            role: assistantMessage.role,
-            contentLength: (assistantMessage.content[0] as TextContent).text.length
-          })
-
-          // Add assistant message to messages
-          setLocalMessages(prevMessages => [...prevMessages, assistantMessage])
-
-          console.log('[Chat Client] Entering stream processing loop')
-          while (true) {
-            const { done, value } = await reader.read()
-            chunkCount++
-            
-            if (done) {
-              console.log('[Chat Client] Stream complete:', {
-                totalChunks: chunkCount,
-                totalLines: lineCount,
-                totalTextDeltas: textDeltaCount,
-                finalResponseLength: responseText.length
+                    : msg
+                )
+              )
+              
+              console.log('[Chat Client] Text delta processed:', {
+                deltaText,
+                totalLength: responseText.length,
+                shouldAddSpace
               })
-              break
-            }
-
-            const chunk = decoder.decode(value)
-            console.log('[Chat Client] Decoded chunk:', {
-              chunk,
-              length: chunk.length,
-              lines: chunk.split('\n').filter(Boolean)
-            })
-
-            // Split chunk into lines and process each line
-            const lines = chunk.split('\n').filter(Boolean)
-            for (const line of lines) {
-              lineCount++
-              
-              // Handle text content (0:)
-              if (line.startsWith('0:')) {
-                try {
-                  // Extract the text content, removing the prefix
-                  const text = line.slice(2)
-                  
-                  // Unescape the JSON string properly
-                  const deltaText = JSON.parse(text)
-                  textDeltaCount++
-                  
-                  // Only add space if we're not dealing with markdown markers or split words
-                  const shouldAddSpace = responseText && 
-                    !responseText.endsWith(' ') && 
-                    !deltaText.startsWith(' ') &&
-                    !responseText.endsWith('*') && 
-                    !deltaText.startsWith('*') &&
-                    // Check if we're in the middle of a word (last char of previous + first of current are letters)
-                    !(responseText.match(/[a-zA-Z]$/) && deltaText.match(/^[a-zA-Z]/))
-                  
-                  if (shouldAddSpace) {
-                    responseText += ' '
-                  }
-                  responseText += deltaText
-                  
-                  // Update assistant message content with properly parsed markdown
-                  setLocalMessages(prevMessages => 
-                    prevMessages.map(msg => 
-                      msg.id === assistantMessage.id 
-                        ? {
-                            ...msg,
-                            content: [{
-                              type: 'text' as const,
-                              text: responseText
-                            }]
-                          }
-                        : msg
-                    )
-                  )
-                  
-                  console.log('[Chat Client] Text delta processed:', {
-                    deltaText,
-                    totalLength: responseText.length,
-                    shouldAddSpace
-                  })
-                } catch (error) {
-                  console.error('[Chat Client] Error processing text chunk:', error)
-                }
-              }
-              
-              // Handle end message (e:)
-              if (line.startsWith('e:')) {
-                try {
-                  const data = JSON.parse(line.slice(2))
-                  console.log('[Chat Client] End message:', data)
-                } catch (error) {
-                  console.error('[Chat Client] Error parsing end message:', error)
-                }
-              }
-              
-              // Handle done message (d:)
-              if (line.startsWith('d:')) {
-                try {
-                  const data = JSON.parse(line.slice(2))
-                  console.log('[Chat Client] Done message:', data)
-                } catch (error) {
-                  console.error('[Chat Client] Error parsing done message:', error)
-                }
-              }
+            } catch (error) {
+              console.error('[Chat Client] Error processing text chunk:', error)
             }
           }
-
-          // Save final state
-          console.log('[Chat Client] Stream finished, saving final state')
-          setLocalMessages(prevMessages => {
-            const finalMessages = prevMessages.map(msg =>
-              msg.id === assistantMessage.id
-                ? {
-                    ...msg,
-                    content: [{
-                      type: 'text' as const,
-                      text: responseText
-                    }]
-                  }
-                : msg
-            )
-            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
-            return finalMessages
-          })
-
-          // Format messages for API request
-          const formattedMessages = updatedMessages.map(msg => ({
-            role: msg.role === 'system' ? 'user' : msg.role,
-            content: Array.isArray(msg.content)
-              ? msg.content.map(c => {
-                  if (c.type === 'text') {
-                    return c.text
-                  }
-                  if (c.type === 'image_url') {
-                    return `[Image: ${c.image_url.url}]`
-                  }
-                  return null
-                }).filter(Boolean).join('\n')
-              : msg.content
-          }))
-
-          console.log('[Chat Client] Image message sent and response received successfully')
-        } catch (error) {
-          console.error('[Chat Client] Failed to send image message:', error)
-          throw error
+          
+          // Handle end message (e:)
+          if (line.startsWith('e:')) {
+            try {
+              const data = JSON.parse(line.slice(2))
+              console.log('[Chat Client] End message:', data)
+            } catch (error) {
+              console.error('[Chat Client] Error parsing end message:', error)
+            }
+          }
+          
+          // Handle done message (d:)
+          if (line.startsWith('d:')) {
+            try {
+              const data = JSON.parse(line.slice(2))
+              console.log('[Chat Client] Done message:', data)
+            } catch (error) {
+              console.error('[Chat Client] Error parsing done message:', error)
+            }
+          }
         }
-
-        // Reset states
-        setSelectedImage(null)
-        setImagePreview(null)
-        setInput?.('')
-        
-      } else {
-        // For text-only messages
-        const textMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: input,
-          createdAt: new Date(),
-          model: selectedModel
-        }
-
-        // Add user message to local state
-        const updatedMessages = [...localMessages, textMessage]
-        setLocalMessages(updatedMessages)
-
-        try {
-          // Send message with proper formatting for each provider
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream',
-            },
-            body: JSON.stringify({
-              messages: updatedMessages.map(msg => ({
-                role: msg.role,
-                content: Array.isArray(msg.content)
-                  ? msg.content.map(c => {
-                      if (c.type === 'text') {
-                        return { type: 'text', text: c.text }
-                      }
-                      if (c.type === 'image_url') {
-                        return {
-                          type: 'image',
-                          source: {
-                            type: 'url',
-                            url: c.image_url.url,
-                            media_type: 'image/jpeg'
-                          }
-                        }
-                      }
-                      return null
-                    }).filter(Boolean)
-                  : String(msg.content)
-              })),
-              model: selectedModel,
-              data: {
-                text: input,
-                stream: true
-              }
-            }),
-            // Add signal for streaming
-            signal: AbortSignal.timeout(30000)
-          })
-
-          if (!response.ok || !response.body) {
-            console.error('[Chat Client] API response not ok:', {
-              status: response.status,
-              statusText: response.statusText,
-              hasBody: !!response.body
-            })
-            throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-          }
-
-          // Process the streaming response
-          const reader = response.body?.getReader()
-          const decoder = new TextDecoder()
-          console.log('[Chat Client] Stream reader created:', !!reader)
-          console.log('[Chat Client] Decoder created')
-
-          if (!reader) {
-            throw new Error('No reader available')
-          }
-
-          console.log('[Chat Client] Starting stream processing')
-          let responseText = ''
-          let chunkCount = 0
-          let lineCount = 0
-          let textDeltaCount = 0
-
-          // Create assistant message placeholder
-          const assistantMessage: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: [{
-              type: 'text' as const,
-              text: ''
-            }] as MessageContent[],
-            createdAt: new Date(),
-            model: selectedModel
-          }
-          console.log('[Chat Client] Created assistant message:', {
-            id: assistantMessage.id,
-            role: assistantMessage.role,
-            contentLength: (assistantMessage.content[0] as TextContent).text.length
-          })
-
-          // Add assistant message to messages
-          setLocalMessages(prevMessages => [...prevMessages, assistantMessage])
-
-          console.log('[Chat Client] Entering stream processing loop')
-          while (true) {
-            const { done, value } = await reader.read()
-            chunkCount++
-            
-            if (done) {
-              console.log('[Chat Client] Stream complete:', {
-                totalChunks: chunkCount,
-                totalLines: lineCount,
-                totalTextDeltas: textDeltaCount,
-                finalResponseLength: responseText.length
-              })
-              break
-            }
-
-            const chunk = decoder.decode(value)
-            console.log('[Chat Client] Decoded chunk:', {
-              chunk,
-              length: chunk.length,
-              lines: chunk.split('\n').filter(Boolean)
-            })
-
-            // Split chunk into lines and process each line
-            const lines = chunk.split('\n').filter(Boolean)
-            for (const line of lines) {
-              lineCount++
-              
-              // Handle text content (0:)
-              if (line.startsWith('0:')) {
-                try {
-                  // Extract the text content, removing the prefix
-                  const text = line.slice(2)
-                  
-                  // Unescape the JSON string properly
-                  const deltaText = JSON.parse(text)
-                  textDeltaCount++
-                  
-                  // Only add space if we're not dealing with markdown markers or split words
-                  const shouldAddSpace = responseText && 
-                    !responseText.endsWith(' ') && 
-                    !deltaText.startsWith(' ') &&
-                    !responseText.endsWith('*') && 
-                    !deltaText.startsWith('*') &&
-                    // Check if we're in the middle of a word (last char of previous + first of current are letters)
-                    !(responseText.match(/[a-zA-Z]$/) && deltaText.match(/^[a-zA-Z]/))
-                  
-                  if (shouldAddSpace) {
-                    responseText += ' '
-                  }
-                  responseText += deltaText
-                  
-                  // Update assistant message content with properly parsed markdown
-                  setLocalMessages(prevMessages => 
-                    prevMessages.map(msg => 
-                      msg.id === assistantMessage.id 
-                        ? {
-                            ...msg,
-                            content: [{
-                              type: 'text' as const,
-                              text: responseText
-                            }]
-                          }
-                        : msg
-                    )
-                  )
-                  
-                  console.log('[Chat Client] Text delta processed:', {
-                    deltaText,
-                    totalLength: responseText.length,
-                    shouldAddSpace
-                  })
-                } catch (error) {
-                  console.error('[Chat Client] Error processing text chunk:', error)
-                }
-              }
-              
-              // Handle end message (e:)
-              if (line.startsWith('e:')) {
-                try {
-                  const data = JSON.parse(line.slice(2))
-                  console.log('[Chat Client] End message:', data)
-                } catch (error) {
-                  console.error('[Chat Client] Error parsing end message:', error)
-                }
-              }
-              
-              // Handle done message (d:)
-              if (line.startsWith('d:')) {
-                try {
-                  const data = JSON.parse(line.slice(2))
-                  console.log('[Chat Client] Done message:', data)
-                } catch (error) {
-                  console.error('[Chat Client] Error parsing done message:', error)
-                }
-              }
-            }
-          }
-
-          // Save final state
-          console.log('[Chat Client] Stream finished, saving final state')
-          setLocalMessages(prevMessages => {
-            const finalMessages = prevMessages.map(msg =>
-              msg.id === assistantMessage.id
-                ? {
-                    ...msg,
-                    content: [{
-                      type: 'text' as const,
-                      text: responseText
-                    }]
-                  }
-                : msg
-            )
-            localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
-            return finalMessages
-          })
-
-          console.log('[Chat Client] Text message sent and response received successfully')
-        } catch (error) {
-          console.error('[Chat Client] Failed to send text message:', error)
-          throw error
-        }
-
-        // Reset input
-        setInput?.('')
       }
+
+      // Save final state
+      console.log('[Chat Client] Stream finished, saving final state')
+      setLocalMessages(prevMessages => {
+        const finalMessages = prevMessages.map(msg =>
+          msg.id === assistantMessage.id
+            ? {
+                ...msg,
+                content: [{
+                  type: 'text' as const,
+                  text: responseText
+                }]
+              }
+            : msg
+        )
+        localStorage.setItem('chatHistory', JSON.stringify(finalMessages))
+        return finalMessages
+      })
+
+      console.log('[Chat Client] Text message sent and response received successfully')
     } catch (error) {
-      console.error('[Chat Client] Error in handleFormSubmit:', error)
-      // TODO: Add error toast notification here
+      console.error('[Chat Client] Failed to send text message:', error)
+      throw error
     }
+
+    // Reset input
+    setInput?.('')
   }
 
   // Update localStorage handling
