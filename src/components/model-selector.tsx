@@ -61,9 +61,15 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
-        <Command>
-          <CommandInput placeholder="Search models..." />
+      <PopoverContent 
+        className="w-[200px] p-0" 
+        style={{ position: 'relative', zIndex: 99999 }}
+        side="bottom" 
+        sideOffset={4}
+        align="start"
+      >
+        <Command shouldFilter>
+          <CommandInput placeholder="Search models..." className="h-9" />
           <CommandList>
             <CommandEmpty>No model found.</CommandEmpty>
             <CommandGroup>
@@ -71,20 +77,21 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
                 <CommandItem
                   key={model.value}
                   value={model.value}
-                  onSelect={(currentValue) => {
-                    onValueChange(currentValue as ModelValue)
+                  onSelect={() => {
+                    onValueChange(model.value)
                     setOpen(false)
                   }}
+                  className="flex items-center gap-2 px-2 py-1.5 cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "h-4 w-4 shrink-0",
                       value === model.value ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <div className="flex flex-col">
-                    <span>{model.label}</span>
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex flex-col flex-1 overflow-hidden">
+                    <span className="truncate">{model.label}</span>
+                    <span className="text-xs text-muted-foreground truncate">
                       {model.description}
                     </span>
                   </div>

@@ -188,11 +188,11 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
 export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
   return new TwitterApi({
-    appKey: env.TWITTER_API_KEY,
-    appSecret: env.TWITTER_API_SECRET,
-    accessToken: env.TWITTER_ACCESS_TOKEN,
-    accessSecret: env.TWITTER_ACCESS_SECRET,
-  }).v2;
+    appKey: env.TWITTER_API_KEY ?? '',
+    appSecret: env.TWITTER_API_SECRET ?? '',
+    accessToken: env.TWITTER_ACCESS_TOKEN ?? '',
+    accessSecret: env.TWITTER_ACCESS_SECRET ?? '',
+  }).readOnly;
 }
 
 // Execute a Twitter API request with rate limit handling

@@ -169,13 +169,15 @@ async function uploadImage(image: { data: string, mime_type: string }, origin: s
 async function listAnthropicModels() {
   try {
     console.log('[Chat API] Fetching available Anthropic models')
+    const headers: HeadersInit = {
+      'x-api-key': env.ANTHROPIC_API_KEY ?? '',
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/models', {
       method: 'GET',
-      headers: {
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      }
+      headers
     })
 
     console.log('[Chat API] Models list response status:', response.status)

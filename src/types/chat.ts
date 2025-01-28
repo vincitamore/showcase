@@ -18,9 +18,10 @@ export type MessageRole = 'system' | 'user' | 'assistant'
 
 export interface Message {
   id: string
-  role: MessageRole
+  role: 'user' | 'assistant' | 'system'
   content: string | MessageContent[]
   createdAt: Date
+  model?: string // Model that generated this message
 }
 
 // Extend AIMessage to support our content types

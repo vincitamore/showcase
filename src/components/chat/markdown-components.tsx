@@ -18,7 +18,10 @@ interface CodeBlockProps {
 export const markdownComponents: Components = {
   p: ({ children, ...props }) => {
     if (typeof children === 'string') {
-      const lines = children.split(/\n+/).filter(Boolean)
+      const lines = children
+        .split(/\n+/)
+        .filter(line => line.trim())
+        .map(line => line.trim().replace(/\s+([.,!?])/g, '$1'))
       return (
         <>
           {lines.map((line, i) => (

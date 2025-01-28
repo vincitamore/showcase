@@ -2,19 +2,31 @@ import { z } from "zod"
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url(),
-  XAI_API_KEY: z.string().min(1),
-  ANTHROPIC_API_KEY: z.string().min(1),
-  CRON_SECRET: z.string().min(1),
-  TWITTER_API_KEY: z.string().min(1),
-  TWITTER_API_SECRET: z.string().min(1),
-  TWITTER_ACCESS_TOKEN: z.string().min(1),
-  TWITTER_ACCESS_SECRET: z.string().min(1),
-  TWITTER_USERNAME: z.string().min(1),
-  NEXT_PUBLIC_URL: z.string().url(),
-  NEXT_PUBLIC_TWITTER_USERNAME: z.string().min(1),
-})
+  DATABASE_URL: z.string().url().optional(),
+  DIRECT_URL: z.string().url().optional(),
+  XAI_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  CRON_SECRET: z.string().min(1).optional(),
+  TWITTER_API_KEY: z.string().min(1).optional(),
+  TWITTER_API_SECRET: z.string().min(1).optional(),
+  TWITTER_ACCESS_TOKEN: z.string().min(1).optional(),
+  TWITTER_ACCESS_SECRET: z.string().min(1).optional(),
+  TWITTER_USERNAME: z.string().min(1).optional(),
+  NEXT_PUBLIC_URL: z.string().url().default("http://localhost:3000"),
+  NEXT_PUBLIC_TWITTER_USERNAME: z.string().min(1).optional(),
+}).refine(
+  (data) => {
+    // In production, require certain variables
+    if (data.NODE_ENV === "production") {
+      return !!(data.DATABASE_URL && data.DIRECT_URL && 
+        (data.XAI_API_KEY || data.ANTHROPIC_API_KEY) && data.CRON_SECRET);
+    }
+    return true;
+  },
+  {
+    message: "Required environment variables missing in production"
+  }
+)
 
 const processEnv = {
   NODE_ENV: process.env.NODE_ENV,

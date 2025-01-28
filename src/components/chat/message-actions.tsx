@@ -26,11 +26,11 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 rounded-full p-0 hover:bg-transparent"
+        className="h-6 w-6 rounded-full p-0 hover:bg-primary/10 hover:text-primary"
         onClick={handleCopy}
       >
         <Copy className="h-3 w-3" />
@@ -40,7 +40,7 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 rounded-full p-0 hover:bg-transparent"
+          className="h-6 w-6 rounded-full p-0 hover:bg-primary/10 hover:text-primary"
           onClick={() => onQuote(Array.isArray(message.content) 
             ? message.content
                 .filter(c => c.type === 'text')

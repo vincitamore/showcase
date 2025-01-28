@@ -40,35 +40,28 @@ export function MessageReactions({ isAssistant, messageId, onReactionChange }: M
   const [reactions, setReactions] = React.useState<MessageReaction[]>(() => initialReactions)
 
   const handleReaction = React.useCallback((index: number) => {
-    setReactions(prev => prev.map((reaction, i) => {
-      if (i === index) {
-        const newActive = !reaction.active;
-        return {
-          ...reaction,
-          count: newActive ? reaction.count + 1 : reaction.count - 1,
-          active: newActive
+    setReactions(prev => {
+      const newReactions = prev.map((reaction, i) => {
+        if (i === index) {
+          const newActive = !reaction.active;
+          onReactionChange(messageId, reaction.type, newActive)
+          return {
+            ...reaction,
+            count: newActive ? reaction.count + 1 : reaction.count - 1,
+            active: newActive
+          }
         }
-      }
-      return reaction
-    }))
-  }, [])
-
-  React.useEffect(() => {
-    reactions.forEach((reaction, index) => {
-      if (reaction.active) {
-        onReactionChange(messageId, reaction.type, reaction.active)
-      }
+        return reaction
+      })
+      return newReactions
     })
-  }, [reactions, messageId, onReactionChange])
+  }, [messageId, onReactionChange])
 
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={cn(
-        "flex gap-0.5 -mt-1",
-        isAssistant ? "justify-start" : "justify-end"
-      )}
+      className="flex items-center gap-0.5"
     >
       {reactions.map((reaction, index) => (
         <Button
@@ -76,7 +69,7 @@ export function MessageReactions({ isAssistant, messageId, onReactionChange }: M
           variant="ghost"
           size="icon"
           className={cn(
-            "h-6 w-6 rounded-full p-0 hover:bg-transparent",
+            "h-5 w-5 rounded-full p-0 hover:bg-transparent",
             !reaction.active && "text-muted-foreground/60 hover:text-muted-foreground"
           )}
           onClick={() => handleReaction(index)}

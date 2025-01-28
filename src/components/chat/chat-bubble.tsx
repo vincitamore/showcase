@@ -33,14 +33,18 @@ export function ChatBubble({
   const messageContent = Array.isArray(message.content) 
     ? message.content.map(c => {
         if (c.type === 'text') {
+          // Trim whitespace and normalize newlines, then fix punctuation spacing
           return (c as TextContent).text
+            .trim()
+            .replace(/\n+/g, '\n')
+            .replace(/\s+([.,!?])/g, '$1') // Remove spaces before punctuation
         }
         if (c.type === 'image_url') {
           return `![Image](${(c as ImageUrlContent).image_url.url})`
         }
         return ''
-      }).join('\n')
-    : message.content
+      }).join('\n').trim()
+    : message.content.trim().replace(/\s+([.,!?])/g, '$1')
 
   return (
     <motion.div
@@ -48,47 +52,48 @@ export function ChatBubble({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className={cn(
-        "group relative flex gap-3 px-4",
+        "group relative flex gap-3 px-4 py-4",
         isAssistant ? "flex-row" : "flex-row-reverse"
       )}
+      style={{ isolation: 'isolate' }}
     >
       <div className={cn(
-        "flex min-h-[32px] flex-1 flex-col space-y-2",
+        "flex min-h-[32px] flex-1 flex-col",
         isAssistant ? "items-start" : "items-end"
       )}>
-        <div className={cn(
-          "group relative space-y-2 rounded-lg px-3 py-2",
-          isAssistant 
-            ? "bg-muted text-foreground" 
-            : "bg-primary text-primary-foreground",
-          isAssistant ? "rounded-tl-none" : "rounded-tr-none"
-        )}>
-          <ReactMarkdown components={markdownComponents}>
-            {messageContent}
-          </ReactMarkdown>
-          {isLoading && (
-            <div className="mt-2">
-              <TypingIndicator />
-            </div>
-          )}
-          <div className={cn(
-            "absolute right-2 top-2 flex opacity-0 transition-opacity group-hover:opacity-100",
-            isAssistant ? "left-2 right-auto" : "left-auto right-2"
-          )}>
+        <div className="relative flex items-start gap-2">
+          <div className="flex items-start pt-2 absolute -left-10">
             <MessageActions 
               message={message} 
               isUser={!isAssistant}
               onQuote={() => setIsQuoteModalOpen(true)}
             />
           </div>
+          <div className={cn(
+            "relative group space-y-2 rounded-lg px-4 py-3",
+            isAssistant 
+              ? "bg-muted text-foreground" 
+              : "bg-primary text-primary-foreground",
+            isAssistant ? "rounded-tl-none" : "rounded-tr-none"
+          )}>
+            <ReactMarkdown components={markdownComponents}>
+              {messageContent}
+            </ReactMarkdown>
+            {isLoading && (
+              <div className="mt-2">
+                <TypingIndicator />
+              </div>
+            )}
+            <div className="absolute -bottom-7 left-0">
+              <MessageReactions 
+                isAssistant={isAssistant}
+                messageId={message.id}
+                onReactionChange={onReactionChange}
+              />
+            </div>
+          </div>
         </div>
-        <MessageReactions 
-          isAssistant={isAssistant}
-          messageId={message.id}
-          onReactionChange={onReactionChange}
-        />
       </div>
-
       <QuoteModal
         content={messageContent}
         isOpen={isQuoteModalOpen}

@@ -30,13 +30,14 @@ import {
 import { useState } from "react"
 import { convertToAIMessage, convertFromAIMessage } from "@/types/chat"
 import { ModelSelector, type ModelValue } from "@/components/model-selector"
-import { GrokTagline } from "@/components/grok-tagline"
+import { ModelSwitcher } from "@/components/model-switcher"
 import {
   ChatBubble,
   ChatInput,
   ExportOptionsDialog,
 } from "@/components/chat"
 import ReactMarkdown, { type Components } from "react-markdown"
+import { MODEL_CONFIGS } from "@/lib/chat-config"
 
 interface CodeComponentProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean
@@ -303,26 +304,44 @@ function MessageActions({
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
-          <MoreVertical className="h-4 w-4" />
-          <span className="sr-only">Message actions</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={handleCopy}>
-          <Copy className="mr-2 h-4 w-4" />
-          Copy
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onQuote(Array.isArray(message.content) 
-          ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
-          : message.content)}>
-          <Quote className="mr-2 h-4 w-4" />
-          Quote
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="absolute -left-14 top-0 h-full flex items-start pt-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn(
+              "h-6 w-6 rounded-full p-0 hover:bg-primary/10 hover:text-primary transition-colors",
+              "opacity-0 group-hover:opacity-100 focus:opacity-100"
+            )}
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+            <span className="sr-only">Message actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent 
+          align="start"
+          className="w-[120px] p-1"
+        >
+          <DropdownMenuItem 
+            onClick={handleCopy}
+            className="flex items-center gap-2 text-xs py-1.5 px-2 cursor-pointer"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy
+          </DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={() => onQuote(Array.isArray(message.content) 
+              ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
+              : message.content)}
+            className="flex items-center gap-2 text-xs py-1.5 px-2 cursor-pointer"
+          >
+            <Quote className="h-3.5 w-3.5" />
+            Quote
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }
 
@@ -431,12 +450,48 @@ export function AnimatedChatInput() {
     body: {
       model: selectedModel
     },
+    key: selectedModel,
     initialMessages: [],
     id: React.useId(),
     onFinish: (message) => {
       // Don't update messages here, we'll handle it in the stream
     }
   })
+
+  // Update model selection handler
+  const handleModelChange = React.useCallback((newModel: ModelValue) => {
+    // Update model selection
+    setSelectedModel(newModel)
+    
+    // Save to localStorage
+    localStorage.setItem('selectedModel', newModel)
+  }, [])
+
+  // Load saved model selection and chat history on mount
+  React.useEffect((): void => {
+    const savedModel = localStorage.getItem('selectedModel')
+    if (savedModel && Object.keys(MODEL_CONFIGS).includes(savedModel)) {
+      setSelectedModel(savedModel as ModelValue)
+    }
+
+    // Load all chat history
+    const allMessages: Message[] = []
+    Object.keys(MODEL_CONFIGS).forEach(modelId => {
+      const modelHistory = localStorage.getItem(`chatHistory-${modelId}`)
+      if (modelHistory) {
+        try {
+          const parsedHistory = JSON.parse(modelHistory)
+          allMessages.push(...parsedHistory)
+        } catch (error) {
+          console.error(`Failed to parse chat history for model ${modelId}:`, error)
+        }
+      }
+    })
+
+    // Sort messages by creation time
+    allMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    setLocalMessages(allMessages)
+  }, [])
 
   // Use localMessages for rendering
   const messages = localMessages
@@ -500,7 +555,8 @@ export function AnimatedChatInput() {
               text: input || 'What is in this image?'
             }
           ],
-          createdAt: new Date()
+          createdAt: new Date(),
+          model: selectedModel
         }
 
         // Add message to chat immediately
@@ -580,7 +636,8 @@ export function AnimatedChatInput() {
               type: 'text' as const,
               text: ''
             }] as MessageContent[],
-            createdAt: new Date()
+            createdAt: new Date(),
+            model: selectedModel
           }
           console.log('[Chat Client] Created assistant message:', {
             id: assistantMessage.id,
@@ -740,7 +797,8 @@ export function AnimatedChatInput() {
           id: crypto.randomUUID(),
           role: 'user',
           content: input,
-          createdAt: new Date()
+          createdAt: new Date(),
+          model: selectedModel
         }
 
         // Add user message to local state
@@ -820,7 +878,8 @@ export function AnimatedChatInput() {
               type: 'text' as const,
               text: ''
             }] as MessageContent[],
-            createdAt: new Date()
+            createdAt: new Date(),
+            model: selectedModel
           }
           console.log('[Chat Client] Created assistant message:', {
             id: assistantMessage.id,
@@ -962,22 +1021,33 @@ export function AnimatedChatInput() {
     }
   }
 
-  // Load chat history from localStorage on mount
+  // Update localStorage handling
+  const storageKey = `chatHistory-${selectedModel}`
+
+  // Save messages to localStorage whenever they change
   React.useEffect(() => {
-    const savedHistory = localStorage.getItem('chatHistory')
-    if (savedHistory) {
-      try {
-        const parsedHistory = JSON.parse(savedHistory)
-        setLocalMessages(parsedHistory)
-      } catch (error) {
-        console.error('Failed to parse chat history:', error)
-      }
+    if (localMessages.length > 0) {
+      // Group messages by model
+      const messagesByModel: Record<string, Message[]> = {}
+      localMessages.forEach(msg => {
+        const model = msg.model || selectedModel // Fallback to selectedModel if not set
+        messagesByModel[model] = messagesByModel[model] || []
+        messagesByModel[model].push(msg)
+      })
+
+      // Save each model's messages separately
+      Object.entries(messagesByModel).forEach(([model, messages]) => {
+        localStorage.setItem(`chatHistory-${model}`, JSON.stringify(messages))
+      })
     }
-  }, [])
+  }, [localMessages, selectedModel])
 
   const handleClearHistory = () => {
+    // Clear all model histories
+    Object.keys(MODEL_CONFIGS).forEach(modelId => {
+      localStorage.removeItem(`chatHistory-${modelId}`)
+    })
     setLocalMessages([])
-    localStorage.removeItem('chatHistory')
     setIsAlertOpen(false)
   }
 
@@ -1032,33 +1102,74 @@ export function AnimatedChatInput() {
 
   const [isExportOptionsOpen, setIsExportOptionsOpen] = React.useState(false)
 
-  const handleExportWithOptions = ({ includeAll, includeHearted, excludeThumbsDown }: { 
+  const handleExportClick = () => {
+    const modelCounts: Record<string, { total: number, hearted: number, thumbsDown: number }> = {}
+    
+    // Get counts for all models
+    Object.keys(MODEL_CONFIGS).forEach(modelId => {
+      const modelHistory = localStorage.getItem(`chatHistory-${modelId}`)
+      if (modelHistory) {
+        try {
+          const messages = JSON.parse(modelHistory)
+          modelCounts[modelId] = {
+            total: messages.length,
+            hearted: messages.filter((m: Message) => messageReactions[m.id]?.heart).length,
+            thumbsDown: messages.filter((m: Message) => messageReactions[m.id]?.thumbsDown).length
+          }
+        } catch (error) {
+          console.error(`Failed to parse history for model ${modelId}:`, error)
+        }
+      }
+    })
+    
+    setIsExportOptionsOpen(true)
+  }
+
+  const handleExportWithOptions = ({ 
+    includeAll, 
+    includeHearted, 
+    excludeThumbsDown,
+    selectedModels 
+  }: { 
     includeAll: boolean
     includeHearted: boolean
-    excludeThumbsDown: boolean 
+    excludeThumbsDown: boolean
+    selectedModels: string[]
   }) => {
-    let filteredMessages = localMessages
-    
-    if (!includeAll) {
-      if (includeHearted) {
-        filteredMessages = localMessages.filter(m => messageReactions[m.id]?.heart)
-      }
-    }
-    
-    if (excludeThumbsDown) {
-      filteredMessages = filteredMessages.filter(m => !messageReactions[m.id]?.thumbsDown)
+    const exportData: Record<string, any> = {
+      version: '2.0',
+      exportDate: new Date().toISOString(),
+      models: {}
     }
 
-    const exportData = {
-      messages: filteredMessages,
-      exportDate: new Date().toISOString(),
-      metadata: {
-        totalMessages: localMessages.length,
-        exportedMessages: filteredMessages.length,
-        heartedMessages: localMessages.filter(m => messageReactions[m.id]?.heart).length,
-        thumbsDownMessages: localMessages.filter(m => messageReactions[m.id]?.thumbsDown).length
+    selectedModels.forEach(modelId => {
+      const modelHistory = localStorage.getItem(`chatHistory-${modelId}`)
+      if (modelHistory) {
+        try {
+          let messages = JSON.parse(modelHistory)
+          
+          if (!includeAll) {
+            if (includeHearted) {
+              messages = messages.filter((m: Message) => messageReactions[m.id]?.heart)
+            }
+          }
+          
+          if (excludeThumbsDown) {
+            messages = messages.filter((m: Message) => !messageReactions[m.id]?.thumbsDown)
+          }
+
+          if (messages.length > 0) {
+            exportData.models[modelId] = {
+              messages,
+              messageCount: messages.length,
+              modelConfig: MODEL_CONFIGS[modelId]
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to process history for model ${modelId}:`, error)
+        }
       }
-    }
+    })
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
@@ -1071,10 +1182,6 @@ export function AnimatedChatInput() {
     URL.revokeObjectURL(url)
   }
 
-  const handleExportClick = () => {
-    setIsExportOptionsOpen(true)
-  }
-
   const handleImportHistory = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -1083,11 +1190,25 @@ export function AnimatedChatInput() {
     reader.onload = (e) => {
       try {
         const importedData = JSON.parse(e.target?.result as string)
-        if (Array.isArray(importedData.messages)) {
-          setLocalMessages(importedData.messages)
-          localStorage.setItem('chatHistory', JSON.stringify(importedData.messages))
+        
+        // Handle both old and new format
+        if (importedData.version === '2.0') {
+          // New format with multiple models
+          Object.entries(importedData.models).forEach(([modelId, data]: [string, any]) => {
+            if (MODEL_CONFIGS[modelId]) { // Only import if model still exists
+              localStorage.setItem(`chatHistory-${modelId}`, JSON.stringify(data.messages))
+            }
+          })
+          
+          // Refresh current model's messages
+          const currentModelMessages = importedData.models[selectedModel]?.messages || []
+          setLocalMessages(currentModelMessages)
         } else {
-          throw new Error('Invalid file format')
+          // Old format - import as current model only
+          if (Array.isArray(importedData.messages)) {
+            localStorage.setItem(storageKey, JSON.stringify(importedData.messages))
+            setLocalMessages(importedData.messages)
+          }
         }
       } catch (error) {
         console.error('Failed to import chat history:', error)
@@ -1100,6 +1221,29 @@ export function AnimatedChatInput() {
       event.target.value = ''
     }
   }
+
+  // Add modelCounts declaration before ExportOptionsDialog
+  const [modelCounts, setModelCounts] = React.useState<Record<string, { total: number, hearted: number, thumbsDown: number }>>({})
+
+  React.useEffect(() => {
+    const counts: Record<string, { total: number, hearted: number, thumbsDown: number }> = {}
+    Object.keys(MODEL_CONFIGS).forEach(modelId => {
+      const modelHistory = localStorage.getItem(`chatHistory-${modelId}`)
+      if (modelHistory) {
+        try {
+          const messages = JSON.parse(modelHistory)
+          counts[modelId] = {
+            total: messages.length,
+            hearted: messages.filter((m: Message) => messageReactions[m.id]?.heart).length,
+            thumbsDown: messages.filter((m: Message) => messageReactions[m.id]?.thumbsDown).length
+          }
+        } catch (error) {
+          console.error(`Failed to parse history for model ${modelId}:`, error)
+        }
+      }
+    })
+    setModelCounts(counts)
+  }, [messageReactions])
 
   if (!mounted) {
     return <ChatSkeleton />
@@ -1164,17 +1308,41 @@ export function AnimatedChatInput() {
               </Button>
             </div>
           </motion.div>
-          <GrokTagline 
+          <ModelSwitcher 
             selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
+            onModelChange={handleModelChange}
+            variant="tagline"
           />
         </motion.div>
       </AnimatePresence>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="flex h-[80vh] max-h-[80vh] flex-col gap-0 p-0 sm:max-w-2xl">
-          <div className="flex items-center justify-between border-b px-4 py-2">
-            <DialogTitle className="text-lg font-semibold">Chat History</DialogTitle>
+        <DialogContent 
+          className="flex h-[80vh] max-h-[80vh] flex-col gap-0 p-0 sm:max-w-2xl"
+          style={{ isolation: 'isolate' }}
+        >
+          <div 
+            className="flex items-center justify-between border-b px-4 py-2"
+            style={{ 
+              position: 'relative',
+              zIndex: 50 
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <DialogTitle className="text-lg font-semibold">Chat History</DialogTitle>
+              <div 
+                style={{ 
+                  position: 'relative',
+                  zIndex: 51
+                }}
+              >
+                <ModelSwitcher 
+                  selectedModel={selectedModel}
+                  onModelChange={handleModelChange}
+                  variant="header"
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -1212,16 +1380,18 @@ export function AnimatedChatInput() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto relative z-0">
             <div className="mx-auto max-w-[600px] px-4">
               <div className="space-y-6 py-4">
-            {localMessages.length === 0 ? (
+            {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 No chat history yet. Start a conversation!
               </div>
             ) : (
                   <AnimatePresence initial={false}>
-                    {localMessages.map((message: Message) => (
+                    {localMessages
+                      .filter(msg => msg.model === selectedModel)
+                      .map((message: Message) => (
                       <ChatBubble 
                         key={message.id}
                         message={message}
@@ -1286,9 +1456,7 @@ export function AnimatedChatInput() {
         isOpen={isExportOptionsOpen}
         onClose={() => setIsExportOptionsOpen(false)}
         onExport={handleExportWithOptions}
-        messageCount={localMessages.length}
-        heartedCount={localMessages.filter(m => messageReactions[m.id]?.heart).length}
-        thumbsDownCount={localMessages.filter(m => messageReactions[m.id]?.thumbsDown).length}
+        messageCounts={modelCounts}
       />
     </>
   )
