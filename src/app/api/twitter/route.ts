@@ -8,6 +8,7 @@ import {
   canMakeRequest,
   FIFTEEN_MINUTES
 } from '@/lib/tweet-storage';
+import { APIError, handleAPIError } from '@/lib/api-error';
 
 // Move helper functions outside of the route exports
 async function searchRecentTweets(client: any) {
@@ -15,7 +16,11 @@ async function searchRecentTweets(client: any) {
     // Check rate limit before making request
     const rateLimit = await getRateLimit('tweets/search/recent');
     if (!await canMakeRequest('tweets/search/recent')) {
-      throw new Error('Rate limit exceeded for search endpoint');
+      throw new APIError(
+        `Rate limit exceeded for tweets/search/recent endpoint. Reset at ${rateLimit?.resetAt}`,
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
     }
 
     // Search for tweets containing ".build"
@@ -45,9 +50,18 @@ async function searchRecentTweets(client: any) {
     if (error instanceof Error && error.message.includes('Rate limit')) {
       const resetTime = new Date(Date.now() + FIFTEEN_MINUTES);
       await updateRateLimit('tweets/search/recent', resetTime, 0);
+      throw new APIError(
+        `Rate limit exceeded for tweets/search/recent endpoint. Reset at ${resetTime.toISOString()}`,
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
     }
     
-    return null;
+    throw new APIError(
+      `Failed to search tweets: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      'TWITTER_SEARCH_ERROR'
+    );
   }
 }
 
@@ -55,17 +69,29 @@ async function getRandomTweet(client: any, username: string) {
   try {
     // Check rate limit before making request
     if (!await canMakeRequest('users/by/username')) {
-      throw new Error('Rate limit exceeded for user lookup endpoint');
+      throw new APIError(
+        'Rate limit exceeded for user lookup endpoint',
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
     }
 
     const user = await client.v2.userByUsername(username);
     if (!user.data) {
-      throw new Error('User not found');
+      throw new APIError(
+        `Twitter user @${username} not found`,
+        404,
+        'USER_NOT_FOUND'
+      );
     }
 
     // Check rate limit before timeline request
     if (!await canMakeRequest('users/:id/tweets')) {
-      throw new Error('Rate limit exceeded for timeline endpoint');
+      throw new APIError(
+        'Rate limit exceeded for timeline endpoint',
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
     }
 
     const tweets = await client.v2.userTimeline(user.data.id, {
@@ -93,7 +119,11 @@ async function getRandomTweet(client: any, username: string) {
     }
 
     if (!tweets.data || tweets.data.length === 0) {
-      throw new Error('No tweets found');
+      throw new APIError(
+        `No tweets found for user @${username}`,
+        404,
+        'NO_TWEETS_FOUND'
+      );
     }
 
     // Get a random tweet from the results
@@ -101,32 +131,44 @@ async function getRandomTweet(client: any, username: string) {
     return tweets.data[randomIndex];
   } catch (error) {
     console.error('Error getting random tweet:', error);
-    return null;
+    
+    if (error instanceof APIError) {
+      throw error;
+    }
+    
+    throw new APIError(
+      `Failed to get random tweet: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      'TWITTER_FETCH_ERROR'
+    );
   }
 }
 
 export async function GET(request: Request) {
-  const searchParams = new URL(request.url).searchParams;
   try {
+    const searchParams = new URL(request.url).searchParams;
     const action = searchParams.get('action');
     const username = searchParams.get('username')?.replace('@', '');
 
     console.log('Twitter API Request:', { action, username });
 
     if (!action) {
-      return NextResponse.json({ error: 'Missing action parameter' }, { status: 400 });
+      throw new APIError(
+        'Missing required parameter: action',
+        400,
+        'MISSING_PARAMETER'
+      );
     }
 
     // Check rate limit
     const rateLimit = await getRateLimit('twitter/api');
     const now = new Date();
     if (!await canMakeRequest('twitter/api')) {
-      console.log('Rate limit in effect, waiting for timeout');
-      return NextResponse.json({ 
-        error: 'Rate limit exceeded',
-        lastRequest: rateLimit ? new Date(rateLimit.resetAt).toISOString() : 'never',
-        nextRequest: rateLimit ? new Date(rateLimit.resetAt).toISOString() : undefined
-      }, { status: 429 });
+      throw new APIError(
+        'Rate limit exceeded for Twitter API',
+        429,
+        'RATE_LIMIT_EXCEEDED'
+      );
     }
 
     switch (action) {
@@ -151,7 +193,11 @@ export async function GET(request: Request) {
         const tweet = buildTweet || (username ? await getRandomTweet(client, username) : null);
 
         if (!tweet) {
-          return NextResponse.json({ error: 'No tweets found' }, { status: 404 });
+          throw new APIError(
+            'No tweets found',
+            404,
+            'NO_TWEETS_FOUND'
+          );
         }
 
         // Cache the tweets and update rate limit
@@ -167,43 +213,14 @@ export async function GET(request: Request) {
       }
 
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        throw new APIError(
+          `Invalid action parameter: ${action}`,
+          400,
+          'INVALID_PARAMETER'
+        );
     }
   } catch (error) {
-    // Log the full error details
-    console.error('Twitter API Error:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      name: error instanceof Error ? error.name : 'Unknown',
-      stack: error instanceof Error ? error.stack : undefined,
-      raw: error,
-      url: request.url,
-      params: { 
-        action: searchParams.get('action'),
-        username: searchParams.get('username')
-      },
-      env: {
-        hasApiKey: !!process.env.TWITTER_API_KEY,
-        hasApiSecret: !!process.env.TWITTER_API_SECRET,
-        nodeEnv: process.env.NODE_ENV,
-        vercelEnv: process.env.VERCEL_ENV
-      }
-    });
-
-    // Update rate limit if we hit a rate limit error
-    if (error instanceof Error && error.message.includes('Rate limit')) {
-      await updateRateLimit(
-        'twitter/api',
-        new Date(Date.now() + FIFTEEN_MINUTES),
-        0
-      );
-    }
-
-    return NextResponse.json({
-      error: 'Failed to process Twitter request',
-      details: error instanceof Error ? error.message : 'Unknown error',
-      type: error instanceof Error ? error.name : 'Unknown',
-      env: process.env.VERCEL_ENV || process.env.NODE_ENV
-    }, { status: 500 });
+    return handleAPIError(error);
   }
 }
 
@@ -213,13 +230,18 @@ export async function POST(request: Request) {
     console.log('Processing tweet post:', { hasText: !!text, hasToken: !!accessToken });
 
     if (!text?.trim()) {
-      return NextResponse.json({ error: 'Tweet text is required' }, { status: 400 });
+      throw new APIError(
+        'Missing required parameter: text',
+        400,
+        'MISSING_PARAMETER'
+      );
     }
 
     if (!accessToken) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
+      throw new APIError(
+        'Authentication required: Missing access token',
+        401,
+        'UNAUTHORIZED'
       );
     }
 
@@ -228,13 +250,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(tweet);
   } catch (error) {
-    console.error('Tweet post error:', error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to post tweet',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 } 
