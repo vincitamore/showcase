@@ -3,8 +3,8 @@ import { z } from "zod"
 // Server-side environment variables
 const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url(),
+  DATABASE_URL: z.string().url().optional(),
+  DIRECT_URL: z.string().url().optional(),
   
   // AI Configuration
   XAI_API_KEY: z.string().min(1).optional(),
@@ -18,7 +18,7 @@ const serverSchema = z.object({
   RATE_LIMIT_TOKEN_MAX: z.number().min(1).default(200000), // Max tokens per window
   
   // Security
-  CRON_SECRET: z.string().min(1),
+  CRON_SECRET: z.string().min(1).optional(),
   
   // Twitter Integration
   TWITTER_API_KEY: z.string().min(1).optional(),
@@ -31,22 +31,39 @@ const serverSchema = z.object({
   MONITORING_ENABLED: z.boolean().default(false),
   ERROR_TRACKING_DSN: z.string().url().optional(),
   PERFORMANCE_MONITORING_URL: z.string().url().optional(),
-}).refine(
-  (data) => {
-    // Only enforce required variables on the server in production
-    if (typeof window === "undefined" && data.NODE_ENV === "production") {
-      const hasDatabase = !!(data.DATABASE_URL && data.DIRECT_URL);
-      const hasAIConfig = !!(data.XAI_API_KEY || data.ANTHROPIC_API_KEY);
-      const hasSecurity = !!data.CRON_SECRET;
-      
-      return hasDatabase && hasAIConfig && hasSecurity;
+}).superRefine((data, ctx) => {
+  // Only enforce required variables on the server in production
+  if (typeof window === "undefined" && data.NODE_ENV === "production") {
+    if (!data.DATABASE_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "DATABASE_URL is required in production",
+        path: ["DATABASE_URL"]
+      });
     }
-    return true;
-  },
-  {
-    message: "Required environment variables missing in production server environment"
+    if (!data.DIRECT_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "DIRECT_URL is required in production",
+        path: ["DIRECT_URL"]
+      });
+    }
+    if (!data.CRON_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CRON_SECRET is required in production",
+        path: ["CRON_SECRET"]
+      });
+    }
+    if (!data.XAI_API_KEY && !data.ANTHROPIC_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Either XAI_API_KEY or ANTHROPIC_API_KEY is required in production",
+        path: ["XAI_API_KEY"]
+      });
+    }
   }
-);
+});
 
 // Client-side environment variables
 const clientSchema = z.object({
