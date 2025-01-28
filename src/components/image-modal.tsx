@@ -4,6 +4,8 @@ import * as React from "react"
 import Image from "next/legacy/image"
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { AlertCircle } from "lucide-react"
 
 interface ImageModalProps {
   src: string
@@ -11,8 +13,26 @@ interface ImageModalProps {
   className?: string
 }
 
-export function ImageModal({ src, alt, className }: ImageModalProps) {
+function BaseImageModal({ src, alt, className }: ImageModalProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [imageError, setImageError] = React.useState(false)
+
+  const handleImageError = () => {
+    console.error('[Image Modal] Failed to load image:', { src })
+    setImageError(true)
+  }
+
+  if (imageError) {
+    return (
+      <div className={cn(
+        "flex flex-col items-center justify-center p-4 space-y-2 rounded-lg border bg-muted/50",
+        className
+      )}>
+        <AlertCircle className="h-8 w-8 text-destructive" />
+        <p className="text-sm text-muted-foreground">Failed to load image</p>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -31,6 +51,7 @@ export function ImageModal({ src, alt, className }: ImageModalProps) {
             layout="fill"
             objectFit="cover"
             className="transition-transform duration-500 group-hover/image:scale-105"
+            onError={handleImageError}
           />
         </div>
       </button>
@@ -45,10 +66,31 @@ export function ImageModal({ src, alt, className }: ImageModalProps) {
               layout="fill"
               objectFit="contain"
               priority
+              onError={handleImageError}
             />
           </div>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+export function ImageModal(props: ImageModalProps) {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className={cn(
+          "flex flex-col items-center justify-center p-4 space-y-2 rounded-lg border bg-muted/50",
+          props.className
+        )}>
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">
+            Something went wrong displaying the image
+          </p>
+        </div>
+      }
+    >
+      <BaseImageModal {...props} />
+    </ErrorBoundary>
   )
 } 

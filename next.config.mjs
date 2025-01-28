@@ -55,6 +55,11 @@ const nextConfig = {
     optimizePackageImports: ['lucide-react'],
     scrollRestoration: true,
   },
+
+  // Font optimization
+  fontLoaders: [
+    { loader: '@next/font/google', options: { subsets: ['latin'] } }
+  ],
   
   // Monitoring and logging
   logging: {

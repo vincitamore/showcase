@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { env } from '@/env'
 import { prisma } from '@/lib/db'
 import { checkRateLimit, getRateLimitInfo } from '@/lib/rate-limit'
+import { APIError, handleAPIError } from '@/lib/api-error'
 import { 
   MODEL_CONFIGS,
   getSystemPrompt,
@@ -11,9 +12,9 @@ import {
 } from '@/lib/chat-config'
 import { xai } from '@ai-sdk/xai'
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { streamText, type Message as AIMessage } from 'ai'
-import type { Message, MessageContent, TextContent } from '@/types/chat'
-import type { LanguageModelV1, LanguageModelV1StreamPart } from '@ai-sdk/provider'
+import { streamText } from 'ai'
+import type { Message, MessageContent, TextContent, MessageRole } from '@/types/chat'
+import type { LanguageModelV1 } from '@ai-sdk/provider'
 
 interface AnthropicMessage {
   role: 'user' | 'assistant'
@@ -53,53 +54,29 @@ function logAnthropicRequest(messages: AnthropicMessage[], model: string) {
   })
 }
 
-// Helper to parse error chunks
-function parseErrorChunk(chunk: string): { error?: any, text?: string } {
-  // Remove any numeric prefix (e.g. "3:")
-  const cleanChunk = chunk.replace(/^\d+:/, '').trim()
-  
-  try {
-    // Try parsing as JSON first
-    const parsed = JSON.parse(cleanChunk)
-    return { error: parsed }
-  } catch {
-    // If not JSON, treat as text
-    return { text: cleanChunk }
+// Convert our Message type to Anthropic format
+function toAnthropicMessage(msg: Message): AnthropicMessage {
+  return {
+    role: msg.role === 'system' ? 'user' : msg.role,
+    content: Array.isArray(msg.content) 
+      ? msg.content.map(c => {
+          if (c.type === 'text') {
+            return { type: 'text', text: c.text }
+          }
+          if (c.type === 'image_url') {
+            return {
+              type: 'image',
+              source: {
+                type: 'url',
+                url: c.image_url.url,
+                media_type: 'image/jpeg'
+              }
+            }
+          }
+          return { type: 'text', text: '' }
+        })
+      : [{ type: 'text', text: String(msg.content) }]
   }
-}
-
-// Define xAI specific types
-interface XAITextContent {
-  type: 'text'
-  text: string
-}
-
-interface XAIImageContent {
-  type: 'image_url'
-  image_url: {
-    url: string
-    detail: 'high' | 'low'
-  }
-}
-
-type XAIMessageContent = XAITextContent | XAIImageContent
-type XAIContent = string | XAIMessageContent[]
-
-interface XAIMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: XAIContent
-}
-
-// Add OPTIONS handler for CORS
-export async function OPTIONS(req: NextRequest) {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  })
 }
 
 // Get the model provider based on the model name
@@ -111,12 +88,12 @@ function getModelProvider(model: string): LanguageModelV1 {
 
   switch (modelConfig.provider) {
     case 'grok': {
-      return xai(model) as unknown as LanguageModelV1
+      return xai(model) as LanguageModelV1
     }
     case 'anthropic': {
       try {
         // Initialize Anthropic provider
-        const provider = anthropic(model)
+        const provider = anthropic(model) as LanguageModelV1
         
         console.log('[Chat API] Anthropic provider initialized:', {
           model,
@@ -126,7 +103,7 @@ function getModelProvider(model: string): LanguageModelV1 {
           timestamp: new Date().toISOString()
         })
 
-        return provider as unknown as LanguageModelV1
+        return provider
       } catch (error: any) {
         console.error('[Chat API] Error initializing Anthropic provider:', {
           error: {
@@ -146,6 +123,18 @@ function getModelProvider(model: string): LanguageModelV1 {
     default:
       throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
   }
+}
+
+// Add OPTIONS handler for CORS
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
 }
 
 async function uploadImage(image: { data: string, mime_type: string }, origin: string) {
@@ -190,14 +179,28 @@ async function listAnthropicModels() {
   }
 }
 
-// Add debug logging to track request processing
+// Wrap the original POST handler with error handling
 export async function POST(req: Request) {
   try {
     console.log('----------------------------------------')
     console.log('[Chat API] Starting request processing')
     
+    // Get client IP for rate limiting
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
+    
+    // Rate limiting check
+    const isAllowed = await checkRateLimit(ip)
+    if (!isAllowed) {
+      const rateLimitInfo = await getRateLimitInfo(ip)
+      throw new APIError('Rate limit exceeded', 429, 'RATE_LIMIT_EXCEEDED')
+    }
+
     const { messages, data, model = 'grok-2-latest' } = await req.json()
     const modelConfig = MODEL_CONFIGS[model]
+    
+    if (!modelConfig) {
+      throw new APIError(`Invalid model: ${model}`, 400, 'INVALID_MODEL')
+    }
     
     console.log('[Chat API] Request details:', {
       model,
@@ -211,6 +214,11 @@ export async function POST(req: Request) {
       }))
     })
 
+    // Validate messages
+    if (!Array.isArray(messages)) {
+      throw new APIError('Messages must be an array', 400, 'INVALID_MESSAGES')
+    }
+
     // Validate that all messages are for the correct model
     const invalidMessages = messages?.filter((m: Message) => m.model && m.model !== model)
     if (invalidMessages?.length > 0) {
@@ -222,57 +230,34 @@ export async function POST(req: Request) {
           role: m.role
         }))
       })
-      throw new Error('Request contains messages for incorrect model')
+      throw new APIError('Request contains messages for incorrect model', 400, 'MODEL_MISMATCH')
     }
 
     // Format messages based on provider
     let formattedMessages
-    if (modelConfig?.provider === 'anthropic') {
+    const provider = modelConfig?.provider
+    if (provider === 'anthropic') {
       console.log('[Chat API] Formatting messages for Anthropic')
       const systemPrompt = await getSystemPrompt()
+      
+      const systemMessage: Message = {
+        id: 'system-' + Date.now(),
+        role: 'system',
+        content: systemPrompt,
+        createdAt: new Date()
+      }
+      
+      const assistantMessage: Message = {
+        id: 'assistant-' + Date.now(),
+        role: 'assistant',
+        content: 'I understand. I will act as described.',
+        createdAt: new Date()
+      }
+      
       formattedMessages = [
-        {
-          role: 'user',
-          content: [{ type: 'text', text: systemPrompt }]
-        },
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'I understand. I will act as described.' }]
-        },
-        ...messages.map((msg: Message) => {
-          const formatted = {
-            role: msg.role === 'system' ? 'user' : msg.role,
-            content: Array.isArray(msg.content)
-              ? msg.content.map(c => {
-                  if (c.type === 'text') {
-                    return { type: 'text', text: c.text }
-                  }
-                  if (c.type === 'image_url') {
-                    return {
-                      type: 'image',
-                      source: {
-                        type: 'url',
-                        url: c.image_url.url,
-                        media_type: 'image/jpeg'
-                      }
-                    }
-                  }
-                  return null
-                }).filter(Boolean)
-              : [{ type: 'text', text: String(msg.content) }]
-          }
-          console.log('[Chat API] Formatted message:', {
-            original: {
-              role: msg.role,
-              contentPreview: JSON.stringify(msg.content).slice(0, 100)
-            },
-            formatted: {
-              role: formatted.role,
-              contentPreview: JSON.stringify(formatted.content).slice(0, 100)
-            }
-          })
-          return formatted
-        })
+        toAnthropicMessage(systemMessage),
+        toAnthropicMessage(assistantMessage),
+        ...messages.map(toAnthropicMessage)
       ]
 
       logAnthropicRequest(formattedMessages, model)
@@ -282,21 +267,18 @@ export async function POST(req: Request) {
       const systemPrompt = await getSystemPrompt()
       formattedMessages = [
         {
+          id: 'system-' + Date.now(),
           role: 'system',
-          content: systemPrompt
-        },
-        ...messages.map((msg: Message) => ({
-          role: msg.role,
-          content: Array.isArray(msg.content)
-            ? msg.content
-            : String(msg.content)
-        }))
+          content: systemPrompt,
+          createdAt: new Date()
+        } as Message,
+        ...messages
       ]
     }
 
     // Get the appropriate provider
     console.log('[Chat API] Getting model provider for:', model)
-    const provider = getModelProvider(model)
+    const providerInstance = getModelProvider(model)
 
     // Log the stream request
     console.log('[Chat API] Creating stream with config:', {
@@ -312,7 +294,7 @@ export async function POST(req: Request) {
 
     // Create the stream with provider-specific options
     const aiStream = await streamText({
-      model: provider,
+      model: providerInstance,
       messages: formattedMessages,
       ...(modelConfig?.provider === 'anthropic' ? {
         maxTokens: 4096,
@@ -370,23 +352,7 @@ export async function POST(req: Request) {
       },
     })
 
-  } catch (error: any) {
-    console.error('[Chat API] Error processing request:', error)
-    return new Response(
-      JSON.stringify({
-        error: error.message,
-        details: {
-          name: error.name,
-          stack: error.stack,
-          cause: error.cause
-        }
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    )
+  } catch (error) {
+    return handleAPIError(error)
   }
 } 

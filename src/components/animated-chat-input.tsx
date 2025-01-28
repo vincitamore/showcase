@@ -39,6 +39,7 @@ import {
 } from "@/components/chat"
 import ReactMarkdown, { type Components } from "react-markdown"
 import { MODEL_CONFIGS } from "@/lib/chat-config"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 interface CodeComponentProps extends React.HTMLAttributes<HTMLElement> {
   inline?: boolean
@@ -344,7 +345,8 @@ async function convertToJpeg(file: File) {
   })
 }
 
-export function AnimatedChatInput() {
+// Rename the base component to BaseAnimatedChatInput
+function BaseAnimatedChatInput() {
   const [mounted, setMounted] = React.useState(false)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isAlertOpen, setIsAlertOpen] = React.useState(false)
@@ -1144,5 +1146,26 @@ export function AnimatedChatInput() {
       />
     </>
   )
-} 
+}
+
+function AnimatedChatInput() {
+  return (
+    <ErrorBoundary
+      onReset={() => {
+        // Clear any stored state that might be causing issues
+        localStorage.removeItem('selectedModel')
+        Object.keys(MODEL_CONFIGS).forEach(modelId => {
+          localStorage.removeItem(`chatHistory-${modelId}`)
+        })
+        localStorage.removeItem('messageReactions')
+        window.location.reload()
+      }}
+    >
+      <BaseAnimatedChatInput />
+    </ErrorBoundary>
+  )
+}
+
+// Export the wrapped component
+export { AnimatedChatInput } 
 
