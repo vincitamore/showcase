@@ -307,9 +307,14 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   return result;
 }
 
-function logStatus(message: string, data?: any) {
-  const timestamp = new Date().toISOString().split('T')[1].split('.')[0]; // HH:mm:ss only
-  console.log(`[API ${timestamp}] ${message}`, data ? JSON.stringify(data) : '');
+function logStatus(message: string, data?: Record<string, unknown>) {
+  const now = new Date();
+  const hours = now.getHours().toString().padStart(2, '0');
+  const minutes = now.getMinutes().toString().padStart(2, '0');
+  const seconds = now.getSeconds().toString().padStart(2, '0');
+  const timeString = `${hours}:${minutes}:${seconds}`;
+  const dataString = data ? ` ${JSON.stringify(data)}` : '';
+  console.log(`[API ${timeString}] ${message}${dataString}`);
 }
 
 export async function GET() {
@@ -366,12 +371,16 @@ export async function GET() {
 
     // Randomly select tweets
     const selectedIds: string[] = [];
-    const availableIds = tweetPool.map((t) => t.id);
+    // Filter out any undefined or null IDs and explicitly type as string[]
+    const availableIds: string[] = tweetPool
+      .map((t) => t.id)
+      .filter((id): id is string => typeof id === 'string');
     
     while (selectedIds.length < SELECTED_TWEET_COUNT && availableIds.length > 0) {
       const randomIndex = Math.floor(Math.random() * availableIds.length);
-      const id = availableIds[randomIndex];
-      selectedIds.push(id);
+      // Since we filtered for non-null strings above, this access is safe
+      const selectedId: string = availableIds[randomIndex]!;
+      selectedIds.push(selectedId);
       availableIds.splice(randomIndex, 1);
     }
 
@@ -427,9 +436,8 @@ export async function POST(req: Request) {
     logStatus('Tweet posted', { id: tweet.data.id });
     return NextResponse.json(tweet);
   } catch (error) {
-    logStatus('Error posting tweet', {
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logStatus('Error posting tweet', { error: errorMessage });
     return NextResponse.json(
       { error: 'Failed to post tweet' },
       { status: 500 }

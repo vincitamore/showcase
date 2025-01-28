@@ -279,9 +279,17 @@ async function convertToJpeg(file: File) {
     return new Promise<{ data: string, mimeType: string }>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => {
-        const base64Data = (reader.result as string).split(',')[1]
+        if (!reader.result || typeof reader.result !== 'string') {
+          reject(new Error('Invalid file data'));
+          return;
+        }
+        const parts = reader.result.split(',');
+        if (parts.length !== 2 || !parts[1]) {
+          reject(new Error('Invalid base64 data format'));
+          return;
+        }
         resolve({
-          data: base64Data,
+          data: parts[1],
           mimeType: 'image/jpeg'
         })
       }
@@ -293,41 +301,29 @@ async function convertToJpeg(file: File) {
   // For non-JPEG images, convert to JPEG
   return new Promise<{ data: string, mimeType: string }>((resolve, reject) => {
     const img = new Image()
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      img.src = e.target?.result as string
-    }
-
     img.onload = () => {
       const canvas = document.createElement('canvas')
       canvas.width = img.width
       canvas.height = img.height
-
       const ctx = canvas.getContext('2d')
       if (!ctx) {
-        reject(new Error('Could not get canvas context'))
+        reject(new Error('Failed to get canvas context'))
         return
       }
-
-      // Use crisp rendering
-      ctx.imageSmoothingEnabled = true
-      ctx.imageSmoothingQuality = 'high'
-
-      // Draw with white background to handle transparency
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0)
       
       // Use a higher quality (0.92) for better image quality
       const jpegData = canvas.toDataURL('image/jpeg', 0.92)
+      const parts = jpegData.split(',')
+      if (parts.length !== 2 || !parts[1]) {
+        reject(new Error('Invalid converted image data'))
+        return
+      }
       
       // Log the converted size
-      const base64Data = jpegData.split(',')[1]
       console.log('[Chat Client] Converted image:', {
         originalSize: file.size,
-        convertedSize: Math.round(base64Data.length * 0.75), // base64 is ~4/3 the size of binary
+        convertedSize: Math.round(parts[1].length * 0.75), // base64 is ~4/3 the size of binary
         width: img.width,
         height: img.height,
         originalType: file.type,
@@ -335,7 +331,7 @@ async function convertToJpeg(file: File) {
       })
 
       resolve({
-        data: base64Data,
+        data: parts[1],
         mimeType: 'image/jpeg'
       })
     }
@@ -344,7 +340,7 @@ async function convertToJpeg(file: File) {
       reject(new Error('Failed to load image for conversion'))
     }
 
-    reader.readAsDataURL(file)
+    img.src = URL.createObjectURL(file)
   })
 }
 

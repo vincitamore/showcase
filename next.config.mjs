@@ -31,12 +31,9 @@ const debugModule = (modulePath, context = '') => {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Image optimization
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
       {
         protocol: 'https',
         hostname: 'pbs.twimg.com',
@@ -46,22 +43,70 @@ const nextConfig = {
         hostname: 'abs.twimg.com',
       }
     ],
+    formats: ['image/avif', 'image/webp'],
   },
+  
+  // Performance optimizations
+  optimizeFonts: true,
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb'
     },
+    optimizePackageImports: ['lucide-react'],
+    scrollRestoration: true,
   },
+  
+  // Monitoring and logging
   logging: {
     fetches: {
       fullUrl: true,
     },
+    level: process.env.NODE_ENV === 'development' ? 'info' : 'error',
   },
+  
+  // Error tracking
+  productionBrowserSourceMaps: true,
+  
+  // Build optimization
+  swcMinify: true,
+  compress: true,
+  poweredByHeader: false,
+  reactStrictMode: true,
+  
+  // Webpack configuration
   webpack: (config, { dev, isServer }) => {
+    // Development configuration
     if (dev && !isServer) {
-      // Disable client-side debug mode in development
       config.devtool = 'eval-source-map';
     }
+    
+    // Production optimization
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          minSize: 20000,
+          maxSize: 244000,
+          minChunks: 1,
+          maxAsyncRequests: 30,
+          maxInitialRequests: 30,
+          cacheGroups: {
+            defaultVendors: {
+              test: /[\\/]node_modules[\\/]/,
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+            default: {
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
+    }
+    
     return config;
   }
 }
