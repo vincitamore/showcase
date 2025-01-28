@@ -69,7 +69,11 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
         align="start"
       >
         <Command shouldFilter>
-          <CommandInput placeholder="Search models..." className="h-9" />
+          <CommandInput 
+            placeholder="Search models..." 
+            className="h-9"
+            autoFocus={false}
+          />
           <CommandList>
             <CommandEmpty>No model found.</CommandEmpty>
             <CommandGroup>
