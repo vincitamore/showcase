@@ -196,7 +196,7 @@ export async function POST(req: Request) {
     console.log('----------------------------------------')
     console.log('[Chat API] Starting request processing')
     
-    const { messages, data, model = 'grok-2-vision-1212' } = await req.json()
+    const { messages, data, model = 'grok-2-latest' } = await req.json()
     const modelConfig = MODEL_CONFIGS[model]
     
     console.log('[Chat API] Request details:', {

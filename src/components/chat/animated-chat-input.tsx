@@ -12,7 +12,7 @@ export function AnimatedChatInput() {
   const [mounted, setMounted] = React.useState(false)
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
   const [isAlertOpen, setIsAlertOpen] = React.useState(false)
-  const [selectedModel, setSelectedModel] = React.useState<ModelValue>("grok-2-vision-1212")
+  const [selectedModel, setSelectedModel] = React.useState<ModelValue>("grok-2-latest")
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [localMessages, setLocalMessages] = React.useState<Message[]>([])
