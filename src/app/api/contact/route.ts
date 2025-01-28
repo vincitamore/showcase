@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createTransport } from "nodemailer"
+import { APIError, handleAPIError } from '@/lib/api-error'
 
 // Force Node.js runtime and disable static optimization
 export const runtime = 'nodejs'
@@ -7,25 +8,46 @@ export const dynamic = 'force-dynamic'
 export const preferredRegion = 'iad1'
 
 export async function POST(request: Request) {
+  let parsedBody: { name?: string; email?: string; message?: string } = {}
+  
   try {
-    const body = await request.json()
-    const { name, email, message } = body
+    parsedBody = await request.json()
+    const { name, email, message } = parsedBody
 
-    if (!name || !email || !message) {
-      return NextResponse.json(
-        { error: 'Name, email, and message are required' },
-        { status: 400 }
+    // Validate required fields
+    if (!name?.trim()) {
+      throw new APIError(
+        'Name is required',
+        400,
+        'MISSING_FIELD'
+      )
+    }
+    if (!email?.trim()) {
+      throw new APIError(
+        'Email is required',
+        400,
+        'MISSING_FIELD'
+      )
+    }
+    if (!message?.trim()) {
+      throw new APIError(
+        'Message is required',
+        400,
+        'MISSING_FIELD'
       )
     }
 
+    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
+      throw new APIError(
+        'Invalid email format',
+        400,
+        'INVALID_EMAIL'
       )
     }
 
+    // Validate SMTP configuration
     const smtpConfig = {
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT),
@@ -41,22 +63,23 @@ export async function POST(request: Request) {
     }
 
     if (!smtpConfig.host || !smtpConfig.port || !smtpConfig.auth.user || !smtpConfig.auth.pass) {
-      console.error("Missing SMTP configuration")
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 }
+      throw new APIError(
+        'SMTP configuration is incomplete',
+        500,
+        'SMTP_CONFIG_ERROR'
       )
     }
 
     const transporter = createTransport(smtpConfig)
 
+    // Verify SMTP connection
     try {
       await transporter.verify()
     } catch (verifyError) {
-      console.error("SMTP verification failed:", verifyError)
-      return NextResponse.json(
-        { error: "Failed to connect to mail server" },
-        { status: 500 }
+      throw new APIError(
+        `Failed to connect to mail server: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
+        500,
+        'SMTP_CONNECTION_ERROR'
       )
     }
 
@@ -74,6 +97,7 @@ export async function POST(request: Request) {
       `
     }
 
+    // Send email
     try {
       await transporter.sendMail(mailOptions)
       return NextResponse.json(
@@ -81,17 +105,13 @@ export async function POST(request: Request) {
         { status: 200 }
       )
     } catch (sendError) {
-      console.error("Failed to send email:", sendError)
-      return NextResponse.json(
-        { error: "Failed to send email" },
-        { status: 500 }
+      throw new APIError(
+        `Failed to send email: ${sendError instanceof Error ? sendError.message : 'Unknown error'}`,
+        500,
+        'EMAIL_SEND_ERROR'
       )
     }
   } catch (error) {
-    console.error('Contact form error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 }
-    )
+    return handleAPIError(error)
   }
 } 

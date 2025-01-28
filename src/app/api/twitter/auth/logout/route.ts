@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { APIError, handleAPIError } from '@/lib/api-error'
 
 export async function POST() {
   const cookieStore = cookies()
@@ -16,10 +17,18 @@ export async function POST() {
       message: 'Logged out successfully'
     })
   } catch (error) {
-    console.error('Logout error:', error)
-    return NextResponse.json({ 
-      error: 'Failed to logout',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    if (error instanceof Error && error.message.includes('cookies')) {
+      throw new APIError(
+        'Failed to clear session cookies',
+        500,
+        'SESSION_CLEAR_ERROR'
+      )
+    }
+    
+    throw new APIError(
+      `Failed to logout: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      'LOGOUT_ERROR'
+    )
   }
 } 

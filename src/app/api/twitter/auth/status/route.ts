@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { APIError, handleAPIError } from '@/lib/api-error'
 
 // Mark route as dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
@@ -15,10 +16,18 @@ export async function GET(request: Request) {
       authenticated: isAuthenticated 
     })
   } catch (error) {
-    console.error('Error checking auth status:', error)
-    return NextResponse.json({ 
-      authenticated: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    if (error instanceof Error && error.message.includes('cookies')) {
+      throw new APIError(
+        'Failed to access session cookies',
+        500,
+        'SESSION_ACCESS_ERROR'
+      )
+    }
+    
+    throw new APIError(
+      `Failed to check authentication status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      500,
+      'AUTH_STATUS_ERROR'
+    )
   }
 } 
