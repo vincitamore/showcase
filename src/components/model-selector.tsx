@@ -78,11 +78,21 @@ export function ModelSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className={cn("w-[200px] p-0", className)} 
-        style={{ position: 'relative', zIndex: 99999 }}
-        side="bottom" 
-        sideOffset={4}
+        className={cn(
+          "w-[200px] p-0",
+          "sm:h-auto", // Auto height on desktop
+          className
+        )}
+        style={{ 
+          position: 'fixed', // Change to fixed positioning
+          zIndex: 99999,
+          maxHeight: '60vh', // Limit max height
+          overflowY: 'auto' // Enable scrolling if needed
+        }}
         align="start"
+        side="top" // Change to top positioning
+        sideOffset={4}
+        avoidCollisions={false} // Disable collision detection
       >
         <Command shouldFilter>
           <CommandInput placeholder="Search models..." className="h-9" />
@@ -97,7 +107,7 @@ export function ModelSelector({
                     onValueChange(model.value)
                     setOpen(false)
                   }}
-                  className="flex items-center gap-2 px-2 py-1.5 cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
+                  className="flex items-center gap-2 px-2 py-2.5 cursor-pointer aria-selected:bg-accent aria-selected:text-accent-foreground"
                 >
                   <Check
                     className={cn(
@@ -106,7 +116,7 @@ export function ModelSelector({
                     )}
                   />
                   <div className="flex flex-col flex-1 overflow-hidden">
-                    <span className="truncate">{model.label}</span>
+                    <span className="truncate font-medium">{model.label}</span>
                     <span className="text-xs text-muted-foreground truncate">
                       {model.description}
                     </span>
@@ -129,12 +139,39 @@ export function ModelSelectorCompact({
 }: ModelSelectorProps) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger className={cn("w-[180px]", className)}>
-        <SelectValue placeholder="Select a model" />
+      <SelectTrigger 
+        className={cn(
+          "h-7 px-2.5 text-sm font-medium",
+          "border-0 bg-transparent hover:bg-accent",
+          "focus:ring-0 focus:ring-offset-0",
+          "rounded-lg",
+          className,
+          triggerClassName
+        )}
+      >
+        <SelectValue placeholder="Select a model">
+          {MODEL_CONFIGS[value]?.name}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        align="start"
+        side="bottom"
+        className={cn(
+          "w-[180px] p-1",
+          "rounded-lg border border-border/40",
+          "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+        )}
+      >
         {Object.entries(MODEL_CONFIGS).map(([id, config]: [string, ModelConfig]) => (
-          <SelectItem key={id} value={id as ModelValue}>
+          <SelectItem 
+            key={id} 
+            value={id as ModelValue}
+            className={cn(
+              "text-sm rounded-md",
+              "focus:bg-accent focus:text-accent-foreground",
+              "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            )}
+          >
             {config.name}
           </SelectItem>
         ))}

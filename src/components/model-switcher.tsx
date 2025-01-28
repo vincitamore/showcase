@@ -3,7 +3,7 @@
 import * as React from "react"
 import { motion } from 'framer-motion'
 import { MODEL_CONFIGS } from "@/lib/chat-config"
-import { ModelSelector } from "./model-selector"
+import { ModelSelector, ModelSelectorCompact } from "./model-selector"
 import type { ModelValue } from "./model-selector"
 
 interface ModelSwitcherProps {
@@ -19,11 +19,11 @@ export function ModelSwitcher({ selectedModel, onModelChange, variant = 'default
     return (
       <div className="flex items-center gap-1.5 text-sm">
         <span className="text-muted-foreground">Model:</span>
-        <ModelSelector
+        <ModelSelectorCompact
           value={selectedModel}
           onValueChange={onModelChange}
           className="h-7 px-2 text-sm font-medium"
-          triggerClassName="justify-between gap-1"
+          triggerClassName="w-[140px] justify-between gap-1"
         />
       </div>
     )
@@ -51,9 +51,11 @@ export function ModelSwitcher({ selectedModel, onModelChange, variant = 'default
       className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground/80"
     >
       <span>Powered by</span>
-      <ModelSelector
+      <ModelSelectorCompact
         value={selectedModel}
         onValueChange={onModelChange}
+        className="h-6 px-2 text-xs font-medium"
+        triggerClassName="w-[140px] justify-between gap-1 border-0 bg-transparent hover:bg-accent/50"
       />
     </motion.div>
   )
