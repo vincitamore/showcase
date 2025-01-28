@@ -26,12 +26,20 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
     - Quote functionality
     - Export options
     - Markdown rendering with syntax highlighting
-    - Image understanding (Claude models)
+    - Image understanding (Claude models)(*coming soon*)
 - Built with performance and accessibility in mind
 - Automated deployment via GitHub Actions
 - PostgreSQL database with optimized queries
 - Rate-limited API endpoints with fallback mechanisms
 - Temporary image storage with automatic cleanup
+- Advanced API Infrastructure:
+  - Comprehensive structured logging across all routes
+  - Centralized error handling with detailed context
+  - Rate limiting with database-backed tracking
+  - Health monitoring with service checks
+  - Performance tracking and metrics
+  - Type-safe route implementations
+  - Secure file handling with automatic cleanup
 
 ## Tech Stack
 
@@ -60,13 +68,29 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - **Analytics**: Vercel Analytics
 - **Cron Jobs**: Vercel Cron
 - **Rate Limiting**: Database-backed with Prisma
+- **Monitoring & Logging**:
+  - Structured logging with metadata
+  - Performance metrics tracking
+  - Service health monitoring
+  - Error tracking and reporting
+  - Rate limit monitoring
+- **Error Handling**:
+  - Error boundaries for UI components
+  - Centralized API error handling
+  - Fallback UI components
+  - Type-safe error responses
 
 ## Project Structure
 
 ```
 src/
 ├── app/                    # Next.js app directory
-│   ├── api/               # API routes for chat, auth, etc.
+│   ├── api/               # API routes with structured logging
+│   │   ├── chat/         # Chat system endpoints
+│   │   ├── twitter/      # Twitter integration endpoints
+│   │   ├── images/       # Image handling endpoints
+│   │   ├── health/       # Health check endpoint
+│   │   └── contact/      # Contact form endpoint
 │   ├── (auth)/           # Authentication related pages
 │   └── (main)/           # Main application pages
 ├── components/            # React components
@@ -77,6 +101,9 @@ src/
 ├── lib/                  # Utility functions and configs
 │   ├── chat-config.ts    # Chat system configuration
 │   ├── utils.ts          # General utilities
+│   ├── logger.ts        # Structured logging utility
+│   ├── api-error.ts     # API error handling
+│   ├── rate-limit.ts    # Rate limiting implementation
 │   └── ...               # Other utilities
 ├── types/                # TypeScript type definitions
 ├── middleware/           # Edge middleware
@@ -119,12 +146,14 @@ cp .env.local.example .env.local
 NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
 
 # Database Configuration
-DATABASE_URL=your-turso-url              # Main connection string
+DATABASE_URL=your-postgres-url           # Main connection string
 DIRECT_URL=your-direct-db-url           # For Prisma direct access
 
-# xAI Configuration
+# AI Configuration
 XAI_API_KEY=your-xai-api-key            # For Grok-2 chat functionality
 XAI_MODEL_ID=grok-2-latest              # Model identifier
+ANTHROPIC_API_KEY=your-anthropic-key    # For Claude models
+ANTHROPIC_MODEL_ID=claude-3-sonnet      # Default model
 
 # SMTP Configuration
 SMTP_HOST=your-smtp-host
@@ -139,8 +168,13 @@ TWITTER_CLIENT_ID=your-oauth2-client-id
 TWITTER_USERNAME=your-username-without-@
 NEXT_PUBLIC_TWITTER_USERNAME=your-username-without-@
 
-# Storage Configuration
-BLOB_READ_WRITE_TOKEN=your-blob-token    # For Vercel Blob Storage
+# Rate Limiting Configuration
+RATE_LIMIT_MAX=100                      # Max requests per window
+RATE_LIMIT_WINDOW=3600                  # Window size in seconds
+
+# Monitoring Configuration
+MONITORING_ENABLED=true                 # Enable performance monitoring
+ERROR_TRACKING_ENABLED=true            # Enable error tracking
 ```
 
 4. Initialize the database:
@@ -189,6 +223,39 @@ npm run dev
    - Update email templates in `src/app/api/contact/route.ts`
    - Test form submission with your email service
 
+## Chat System Features
+
+The site includes an advanced AI-powered chat system with multi-model support:
+
+1. **Model Integration**
+   - xAI Grok-2 for general queries
+   - Claude 3.5 Sonnet for balanced performance
+   - Claude 3.5 Haiku for fast responses
+   - Claude 3 Opus for complex tasks
+   - Per-model history tracking
+   - Provider-specific optimizations
+
+2. **Interactive Interface**
+   - Animated chat input with typewriter effect
+   - Real-time streaming responses
+   - Model switching capability
+   - Message actions and reactions
+   - Quote and export functionality
+   - Markdown rendering with syntax highlighting
+   - Image understanding (Claude models)
+
+3. **Performance**
+   - Streaming responses for fast interaction
+   - Optimized database queries
+   - Proper error boundaries
+   - Fallback mechanisms
+
+4. **Security**
+   - Rate limiting per IP
+   - Input validation
+   - Secure environment variable handling
+   - Production-ready middleware
+
 ## Blog Section Features
 
 The blog section integrates with X (formerly Twitter) to provide:
@@ -216,7 +283,6 @@ The blog section integrates with X (formerly Twitter) to provide:
    - Protected API endpoints
    - Secure cookie handling
    - Rate limiting and validation
-
 
 ## Project Goals
 
@@ -267,22 +333,50 @@ The blog section integrates with X (formerly Twitter) to provide:
 - Turso database setup
 - Edge middleware for auth and rate limiting
 - Blob storage integration
+- Error handling and monitoring:
+  - Centralized API error handling
+  - Error boundaries for all components
+  - Structured logging implementation
+  - Rate limiting with database tracking
+  - Health check endpoint with monitoring
+  - Performance metric collection
+  - Type-safe route implementations
+- API Improvements:
+  - Enhanced Twitter integration
+  - Secure image handling
+  - Contact form validation
+  - Health monitoring system
+  - Cron job management
+  - Database-backed rate limiting
 
 ### In Progress
-- Chat system improvements:
-  - Context awareness
-  - System prompt refinement
-  - Error boundary implementation
-- Performance optimization:
-  - Image loading strategies
-  - Component code splitting
-  - Cache management
-- Analytics implementation:
-  - User interaction tracking
-  - Performance monitoring
-  - Error reporting
+- Performance monitoring:
+  - Request duration tracking
+  - Memory usage monitoring
+  - Database query timing
+  - External service latency
+- Resource usage tracking:
+  - Memory consumption
+  - CPU utilization
+  - Database connection pool
+  - Rate limit status
+- Error tracking:
+  - Error rates by route
+  - Error types distribution
+  - Response time degradation
+  - Failed requests tracking
 
 ### Upcoming
+- Monitoring dashboard:
+  - Request metrics visualization
+  - Error rate tracking
+  - Performance metrics display
+  - Rate limit status
+- Enhanced logging features:
+  - Log aggregation
+  - Performance analysis
+  - Error pattern detection
+  - Automated alerts
 - Advanced chat features:
   - Multi-model support
   - Chat history management
@@ -316,57 +410,33 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - [Cursor](https://cursor.com/) for the AI-powered development environment
 - GitHub Actions for automated cross-repository workflow management
 
-## Chat System Features
+## API Features
 
-The site includes an advanced AI-powered chat system with multi-model support:
-
-1. **Model Integration**
-   - xAI Grok-2 for general queries
-   - Claude 3.5 Sonnet for balanced performance
-   - Claude 3.5 Haiku for fast responses
-   - Claude 3 Opus for complex tasks
-   - Per-model history tracking
-   - Provider-specific optimizations
-
-2. **Interactive Interface**
-   - Animated chat input with typewriter effect
-   - Real-time streaming responses
-   - Model switching capability
-   - Message actions and reactions
-   - Quote and export functionality
-   - Markdown rendering with syntax highlighting
-   - Image understanding (Claude models)
-
-3. **Performance**
-   - Streaming responses for fast interaction
-   - Optimized database queries
-   - Proper error boundaries
+1. **Error Handling**
+   - Centralized error handling system
+   - Type-safe error responses
+   - Detailed error context
    - Fallback mechanisms
+   - Rate limit protection
 
-4. **Security**
-   - Rate limiting per IP
-   - Input validation
-   - Secure environment variable handling
-   - Production-ready middleware
-
-## Twitter Integration
-
-The X (Twitter) integration provides:
-
-1. **Authentication**
-   - OAuth 2.0 flow
-   - Session management
-   - Token refresh handling
-   - CSRF protection
-
-2. **Content Management**
-   - Real-time tweet fetching
-   - Media handling
-   - Engagement metrics
-   - Responsive layouts
+2. **Logging System**
+   - Structured logging with metadata
+   - Request/response cycle tracking
+   - Operation step tracking
+   - Performance metrics collection
+   - Error context enrichment
 
 3. **Security**
-   - Server-side token management
-   - Protected endpoints
-   - Rate limiting
-   - Validation
+   - Rate limiting per route
+   - Input validation
+   - Secure file handling
+   - Cookie security
+   - CSRF protection
+
+4. **Monitoring**
+   - Health check endpoint
+   - Service status tracking
+   - Performance metrics
+   - Error rate monitoring
+   - Resource usage tracking
+
