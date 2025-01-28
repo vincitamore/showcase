@@ -227,7 +227,7 @@ To generate your preview image:
 - Analytics integration
 - X integration with OAuth authentication
 - Blog section with post composer
-- xAI Grok-2 chat integration
+- xAI Grok-2 chat integrations
 - PostgreSQL database setup
 - Chat streaming implementation
 - Animated chat UI with glow effects
