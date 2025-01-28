@@ -538,6 +538,9 @@ export function AnimatedChatInput() {
       // Add to local state (with all message properties)
       setLocalMessages(prev => [...prev, textMessage])
 
+      // Clear input immediately after sending
+      setInput?.('')
+
       // Send message
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -722,9 +725,6 @@ export function AnimatedChatInput() {
       console.error('[Chat Client] Failed to send text message:', error)
       throw error
     }
-
-    // Reset input
-    setInput?.('')
   }
 
   // Update localStorage handling
