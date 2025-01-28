@@ -29,16 +29,16 @@ export function MessageReactions({
   const [reactions, setReactions] = React.useState<MessageReaction[]>([
     { 
       emoji: (active: boolean) => active ? 
-        <Heart className="h-3 w-3 fill-red-500 text-red-500" /> : 
-        <Heart className="h-3 w-3" />,
+        <Heart className="h-3.5 w-3.5 sm:h-3 sm:w-3 fill-red-500 text-red-500" /> : 
+        <Heart className="h-3.5 w-3.5 sm:h-3 sm:w-3" />,
       count: currentMessageReactions.heart ? 1 : 0,
       active: currentMessageReactions.heart,
       type: 'heart' as const
     },
     { 
       emoji: (active: boolean) => active ? 
-        <ThumbsDown className="h-3 w-3 fill-foreground text-foreground" /> : 
-        <ThumbsDown className="h-3 w-3" />,
+        <ThumbsDown className="h-3.5 w-3.5 sm:h-3 sm:w-3 fill-foreground text-foreground" /> : 
+        <ThumbsDown className="h-3.5 w-3.5 sm:h-3 sm:w-3" />,
       count: currentMessageReactions.thumbsDown ? 1 : 0,
       active: currentMessageReactions.thumbsDown,
       type: 'thumbsDown' as const
@@ -75,8 +75,9 @@ export function MessageReactions({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        "flex gap-0.5 -mt-1",
-        isAssistant ? "justify-start" : "justify-end"
+        "flex gap-1 -mt-1",
+        isAssistant ? "justify-start" : "justify-end",
+        "touch-none select-none"
       )}
     >
       {reactions.map((reaction, index) => (
@@ -85,8 +86,10 @@ export function MessageReactions({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-6 w-6 rounded-full p-0 hover:bg-transparent",
-            !reaction.active && "text-muted-foreground/60 hover:text-muted-foreground"
+            "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
+            "hover:bg-primary/10 active:scale-95",
+            !reaction.active && "text-muted-foreground/60 hover:text-muted-foreground",
+            "transition-all duration-200"
           )}
           onClick={() => handleReaction(index)}
         >
@@ -97,7 +100,7 @@ export function MessageReactions({
             {reaction.emoji(reaction.active)}
             {reaction.count > 0 && (
               <span className={cn(
-                "text-xs",
+                "text-xs font-medium",
                 reaction.active && reaction.type === 'heart' && "text-red-500",
                 reaction.active && reaction.type === 'thumbsDown' && "text-foreground"
               )}>

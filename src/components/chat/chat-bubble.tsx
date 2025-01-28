@@ -66,7 +66,15 @@ export function ChatBubble({
         isAssistant ? "items-start" : "items-end"
       )}>
         <div className="relative flex items-start gap-2">
-          <div className="flex items-start pt-2 absolute -left-10">
+          <div className={cn(
+            "flex items-start pt-2",
+            "absolute",
+            isAssistant 
+              ? "sm:-left-10 -left-1 sm:translate-x-0 -translate-x-full" 
+              : "sm:-right-10 -right-1 sm:translate-x-0 translate-x-full left-auto",
+            "sm:opacity-0 group-hover:opacity-100 transition-opacity",
+            "z-10"
+          )}>
             <MessageActions 
               message={message} 
               isUser={!isAssistant}
@@ -89,7 +97,11 @@ export function ChatBubble({
                 <TypingIndicator />
               </div>
             )}
-            <div className="absolute -bottom-7 left-0">
+            <div className={cn(
+              "absolute -bottom-7",
+              isAssistant ? "left-0" : "right-0",
+              "sm:opacity-0 group-hover:opacity-100 transition-opacity"
+            )}>
               <MessageReactions 
                 isAssistant={isAssistant}
                 messageId={message.id}
@@ -105,6 +117,7 @@ export function ChatBubble({
         isOpen={isQuoteModalOpen}
         onClose={() => setIsQuoteModalOpen(false)}
         onQuote={handleQuote}
+        className="sm:max-w-2xl max-w-[95vw] w-full"
       />
     </motion.div>
   )

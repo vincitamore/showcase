@@ -29,7 +29,7 @@ export function AnimatedChatInput() {
             rounded-2xl
             border border-border/40"
         >
-          <div className="flex flex-col border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/90 rounded-t-2xl">
+          <div className="flex flex-col border-b bg-background/99 backdrop-blur supports-[backdrop-filter]:bg-background/90 rounded-t-2xl">
             <div className="flex items-center justify-between relative px-3 py-2 sm:px-4 sm:py-3">
               <DialogTitle className="text-base font-semibold">Chat History</DialogTitle>
               <DialogClose asChild>
