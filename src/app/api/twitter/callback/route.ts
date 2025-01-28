@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createTwitterClient, getBaseUrl } from '@/lib/twitter-client';
 import { APIError, handleAPIError } from '@/lib/api-error';
+import { logger, withLogging } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
+async function handleTwitterCallback(request: Request): Promise<Response> {
   const cookieStore = cookies();
   
   try {
@@ -17,7 +18,22 @@ export async function GET(request: Request) {
     const storedState = cookieStore.get('x_oauth_state')?.value;
     const codeVerifier = cookieStore.get('x_oauth_code_verifier')?.value;
     
+    logger.info('Processing OAuth callback', {
+      step: 'validate-params',
+      hasState: !!state,
+      hasCode: !!code,
+      hasStoredState: !!storedState,
+      hasCodeVerifier: !!codeVerifier
+    });
+    
     if (!state || !code || !storedState || !codeVerifier) {
+      logger.warn('Missing OAuth parameters', {
+        step: 'validation',
+        missingState: !state,
+        missingCode: !code,
+        missingStoredState: !storedState,
+        missingCodeVerifier: !codeVerifier
+      });
       throw new APIError(
         'Missing OAuth parameters',
         400,
@@ -26,12 +42,21 @@ export async function GET(request: Request) {
     }
     
     if (state !== storedState) {
+      logger.warn('Invalid OAuth state', {
+        step: 'validation',
+        expectedState: storedState,
+        receivedState: state
+      });
       throw new APIError(
         'Invalid OAuth state parameter',
         400,
         'INVALID_OAUTH_STATE'
       );
     }
+    
+    logger.debug('Cleaning up OAuth cookies', {
+      step: 'cleanup-cookies'
+    });
     
     // Clean up OAuth cookies regardless of outcome
     cookieStore.delete('x_oauth_state');
@@ -41,10 +66,22 @@ export async function GET(request: Request) {
     const baseUrl = getBaseUrl();
     
     try {
+      logger.info('Exchanging OAuth code for tokens', {
+        step: 'token-exchange',
+        redirectUri: `${baseUrl}/api/twitter/callback`
+      });
+
       const { accessToken, refreshToken } = await client.loginWithOAuth2({
         code,
         codeVerifier,
         redirectUri: `${baseUrl}/api/twitter/callback`,
+      });
+      
+      logger.debug('Setting auth cookies', {
+        step: 'set-cookies',
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken,
+        secure: process.env.NODE_ENV === 'production'
       });
       
       cookieStore.set('x_access_token', accessToken, {
@@ -65,6 +102,11 @@ export async function GET(request: Request) {
         });
       }
       
+      logger.info('Authentication successful', {
+        step: 'complete',
+        redirectTo: '/blog'
+      });
+      
       const response = NextResponse.redirect(new URL('/blog', request.url), {
         status: 302,
       });
@@ -73,6 +115,10 @@ export async function GET(request: Request) {
       
       return response;
     } catch (error) {
+      logger.error('Twitter OAuth login failed', {
+        step: 'token-exchange-error',
+        error
+      });
       throw new APIError(
         `Twitter OAuth login failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         500,
@@ -80,6 +126,11 @@ export async function GET(request: Request) {
       );
     }
   } catch (error) {
+    logger.error('OAuth callback failed', {
+      step: 'error',
+      error
+    });
+
     // Clean up OAuth cookies on error
     cookieStore.delete('x_oauth_state');
     cookieStore.delete('x_oauth_code_verifier');
@@ -89,6 +140,11 @@ export async function GET(request: Request) {
       ? error.message
       : 'Authentication failed';
       
+    logger.info('Redirecting to error page', {
+      step: 'error-redirect',
+      errorMessage
+    });
+
     const response = NextResponse.redirect(
       new URL(`/error?message=${encodeURIComponent(errorMessage)}`, request.url),
       { status: 302 }
@@ -98,4 +154,6 @@ export async function GET(request: Request) {
     
     return response;
   }
-} 
+}
+
+export const GET = withLogging(handleTwitterCallback, 'api/twitter/callback'); 
