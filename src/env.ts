@@ -3,11 +3,11 @@ import { z } from "zod"
 // Server-side environment variables
 const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url(),
+  DATABASE_URL: z.string().url().optional(),
+  DIRECT_URL: z.string().url().optional(),
   XAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  CRON_SECRET: z.string().min(1),
+  CRON_SECRET: z.string().min(1).optional(),
   TWITTER_API_KEY: z.string().min(1).optional(),
   TWITTER_API_SECRET: z.string().min(1).optional(),
   TWITTER_ACCESS_TOKEN: z.string().min(1).optional(),
@@ -15,14 +15,15 @@ const serverSchema = z.object({
   TWITTER_USERNAME: z.string().min(1).optional(),
 }).refine(
   (data) => {
-    if (data.NODE_ENV === "production") {
+    // Only enforce required variables on the server in production
+    if (typeof window === "undefined" && data.NODE_ENV === "production") {
       return !!(data.DATABASE_URL && data.DIRECT_URL && 
         (data.XAI_API_KEY || data.ANTHROPIC_API_KEY) && data.CRON_SECRET);
     }
     return true;
   },
   {
-    message: "Required environment variables missing in production"
+    message: "Required environment variables missing in production server environment"
   }
 );
 
