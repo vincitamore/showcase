@@ -6,36 +6,58 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 
 ## Features
 
-- Modern UI with shadcn/ui components
+- Modern UI with shadcn/ui components and Radix primitives
 - Theme system with Light/Dark/Dim modes
 - Interactive 3D card effects with smooth animations
 - Fully responsive design with mobile-first approach
 - Smooth scroll navigation with section highlighting
-- Dynamic image modals for project showcases
+- Dynamic project details modal with image galleries
+- Professional journey timeline with animations
 - Real-time form validation and submission
-- X (Twitter) Integration with OAuth authentication and cron-based tweet fetching
-- xAI Grok-2 powered chat interface with streaming responses
+- X (Twitter) Integration with OAuth2 authentication
+- Advanced AI chat interface powered by:
+  - xAI Grok-2
+  - Anthropic Claude 3.5 (Sonnet, Haiku)
+  - Anthropic Claude 3 Opus
+  - Features:
+    - Streaming responses
+    - Model switching
+    - Message actions and reactions
+    - Quote functionality
+    - Export options
+    - Markdown rendering with syntax highlighting
+    - Image understanding (Claude models)
 - Built with performance and accessibility in mind
-- Automated deployment via GitHub Actions and Vercel
-- Blob storage for tweet caching and management
+- Automated deployment via GitHub Actions
+- PostgreSQL database with optimized queries
 - Rate-limited API endpoints with fallback mechanisms
-- PostgreSQL database for chat history and system prompts
+- Temporary image storage with automatic cleanup
 
 ## Tech Stack
 
 - **Framework**: Next.js 14 with App Router
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui
 - **Database**: PostgreSQL with Prisma ORM
-- **AI Integration**: xAI SDK with Grok-2
-- **Runtime**: Node.js
-- **Animations**: Framer Motion & CSS transforms
-- **Theme Management**: next-themes
+- **UI Components**: 
+  - shadcn/ui with Radix primitives
+  - Tailwind CSS for styling
+  - Framer Motion for animations
+- **AI Integration**: 
+  - xAI SDK with Grok-2
+  - Anthropic SDK with Claude models
+  - AI SDK for streaming responses
+- **State Management**:
+  - React Server Components
+  - URL state with nuqs
+- **Authentication**: Next-Auth with OAuth2
 - **Email**: Nodemailer with SMTP
-- **Social**: X (Twitter) API v2
+- **Social**: Twitter API v2
+- **Media**: Sharp for image optimization
+- **Development**:
+  - ESLint for code quality
+  - Prettier for formatting
+  - TypeScript for type safety
 - **Analytics**: Vercel Analytics
-- **Storage**: Vercel Blob Storage
 - **Cron Jobs**: Vercel Cron
 - **Rate Limiting**: Database-backed with Prisma
 
@@ -43,17 +65,37 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 
 ```
 src/
-├── app/              # Next.js app directory
-│   ├── api/         # API routes for chat, form handling, and X auth
-│   └── og/          # OpenGraph image generation
-├── components/       # React components
-│   ├── ui/          # shadcn/ui components
-│   └── ...          # Custom components
-├── hooks/           # Custom React hooks
-├── lib/             # Utility functions and API clients
-└── middleware.ts    # Edge middleware for auth and rate limiting
-prisma/              # Database schema and migrations
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes for chat, auth, etc.
+│   ├── (auth)/           # Authentication related pages
+│   └── (main)/           # Main application pages
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   ├── chat/             # Chat interface components
+│   └── ...               # Feature-specific components
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility functions and configs
+│   ├── chat-config.ts    # Chat system configuration
+│   ├── utils.ts          # General utilities
+│   └── ...               # Other utilities
+├── types/                # TypeScript type definitions
+├── middleware/           # Edge middleware
+│   ├── auth.ts          # Authentication middleware
+│   └── ...              # Other middleware
+└── env.ts               # Environment variable validation
 ```
+
+Key directories and their purposes:
+
+- `app/`: Next.js App Router pages and API routes
+- `components/`: Reusable React components
+  - `ui/`: shadcn/ui component library
+  - `chat/`: Chat interface components
+  - Feature-specific components (blog, projects, etc.)
+- `hooks/`: Custom React hooks for shared logic
+- `lib/`: Utility functions and configurations
+- `types/`: TypeScript type definitions
+- `middleware/`: Edge middleware for auth and routing
 
 ## Getting Started
 
@@ -74,15 +116,15 @@ cp .env.local.example .env.local
 
 # Edit .env.local with your credentials:
 # Core Configuration
-NEXT_PUBLIC_URL=http://localhost:3000 # Change in production
-CRON_SECRET=your-cron-secret          # For authenticating cron jobs
+NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
 
 # Database Configuration
-DATABASE_URL=your-postgresql-url      # Main connection string
-DIRECT_URL=your-direct-db-url        # For Prisma migrations
+DATABASE_URL=your-turso-url              # Main connection string
+DIRECT_URL=your-direct-db-url           # For Prisma direct access
 
 # xAI Configuration
-XAI_API_KEY=your-xai-api-key         # For Grok-2 chat functionality
+XAI_API_KEY=your-xai-api-key            # For Grok-2 chat functionality
+XAI_MODEL_ID=grok-2-latest              # Model identifier
 
 # SMTP Configuration
 SMTP_HOST=your-smtp-host
@@ -93,8 +135,12 @@ SMTP_PASS=your-smtp-password
 # X (Twitter) API Configuration
 TWITTER_API_KEY=your-api-key
 TWITTER_API_SECRET=your-api-secret
+TWITTER_CLIENT_ID=your-oauth2-client-id
 TWITTER_USERNAME=your-username-without-@
 NEXT_PUBLIC_TWITTER_USERNAME=your-username-without-@
+
+# Storage Configuration
+BLOB_READ_WRITE_TOKEN=your-blob-token    # For Vercel Blob Storage
 ```
 
 4. Initialize the database:
@@ -171,18 +217,6 @@ The blog section integrates with X (formerly Twitter) to provide:
    - Secure cookie handling
    - Rate limiting and validation
 
-## OpenGraph Preview
-
-The site includes a built-in OpenGraph image preview tool at `/og`. This page allows you to:
-1. Preview your social sharing card in Light/Dark/Dim modes
-2. Customize the image in `src/components/og-image.tsx`
-3. Take a screenshot for social media platforms
-
-To generate your preview image:
-1. Visit `http://localhost:3000/og` in development
-2. Use browser dev tools to set viewport to 1200x630px (standard OG dimensions)
-3. Switch between themes to check appearance
-4. Use browser screenshot or a tool like [screely.com](https://www.screely.com) to capture
 
 ## Project Goals
 
@@ -220,28 +254,46 @@ To generate your preview image:
 - 3D card components with hover effects
 - Smooth scroll behavior
 - Skills section with interactive grid
-- Experience timeline
+- Professional journey timeline
 - Contact form with email integration
-- Project image modals
-- OpenGraph image generation
-- Analytics integration
-- X integration with OAuth authentication
+- Project details modal with image galleries
+- X integration with OAuth2 authentication
 - Blog section with post composer
-- xAI Grok-2 chat integrations
-- PostgreSQL database setup
-- Chat streaming implementation
-- Animated chat UI with glow effects
+- xAI Grok-2 chat integration with:
+  - Streaming responses
+  - Animated typewriter input
+  - Model switching
+  - Markdown rendering
+- Turso database setup
+- Edge middleware for auth and rate limiting
+- Blob storage integration
 
 ### In Progress
-- System prompt refinement
-- Error boundary implementation
-- Performance optimization
-- Rate limiting feedback
+- Chat system improvements:
+  - Context awareness
+  - System prompt refinement
+  - Error boundary implementation
+- Performance optimization:
+  - Image loading strategies
+  - Component code splitting
+  - Cache management
+- Analytics implementation:
+  - User interaction tracking
+  - Performance monitoring
+  - Error reporting
 
 ### Upcoming
-- Case studies for major projects
-- Advanced image optimization
+- Advanced chat features:
+  - Multi-model support
+  - Chat history management
+  - Export functionality
+- Enhanced blog features:
+  - Rich text editor
+  - Media embedding
+  - Draft system
 - Internationalization support
+- Advanced image optimization
+- Case studies for major projects
 
 ## License
 
@@ -266,21 +318,24 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Chat System Features
 
-The site includes an AI-powered chat system using xAI's Grok-2 model:
+The site includes an advanced AI-powered chat system with multi-model support:
 
-1. **Interactive Interface**
+1. **Model Integration**
+   - xAI Grok-2 for general queries
+   - Claude 3.5 Sonnet for balanced performance
+   - Claude 3.5 Haiku for fast responses
+   - Claude 3 Opus for complex tasks
+   - Per-model history tracking
+   - Provider-specific optimizations
+
+2. **Interactive Interface**
    - Animated chat input with typewriter effect
    - Real-time streaming responses
-   - Markdown rendering for formatted output
-   - Skill tag highlighting
-   - Chat history with dialog view
-
-2. **Backend Features**
-   - PostgreSQL database for chat storage
-   - Rate limiting with database tracking
-   - System prompt versioning
-   - Skill and context awareness
-   - Error handling and retry logic
+   - Model switching capability
+   - Message actions and reactions
+   - Quote and export functionality
+   - Markdown rendering with syntax highlighting
+   - Image understanding (Claude models)
 
 3. **Performance**
    - Streaming responses for fast interaction
@@ -293,3 +348,25 @@ The site includes an AI-powered chat system using xAI's Grok-2 model:
    - Input validation
    - Secure environment variable handling
    - Production-ready middleware
+
+## Twitter Integration
+
+The X (Twitter) integration provides:
+
+1. **Authentication**
+   - OAuth 2.0 flow
+   - Session management
+   - Token refresh handling
+   - CSRF protection
+
+2. **Content Management**
+   - Real-time tweet fetching
+   - Media handling
+   - Engagement metrics
+   - Responsive layouts
+
+3. **Security**
+   - Server-side token management
+   - Protected endpoints
+   - Rate limiting
+   - Validation
