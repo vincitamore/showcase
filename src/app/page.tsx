@@ -43,7 +43,7 @@ export default function Home() {
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-primary/[0.07] to-transparent" />
           
-          <div className="container relative mx-auto px-4 py-16 sm:py-24">
+          <div className="container relative mx-auto px-4 pt-8 sm:pt-8">
             <div className="text-center">
               {/* Logo */}
               <div className="mx-auto mb-6 h-14 w-14">

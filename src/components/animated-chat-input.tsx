@@ -1150,7 +1150,11 @@ export function AnimatedChatInput() {
           
           if (!includeAll) {
             if (includeHearted) {
-              messages = messages.filter((m: Message) => messageReactions[m.id]?.heart)
+              try {
+                messages = messages.filter((m: Message) => messageReactions[m.id]?.heart)
+              } catch (error) {
+                console.error('Error filtering hearted messages:', error)
+              }
             }
           }
           
@@ -1190,36 +1194,46 @@ export function AnimatedChatInput() {
     reader.onload = (e) => {
       try {
         const importedData = JSON.parse(e.target?.result as string)
+        let allMessages: Message[] = []
         
         // Handle both old and new format
         if (importedData.version === '2.0') {
           // New format with multiple models
           Object.entries(importedData.models).forEach(([modelId, data]: [string, any]) => {
             if (MODEL_CONFIGS[modelId]) { // Only import if model still exists
-              localStorage.setItem(`chatHistory-${modelId}`, JSON.stringify(data.messages))
+              const modelMessages = data.messages
+              localStorage.setItem(`chatHistory-${modelId}`, JSON.stringify(modelMessages))
+              allMessages = [...allMessages, ...modelMessages]
             }
           })
-          
-          // Refresh current model's messages
-          const currentModelMessages = importedData.models[selectedModel]?.messages || []
-          setLocalMessages(currentModelMessages)
         } else {
           // Old format - import as current model only
           if (Array.isArray(importedData.messages)) {
             localStorage.setItem(storageKey, JSON.stringify(importedData.messages))
-            setLocalMessages(importedData.messages)
+            allMessages = importedData.messages
           }
         }
+
+        // Update local messages with all imported messages
+        setLocalMessages(allMessages)
+
+        // Update model counts
+        const counts: Record<string, { total: number, hearted: number, thumbsDown: number }> = {}
+        Object.keys(MODEL_CONFIGS).forEach(modelId => {
+          const modelMessages = allMessages.filter(msg => msg.model === modelId)
+          counts[modelId] = {
+            total: modelMessages.length,
+            hearted: modelMessages.filter(m => messageReactions[m.id]?.heart).length,
+            thumbsDown: modelMessages.filter(m => messageReactions[m.id]?.thumbsDown).length
+          }
+        })
+        setModelCounts(counts)
       } catch (error) {
         console.error('Failed to import chat history:', error)
-        // You might want to show a toast notification here
       }
     }
     reader.readAsText(file)
-    // Reset the file input
-    if (event.target) {
-      event.target.value = ''
-    }
+    event.target.value = ''
   }
 
   // Add modelCounts declaration before ExportOptionsDialog
@@ -1316,73 +1330,71 @@ export function AnimatedChatInput() {
         </motion.div>
       </AnimatePresence>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog modal={false} open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent 
-          className="flex h-[80vh] max-h-[80vh] flex-col gap-0 p-0 sm:max-w-2xl"
-          style={{ isolation: 'isolate' }}
+          className="flex flex-col gap-0 p-0 data-[state=open]:duration-200
+            sm:max-w-2xl sm:rounded-lg overflow-hidden
+            h-[100dvh] sm:h-[80vh]
+            w-screen sm:w-full
+            fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]"
         >
-          <div 
-            className="flex items-center justify-between border-b px-4 py-2"
-            style={{ 
-              position: 'relative',
-              zIndex: 50 
-            }}
-          >
-            <div className="flex items-center gap-4">
-              <DialogTitle className="text-lg font-semibold">Chat History</DialogTitle>
-              <div 
-                style={{ 
-                  position: 'relative',
-                  zIndex: 51
-                }}
-              >
-                <ModelSwitcher 
-                  selectedModel={selectedModel}
-                  onModelChange={handleModelChange}
-                  variant="header"
-                />
+          <div className="flex flex-col border-b bg-background">
+            <div className="flex items-center justify-between px-4 py-3">
+              <DialogTitle className="text-base font-semibold">Chat History</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="sr-only">Import chat history</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportClick}
+                  disabled={localMessages.length === 0}
+                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="sr-only">Export chat history</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAlertOpen(true)}
+                  disabled={localMessages.length === 0}
+                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Clear history</span>
+                </Button>
+                <DialogClose asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-10 rounded-full p-0 hover:bg-accent"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
+                  </Button>
+                </DialogClose>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-8 w-8 rounded-full p-0 opacity-70 hover:opacity-100 hover:bg-primary/10 hover:text-primary"
-                title="Import chat history"
-              >
-                <Upload className="h-4 w-4" />
-                <span className="sr-only">Import chat history</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleExportClick}
-                disabled={localMessages.length === 0}
-                className="h-8 w-8 rounded-full p-0 opacity-70 hover:opacity-100 hover:bg-primary/10 hover:text-primary"
-                title="Export chat history"
-              >
-                <Download className="h-4 w-4" />
-                <span className="sr-only">Export chat history</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsAlertOpen(true)}
-                disabled={localMessages.length === 0}
-                className="h-8 w-8 rounded-full p-0 opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-                title="Clear chat history"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Clear history</span>
-              </Button>
-              <DialogClose className="h-6 w-6 rounded-md p-0 opacity-70 hover:opacity-100" />
+            <div className="border-t px-4 py-2 sm:border-none">
+              <ModelSwitcher 
+                selectedModel={selectedModel}
+                onModelChange={handleModelChange}
+                variant="header"
+              />
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto relative z-0">
-            <div className="mx-auto max-w-[600px] px-4">
-              <div className="space-y-6 py-4">
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-[600px] px-4 py-4">
+              <div className="space-y-4">
             {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
               <div className="text-center py-6 text-muted-foreground">
                 No chat history yet. Start a conversation!
