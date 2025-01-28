@@ -1339,38 +1339,9 @@ export function AnimatedChatInput() {
             fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]"
         >
           <div className="flex flex-col border-b bg-background">
-            <div className="flex items-center justify-between px-4 py-3">
-              <DialogTitle className="text-base font-semibold">Chat History</DialogTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
-                >
-                  <Upload className="h-4 w-4" />
-                  <span className="sr-only">Import chat history</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleExportClick}
-                  disabled={localMessages.length === 0}
-                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="sr-only">Export chat history</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsAlertOpen(true)}
-                  disabled={localMessages.length === 0}
-                  className="h-10 w-10 rounded-full p-0 hover:bg-accent"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Clear history</span>
-                </Button>
+            <div className="flex items-center justify-center relative px-4 py-3">
+              <DialogTitle className="text-base font-semibold absolute left-1/2 -translate-x-1/2">Chat History</DialogTitle>
+              <div className="flex items-center gap-2 ml-auto">
                 <DialogClose asChild>
                   <Button
                     variant="ghost"
@@ -1383,12 +1354,43 @@ export function AnimatedChatInput() {
                 </DialogClose>
               </div>
             </div>
-            <div className="border-t px-4 py-2 sm:border-none">
+            <div className="flex items-center justify-between border-t px-2 sm:px-4 py-2 sm:border-none">
               <ModelSwitcher 
                 selectedModel={selectedModel}
                 onModelChange={handleModelChange}
                 variant="header"
               />
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="sr-only">Import chat history</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportClick}
+                  disabled={localMessages.length === 0}
+                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="sr-only">Export chat history</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAlertOpen(true)}
+                  disabled={localMessages.length === 0}
+                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                >
+                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="sr-only">Clear history</span>
+                </Button>
+              </div>
             </div>
           </div>
           

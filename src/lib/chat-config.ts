@@ -15,7 +15,7 @@ export interface ModelConfig {
 }
 
 export const MODEL_CONFIGS: Record<string, ModelConfig> = {
-  'grok-2-vision-1212': {
+  'grok-2-latest': {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
