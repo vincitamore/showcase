@@ -9,6 +9,8 @@ import {
   updateRateLimit,
   MAX_TWEETS 
 } from '@/lib/tweet-storage';
+import { APIError, handleAPIError } from '@/lib/api-error';
+import { logger, withLogging } from '@/lib/logger';
 
 type TweetWithEntities = {
   id: string;
@@ -105,7 +107,7 @@ function convertToTweetV2(dbTweet: TweetWithEntities): TweetV2 {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 58 // Just under Vercel's 60s limit
 
-export async function GET(req: Request) {
+async function fetchTweetsHandler(req: Request): Promise<Response> {
   const startTime = Date.now();
   let cachedTweets: any[] = [];
   
@@ -113,21 +115,26 @@ export async function GET(req: Request) {
     // Verify cron secret
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
-      console.error('[Cron] Unauthorized request:', {
+      logger.error('Unauthorized cron request', {
         hasAuth: !!authHeader,
-        timestamp: new Date().toISOString(),
         step: 'auth-check'
       });
-      return new NextResponse('Unauthorized', { status: 401 });
+      return NextResponse.json(
+        { error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } },
+        { status: 401 }
+      );
     }
 
-    console.log('[Cron] Starting tweet fetch...', {
-      timestamp: new Date().toISOString(),
-      step: 'start'
-    });
+    logger.info('Starting tweet fetch', { step: 'start' });
 
     // Check cache first
-    const { tweets } = await getCachedTweets('current');
+    const { tweets } = await getCachedTweets('current').catch(error => {
+      logger.error('Failed to fetch cached tweets', {
+        step: 'cache-fetch',
+        error
+      });
+      throw new APIError('Failed to fetch cached tweets', 500, 'CACHE_ERROR');
+    });
     cachedTweets = tweets;
 
     // If we have enough recent tweets, skip the API call
@@ -137,11 +144,10 @@ export async function GET(req: Request) {
 
       // If cache is less than 15 minutes old, skip update
       if (cacheAge < FIFTEEN_MINUTES) {
-        console.log('[Cron] Using recent cache:', {
+        logger.info('Using recent cache', {
+          step: 'using-cache',
           tweetCount: cachedTweets.length,
-          cacheAgeMinutes: Math.floor(cacheAge / 60000),
-          timestamp: new Date().toISOString(),
-          step: 'using-cache'
+          cacheAgeMinutes: Math.floor(cacheAge / 60000)
         });
         return NextResponse.json({
           status: 'success',
@@ -152,30 +158,44 @@ export async function GET(req: Request) {
     }
 
     // Initialize Twitter client
-    const client = await getReadOnlyClient();
+    const client = await getReadOnlyClient().catch(error => {
+      logger.error('Failed to initialize Twitter client', {
+        step: 'client-init',
+        error
+      });
+      throw new APIError('Failed to initialize Twitter client', 500, 'TWITTER_CLIENT_ERROR');
+    });
     
     // Get user info for query
     const username = env.TWITTER_USERNAME?.replace('@', '');
     if (!username) {
-      console.error('[Cron] Twitter username not configured');
-      return new NextResponse('Twitter username not configured', { status: 500 });
+      logger.error('Twitter username not configured', {
+        step: 'config-check'
+      });
+      throw new APIError('Twitter username not configured', 500, 'CONFIG_ERROR');
     }
 
     const query = `from:${username} -is:retweet`;
 
     // Check if we can make the request
-    const canMakeReq = await canMakeRequest('tweets/search/recent');
+    const canMakeReq = await canMakeRequest('tweets/search/recent').catch(error => {
+      logger.error('Failed to check rate limit', {
+        step: 'rate-limit-check',
+        error
+      });
+      throw new APIError('Failed to check rate limit', 500, 'RATE_LIMIT_CHECK_ERROR');
+    });
+
     if (!canMakeReq) {
       const rateLimit = await getRateLimit('tweets/search/recent');
       const resetAt = new Date(rateLimit.resetAt);
       
-      console.log('[Twitter API] Rate limited, using cache:', {
+      logger.warn('Rate limited, using cache', {
+        step: 'rate-limited',
         endpoint: 'tweets/search/recent',
         resetAt: resetAt.toISOString(),
         remaining: rateLimit.remaining,
-        cachedTweetCount: cachedTweets.length,
-        timestamp: new Date().toISOString(),
-        step: 'rate-limited'
+        cachedTweetCount: cachedTweets.length
       });
 
       // Return cached tweets if available
@@ -191,11 +211,16 @@ export async function GET(req: Request) {
         });
       }
 
-      return NextResponse.json({
-        status: 'rate_limited',
-        resetAt: resetAt.toISOString(),
-        message: 'Rate limit exceeded, try again after reset time'
-      }, { status: 429 });
+      return NextResponse.json(
+        {
+          error: {
+            message: 'Rate limit exceeded',
+            code: 'RATE_LIMIT_EXCEEDED',
+            resetAt: resetAt.toISOString()
+          }
+        },
+        { status: 429 }
+      );
     }
 
     // Prepare search parameters
@@ -230,11 +255,10 @@ export async function GET(req: Request) {
     }
 
     // Make the API request
-    console.log('[Twitter API] Making search request:', {
+    logger.info('Making search request', {
+      step: 'search-start',
       query,
-      sinceId: searchParams.since_id,
-      timestamp: new Date().toISOString(),
-      step: 'search-start'
+      sinceId: searchParams.since_id
     });
 
     const response = await client.search(query, searchParams);
@@ -246,12 +270,11 @@ export async function GET(req: Request) {
 
       await updateRateLimit('tweets/search/recent', rateLimitReset, remainingRequests);
 
-      console.log('[Twitter API] Updated rate limits:', {
+      logger.debug('Updated rate limits', {
+        step: 'rate-limit-update',
         endpoint: 'tweets/search/recent',
         remaining: remainingRequests,
-        resetAt: rateLimitReset.toISOString(),
-        timestamp: new Date().toISOString(),
-        step: 'rate-limit-update'
+        resetAt: rateLimitReset.toISOString()
       });
     }
 
@@ -259,10 +282,9 @@ export async function GET(req: Request) {
     const newTweets = response.data.data;
     
     if (!newTweets?.length) {
-      console.log('[Twitter API] No new tweets found:', {
-        timestamp: new Date().toISOString(),
-        cachedCount: cachedTweets.length,
-        step: 'no-new-tweets'
+      logger.info('No new tweets found', {
+        step: 'no-new-tweets',
+        cachedCount: cachedTweets.length
       });
       
       return NextResponse.json({
@@ -273,10 +295,9 @@ export async function GET(req: Request) {
       });
     }
 
-    console.log('[Twitter API] Search complete:', {
-      newTweetCount: newTweets.length,
-      timestamp: new Date().toISOString(),
-      step: 'search-complete'
+    logger.info('Search complete', {
+      step: 'search-complete',
+      newTweetCount: newTweets.length
     });
 
     // Merge with existing tweets if needed
@@ -295,57 +316,36 @@ export async function GET(req: Request) {
     });
 
   } catch (error) {
-    console.error('[Cron] Error fetching tweets:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString()
+    logger.error('Error in tweet fetch', {
+      step: 'error',
+      error,
+      duration: Date.now() - startTime
     });
-
-    // Handle rate limit errors specifically
-    if (error instanceof ApiResponseError && error.code === 429) {
-      const resetAt = error.rateLimit?.reset 
-        ? new Date(parseInt(error.rateLimit.reset.toString()) * 1000)
-        : new Date(Date.now() + 15 * 60 * 1000); // Default to 15 minutes if no reset time
-
-      await updateRateLimit('tweets/search/recent', resetAt, 0);
-
-      // Return cached tweets if available
-      if (cachedTweets?.length > 0) {
-        return NextResponse.json({
-          status: 'success',
-          tweetCount: cachedTweets.length,
-          source: 'cache',
-          rateLimit: {
-            resetAt: resetAt.toISOString(),
-            message: 'Using cached tweets due to rate limit error'
+    
+    if (error instanceof APIError) {
+      return NextResponse.json(
+        {
+          error: {
+            message: error.message,
+            code: error.code
           }
-        });
-      }
+        },
+        { status: error.statusCode }
+      );
+    }
 
-      return NextResponse.json({
-        status: 'rate_limited',
-        resetAt: resetAt.toISOString(),
-        message: 'Rate limit exceeded from API response'
-      }, { status: 429 });
-    }
-    
-    // For other errors, return cached tweets if available
-    if (cachedTweets?.length > 0) {
-      return NextResponse.json({
-        status: 'success',
-        tweetCount: cachedTweets.length,
-        source: 'cache',
+    return NextResponse.json(
+      {
         error: {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          type: 'api_error'
+          message: 'Internal server error',
+          code: 'INTERNAL_SERVER_ERROR'
         }
-      });
-    }
-    
-    return NextResponse.json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+      },
+      { status: 500 }
+    );
   }
-} 
+}
+
+// Wrap the handler with logging and ensure it returns Response
+export const GET = withLogging(fetchTweetsHandler, 'api/cron/fetch-tweets'); 
 
