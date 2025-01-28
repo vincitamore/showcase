@@ -61,25 +61,25 @@ export function ExportOptionsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] w-[calc(100%-2rem)] mx-auto">
         <div className="flex items-center justify-between">
-          <DialogTitle className="text-lg font-semibold">Export Options</DialogTitle>
+          <DialogTitle className="text-base sm:text-lg font-semibold">Export Options</DialogTitle>
           <DialogClose asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full p-0 hover:bg-accent"
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-full p-0 hover:bg-accent"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span className="sr-only">Close</span>
             </Button>
           </DialogClose>
         </div>
         
-        <div className="space-y-6 py-4">
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium leading-none text-foreground/90">Message Filters</h4>
-            <div className="space-y-3">
+        <div className="space-y-4 sm:space-y-6 py-3 sm:py-4">
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className="text-xs sm:text-sm font-medium leading-none text-foreground/90">Message Filters</h4>
+            <div className="space-y-2 sm:space-y-3">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="includeAll"
@@ -88,10 +88,11 @@ export function ExportOptionsDialog({
                     setIncludeAll(checked)
                     if (checked) setIncludeHearted(false)
                   }}
+                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                 />
                 <Label 
                   htmlFor="includeAll" 
-                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-xs sm:text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Export all messages <span className="text-muted-foreground ml-1">({totalMessages})</span>
                 </Label>
@@ -104,10 +105,11 @@ export function ExportOptionsDialog({
                     setIncludeHearted(checked)
                     if (checked) setIncludeAll(false)
                   }}
+                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                 />
                 <Label 
                   htmlFor="includeHearted" 
-                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-xs sm:text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Only export hearted messages <span className="text-muted-foreground ml-1">({totalHearted})</span>
                 </Label>
@@ -117,10 +119,11 @@ export function ExportOptionsDialog({
                   id="excludeThumbsDown"
                   checked={excludeThumbsDown}
                   onCheckedChange={(checked: boolean) => setExcludeThumbsDown(checked)}
+                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                 />
                 <Label 
                   htmlFor="excludeThumbsDown" 
-                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  className="text-xs sm:text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Exclude thumbs down messages <span className="text-muted-foreground ml-1">({totalThumbsDown})</span>
                 </Label>
@@ -128,9 +131,9 @@ export function ExportOptionsDialog({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium leading-none text-foreground/90">Models to Export</h4>
-            <div className="space-y-3">
+          <div className="space-y-3 sm:space-y-4">
+            <h4 className="text-xs sm:text-sm font-medium leading-none text-foreground/90">Models to Export</h4>
+            <div className="space-y-2 sm:space-y-3">
               {Object.entries(MODEL_CONFIGS).map(([modelId, config]) => (
                 <div key={modelId} className="flex items-center space-x-2">
                   <Checkbox
@@ -143,10 +146,11 @@ export function ExportOptionsDialog({
                           : prev.filter(id => id !== modelId)
                       )
                     }}
+                    className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                   />
                   <Label 
                     htmlFor={`model-${modelId}`} 
-                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    className="text-xs sm:text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
                     {config.name} <span className="text-muted-foreground ml-1">({messageCounts[modelId]?.total || 0})</span>
                   </Label>
@@ -156,11 +160,12 @@ export function ExportOptionsDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button 
             variant="outline" 
             onClick={onClose}
             size="sm"
+            className="h-8 sm:h-9 text-xs sm:text-sm px-3"
           >
             Cancel
           </Button>
@@ -171,6 +176,7 @@ export function ExportOptionsDialog({
             }}
             disabled={selectedModels.length === 0}
             size="sm"
+            className="h-8 sm:h-9 text-xs sm:text-sm px-3"
           >
             Export
           </Button>

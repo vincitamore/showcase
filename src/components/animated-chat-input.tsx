@@ -1002,41 +1002,42 @@ export function AnimatedChatInput() {
       <Dialog modal={false} open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent 
           className="flex flex-col gap-0 p-0 data-[state=open]:duration-200
-            sm:max-w-2xl sm:rounded-lg overflow-hidden
-            h-[100dvh] sm:h-[80vh]
-            w-screen sm:w-full
-            fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]"
+            sm:max-w-2xl sm:rounded-2xl overflow-hidden
+            h-[95dvh] sm:h-[80vh]
+            w-[95vw] sm:w-full
+            fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%]
+            bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75"
         >
-          <div className="flex flex-col border-b bg-background">
-            <div className="flex items-center justify-center relative px-4 py-3">
-              <DialogTitle className="text-base font-semibold absolute left-1/2 -translate-x-1/2">Chat History</DialogTitle>
-              <div className="flex items-center gap-2 ml-auto">
-                <DialogClose asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 w-10 rounded-full p-0 hover:bg-accent"
-                  >
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                  </Button>
-                </DialogClose>
-              </div>
+          <div className="flex flex-col border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+            <div className="flex items-center justify-between relative px-3 py-2 sm:px-4 sm:py-3">
+              <DialogTitle className="text-base font-semibold">Chat History</DialogTitle>
+              <DialogClose asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full p-0 hover:bg-accent"
+                >
+                  <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="sr-only">Close</span>
+                </Button>
+              </DialogClose>
             </div>
-            <div className="flex items-center justify-between border-t px-2 sm:px-4 py-2 sm:border-none">
-              <ModelSwitcher 
-                selectedModel={selectedModel}
-                onModelChange={handleModelChange}
-                variant="header"
-              />
-              <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5 sm:px-4 sm:py-2">
+              <div className="flex-1 min-w-0">
+                <ModelSwitcher 
+                  selectedModel={selectedModel}
+                  onModelChange={handleModelChange}
+                  variant="compact"
+                />
+              </div>
+              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                  className="h-6 w-6 sm:h-7 sm:w-7 rounded-full p-0 hover:bg-accent"
                 >
-                  <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Upload className="h-3 w-3" />
                   <span className="sr-only">Import chat history</span>
                 </Button>
                 <Button
@@ -1044,9 +1045,9 @@ export function AnimatedChatInput() {
                   size="sm"
                   onClick={handleExportClick}
                   disabled={localMessages.length === 0}
-                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                  className="h-6 w-6 sm:h-7 sm:w-7 rounded-full p-0 hover:bg-accent"
                 >
-                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Download className="h-3 w-3" />
                   <span className="sr-only">Export chat history</span>
                 </Button>
                 <Button
@@ -1054,9 +1055,9 @@ export function AnimatedChatInput() {
                   size="sm"
                   onClick={() => setIsAlertOpen(true)}
                   disabled={localMessages.length === 0}
-                  className="h-8 w-8 sm:h-10 sm:w-10 rounded-full p-0 hover:bg-accent"
+                  className="h-6 w-6 sm:h-7 sm:w-7 rounded-full p-0 hover:bg-accent"
                 >
-                  <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Trash2 className="h-3 w-3" />
                   <span className="sr-only">Clear history</span>
                 </Button>
               </div>
@@ -1064,13 +1065,13 @@ export function AnimatedChatInput() {
           </div>
           
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-[600px] px-4 py-4">
-              <div className="space-y-4">
-            {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                No chat history yet. Start a conversation!
-              </div>
-            ) : (
+            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-4 sm:py-4">
+              <div className="space-y-3 sm:space-y-4">
+                {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No chat history yet. Start a conversation!
+                  </div>
+                ) : (
                   <AnimatePresence initial={false}>
                     {localMessages
                       .filter(msg => msg.model === selectedModel)
@@ -1087,11 +1088,11 @@ export function AnimatedChatInput() {
                   </AnimatePresence>
                 )}
                 <div ref={messagesEndRef} />
-                  </div>
-                  </div>
-                </div>
+              </div>
+            </div>
+          </div>
 
-          <div className="border-t p-4">
+          <div className="border-t p-3 sm:p-4">
             <div className="mx-auto max-w-[600px]">
               <ChatInput
                 input={input}
@@ -1102,7 +1103,7 @@ export function AnimatedChatInput() {
                 onImageRemove={handleImageRemove}
                 imagePreview={imagePreview}
               />
-              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -17,6 +17,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { MODEL_CONFIGS } from "@/lib/chat-config"
+import type { ModelConfig } from "@/lib/chat-config"
 
 const models = [
   {
@@ -38,12 +47,19 @@ const models = [
 
 export type ModelValue = typeof models[number]["value"]
 
-interface ModelSelectorProps {
+export interface ModelSelectorProps {
   value: ModelValue
   onValueChange: (value: ModelValue) => void
+  className?: string
+  triggerClassName?: string
 }
 
-export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
+export function ModelSelector({ 
+  value, 
+  onValueChange,
+  className,
+  triggerClassName
+}: ModelSelectorProps) {
   const [open, setOpen] = React.useState(false)
 
   return (
@@ -53,7 +69,7 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between text-xs"
+          className={cn("w-[200px] justify-between text-xs", triggerClassName)}
         >
           <span className="truncate">
             {value ? models.find((model) => model.value === value)?.label : "Select model..."}
@@ -62,7 +78,7 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[200px] p-0" 
+        className={cn("w-[200px] p-0", className)} 
         style={{ position: 'relative', zIndex: 99999 }}
         side="bottom" 
         sideOffset={4}
@@ -102,5 +118,27 @@ export function ModelSelector({ value, onValueChange }: ModelSelectorProps) {
         </Command>
       </PopoverContent>
     </Popover>
+  )
+}
+
+export function ModelSelectorCompact({ 
+  value, 
+  onValueChange,
+  className,
+  triggerClassName
+}: ModelSelectorProps) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className={cn("w-[180px]", className)}>
+        <SelectValue placeholder="Select a model" />
+      </SelectTrigger>
+      <SelectContent>
+        {Object.entries(MODEL_CONFIGS).map(([id, config]: [string, ModelConfig]) => (
+          <SelectItem key={id} value={id as ModelValue}>
+            {config.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 } 

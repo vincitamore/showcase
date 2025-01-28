@@ -74,11 +74,12 @@ export function ChatBubble({
             />
           </div>
           <div className={cn(
-            "relative group space-y-2 rounded-lg px-4 py-3",
+            "relative group space-y-2 rounded-2xl px-4 py-3",
             isAssistant 
-              ? "bg-muted text-foreground" 
-              : "bg-primary text-primary-foreground",
-            isAssistant ? "rounded-tl-none" : "rounded-tr-none"
+              ? "bg-card/95 text-card-foreground backdrop-blur-sm border border-border/5" 
+              : "bg-primary/70 text-primary-foreground dark:bg-primary/95",
+            isAssistant ? "rounded-tl-sm" : "rounded-tr-sm",
+            "shadow-sm hover:shadow-md transition-shadow duration-200"
           )}>
             <ReactMarkdown components={markdownComponents}>
               {messageContent}

@@ -2,19 +2,33 @@
 
 import * as React from "react"
 import { motion } from 'framer-motion'
-import { ModelSelector, type ModelValue } from "@/components/model-selector"
+import { MODEL_CONFIGS } from "@/lib/chat-config"
+import { ModelSelector } from "./model-selector"
+import type { ModelValue } from "./model-selector"
 
 interface ModelSwitcherProps {
   selectedModel: ModelValue
-  onModelChange: (value: ModelValue) => void
-  variant?: 'tagline' | 'header' | 'default'
+  onModelChange: (model: ModelValue) => void
+  variant?: 'default' | 'header' | 'tagline' | 'compact'
 }
 
-export function ModelSwitcher({ 
-  selectedModel, 
-  onModelChange,
-  variant = "default"
-}: ModelSwitcherProps) {
+export function ModelSwitcher({ selectedModel, onModelChange, variant = 'default' }: ModelSwitcherProps) {
+  const selectedConfig = MODEL_CONFIGS[selectedModel]
+
+  if (variant === 'compact') {
+    return (
+      <div className="flex items-center gap-1.5 text-sm">
+        <span className="text-muted-foreground">Model:</span>
+        <ModelSelector
+          value={selectedModel}
+          onValueChange={onModelChange}
+          className="h-7 px-2 text-sm font-medium"
+          triggerClassName="justify-between gap-1"
+        />
+      </div>
+    )
+  }
+
   if (variant === 'header') {
     return (
       <div className="flex items-center gap-2 px-2">
