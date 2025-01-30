@@ -16,7 +16,8 @@ function hashPassword(password: string, salt: string): string {
 export async function POST(req: Request) {
   try {
     // Check if monitoring is enabled
-    if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
+    if (!env.MONITORING_ENABLED) {
+      console.debug('Monitoring is disabled')
       return NextResponse.json(
         { error: 'Monitoring is disabled' },
         { status: 404 }
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
     // Set auth cookie
     cookies().set(COOKIE_NAME, hashedPassword, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE,
       path: '/'

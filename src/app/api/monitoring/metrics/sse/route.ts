@@ -373,12 +373,8 @@ export const runtime = 'nodejs'
 export const preferredRegion = 'iad1'
 
 export async function GET(req: Request) {
-  // Only log route calls in development
-  if (env.NODE_ENV === 'development') {
-    console.debug('SSE route called');
-  }
-
-  if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
+  // Check if monitoring is enabled
+  if (!env.MONITORING_ENABLED) {
     console.debug('Monitoring disabled');
     return new Response('Monitoring is disabled', { status: 404 });
   }
@@ -413,10 +409,6 @@ export async function GET(req: Request) {
             try {
               const message = formatSSEMessage(event, data);
               controller.enqueue(encoder.encode(message));
-              // Only log message types in development
-              if (env.NODE_ENV === 'development') {
-                console.debug(`Sent ${event} message`);
-              }
             } catch (error: unknown) {
               if (error instanceof Error && error.message.includes('Controller is already closed')) {
                 isConnected = false;
@@ -485,16 +477,12 @@ export async function GET(req: Request) {
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-store, no-transform',
+        'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        'Content-Encoding': 'none',
-        'Access-Control-Allow-Origin': '*',
-        'X-Accel-Buffering': 'no',
-        'retry': '1000' // Tell client to retry every second
-      }
+      },
     });
   } catch (error) {
-    console.error('Error setting up SSE stream:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    console.error('Error setting up SSE:', error);
+    return new Response('Failed to setup metrics stream', { status: 500 });
   }
 } 

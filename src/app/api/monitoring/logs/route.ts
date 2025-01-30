@@ -136,11 +136,10 @@ async function getLogs(query: LogsQuery) {
   }
 }
 
-export async function GET(req: Request): Promise<Response> {
-  console.debug('[Logs API] Received GET request:', req.url)
-
-  if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
-    console.debug('[Logs API] Monitoring disabled')
+export async function GET(req: Request) {
+  // Check if monitoring is enabled
+  if (!env.MONITORING_ENABLED) {
+    console.debug('Monitoring disabled')
     return new Response('Monitoring is disabled', { status: 404 })
   }
 
@@ -156,14 +155,7 @@ export async function GET(req: Request): Promise<Response> {
       offset: url.searchParams.get('offset') ? Math.max(0, parseInt(url.searchParams.get('offset')!)) : undefined
     }
 
-    console.debug('[Logs API] Parsed query parameters:', query)
-
     const [logs, total] = await getLogs(query)
-
-    console.debug('[Logs API] Sending response:', {
-      logCount: logs.length,
-      total
-    })
 
     return NextResponse.json({
       logs,
@@ -171,7 +163,7 @@ export async function GET(req: Request): Promise<Response> {
       query
     })
   } catch (error) {
-    console.error('[Logs API] Error handling request:', error)
+    console.error('Logs API error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
