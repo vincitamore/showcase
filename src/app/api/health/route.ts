@@ -4,7 +4,7 @@ import { APIError, handleAPIError } from '@/lib/api-error'
 import { logger, withLogging } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 interface HealthStatus {
   status: 'ok' | 'error'

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
 import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
+import { performance } from '@/lib/performance'
 
 interface UrlEntity {
   url: string
@@ -99,6 +100,7 @@ const BlogSection = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
 
   // Initialize Twitter embed script
   useTwitterEmbed()
@@ -140,42 +142,18 @@ const BlogSection = () => {
 
   const fetchCachedTweets = async () => {
     try {
-      console.log('Fetching cached tweets from API...');
+      performance.start('tweet_processing', { operation: 'fetch_tweets' });
       const response = await fetch('/api/twitter/tweets');
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to fetch cached tweets:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-        
-        toast({
-          title: "Error Loading Tweets",
-          description: errorData.error || "Failed to load tweets. Please try again later.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
       const data = await response.json();
-      
-      // Enhanced debug logging
-      console.log('Raw tweet response:', data);
-      
-      if (!data.tweets || !Array.isArray(data.tweets)) {
-        console.error('Invalid tweets data received:', data);
-        toast({
-          title: "Error",
-          description: "Received invalid tweet data. Please try again later.",
-          variant: "destructive",
-        });
+
+      if (!data.tweets?.length) {
+        performance.end('tweet_processing', { error: 'no_tweets' });
+        setError('No tweets available');
         return;
       }
-      
-      // Convert database tweets to TweetV2 format
-      const processedTweets = data.tweets.map((dbTweet: any) => {
+
+      // Process tweets
+      const processedTweets = await Promise.all(data.tweets.map(async (dbTweet: any) => {
         try {
           const publicMetrics = dbTweet.publicMetrics 
             ? (typeof dbTweet.publicMetrics === 'string' 
@@ -196,14 +174,6 @@ const BlogSection = () => {
                     : entity.metadata)
                 : {};
 
-              // Log entity processing for debugging
-              console.log('[Tweet Processing] Processing entity:', {
-                type: entity.type,
-                mediaKey: entity.mediaKey,
-                url: entity.url,
-                metadata: metadata
-              });
-
               return {
                 id: entity.id,
                 type: entity.type,
@@ -215,24 +185,13 @@ const BlogSection = () => {
                 metadata
               };
             } catch (entityError) {
-              console.error('Error processing entity:', { entity, error: entityError });
+              performance.end('tweet_processing', { 
+                error: 'entity_processing_error',
+                entityId: entity.id 
+              });
               return null;
             }
           }).filter(Boolean);
-
-          // Log processed entities
-          console.log('[Tweet Processing] Processed entities:', {
-            tweetId: dbTweet.id,
-            entityCount: entities?.length || 0,
-            mediaCount: entities?.filter((e: TweetEntity) => e.type === 'media').length || 0,
-            urlCount: entities?.filter((e: TweetEntity) => e.type === 'url').length || 0,
-            entities: entities?.map((e: TweetEntity) => ({
-              type: e.type,
-              text: e.text,
-              mediaKey: e.mediaKey,
-              url: e.url
-            }))
-          });
 
           return {
             id: dbTweet.id,
@@ -247,27 +206,23 @@ const BlogSection = () => {
             entities
           };
         } catch (tweetError) {
-          console.error('Error processing tweet:', { tweet: dbTweet, error: tweetError });
+          performance.end('tweet_processing', { 
+            error: 'tweet_processing_error',
+            tweetId: dbTweet.id 
+          });
           return null;
         }
-      }).filter(Boolean) as Tweet[];
-      
-      // Log the processed tweets
-      console.log('Processed tweets:', processedTweets.map((t: Tweet) => ({
-        id: t.id,
-        created_at: t.created_at,
-        metrics: t.public_metrics,
-        entityCounts: {
-          urls: t.entities?.filter(e => e.type === 'url').length || 0,
-          mentions: t.entities?.filter(e => e.type === 'mention').length || 0,
-          hashtags: t.entities?.filter(e => e.type === 'hashtag').length || 0,
-          media: t.entities?.filter(e => e.type === 'media').length || 0
-        }
-      })));
-      
-      setTweets(processedTweets);
+      }));
+
+      // Filter out null values and set tweets
+      const validTweets = processedTweets.filter(Boolean);
+      performance.end('tweet_processing', { 
+        processed_count: processedTweets.length,
+        valid_count: validTweets.length 
+      });
+      setTweets(validTweets);
     } catch (error) {
-      console.error('Error fetching cached tweets:', error);
+      performance.end('tweet_processing', { error: 1 });
       toast({
         title: "Error",
         description: "Failed to load tweets. Please try again later.",
@@ -597,70 +552,68 @@ const BlogSection = () => {
   const renderTweet = (tweet: Tweet) => {
     const entities = tweet.entities || [];
     
-    // Log entity processing
-    console.log('[Tweet Rendering] Processing tweet:', {
-      tweetId: tweet.id,
-      totalEntities: entities.length,
-      entityTypes: entities.map(e => e.type),
-      mediaEntities: entities.filter(e => e.type === 'media'),
-      urlEntities: entities.filter(e => e.type === 'url')
-    });
+    try {
+      // Get unique Twitter URLs for embedding
+      const twitterUrls = entities
+        .filter(e => e.type === 'url' && e.expandedUrl?.includes('twitter.com/'))
+        .reduce((acc: string[], entity) => {
+          const url = entity.expandedUrl;
+          if (url && !acc.includes(url)) acc.push(url);
+          return acc;
+        }, []);
 
-    // Get unique Twitter URLs for embedding
-    const twitterUrls = entities
-      .filter(e => e.type === 'url' && e.expandedUrl?.includes('twitter.com/'))
-      .reduce((acc: string[], entity) => {
-        const url = entity.expandedUrl;
-        if (url && !acc.includes(url)) acc.push(url);
-        return acc;
-      }, []);
+      // Only render one Twitter embed per tweet
+      const primaryTwitterUrl = twitterUrls[0];
 
-    // Only render one Twitter embed per tweet
-    const primaryTwitterUrl = twitterUrls[0];
-
-    return (
-      <div className="flex h-full flex-col justify-between gap-4">
-        <div className="space-y-4">
-          <div className="text-sm">
-            {renderTweetText(tweet.text, entities)}
-            {renderMedia(entities)}
-            {renderUrlPreviews(entities)}
-            {primaryTwitterUrl && (
-              <div 
-                key={`${tweet.id}-embed`}
-                className="mt-2 rounded-lg border border-border/50 overflow-hidden"
-              >
-                <blockquote 
-                  className="twitter-tweet" 
-                  data-conversation="none"
-                  data-theme="dark"
+      const result = (
+        <div className="flex h-full flex-col justify-between gap-4">
+          <div className="space-y-4">
+            <div className="text-sm">
+              {renderTweetText(tweet.text, entities)}
+              {renderMedia(entities)}
+              {renderUrlPreviews(entities)}
+              {primaryTwitterUrl && (
+                <div 
+                  key={`${tweet.id}-embed`}
+                  className="mt-2 rounded-lg border border-border/50 overflow-hidden"
                 >
-                  <a href={primaryTwitterUrl}></a>
-                </blockquote>
-              </div>
-            )}
+                  <blockquote 
+                    className="twitter-tweet" 
+                    data-conversation="none"
+                    data-theme="dark"
+                  >
+                    <a href={primaryTwitterUrl}></a>
+                  </blockquote>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <div>{formatDate(tweet.created_at)}</div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <Heart className="h-4 w-4" />
-              <span>{formatNumber(tweet.public_metrics?.like_count)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Repeat2 className="h-4 w-4" />
-              <span>{formatNumber(tweet.public_metrics?.retweet_count)}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <MessageCircle className="h-4 w-4" />
-              <span>{formatNumber(tweet.public_metrics?.reply_count)}</span>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>{formatDate(tweet.created_at)}</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                <span>{formatNumber(tweet.public_metrics?.like_count)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Repeat2 className="h-4 w-4" />
+                <span>{formatNumber(tweet.public_metrics?.retweet_count)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageCircle className="h-4 w-4" />
+                <span>{formatNumber(tweet.public_metrics?.reply_count)}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    );
+      );
+
+      return result;
+    } catch (error) {
+      console.error('Error rendering tweet:', error);
+      return null;
+    }
   };
 
   return (
@@ -719,90 +672,104 @@ const BlogSection = () => {
               dragFree: false
             }}
           >
-            {tweets.map((tweet, index) => (
-              <Card3D
-                key={tweet.id}
-                onClick={() => handleCardClick(tweet.id)}
-                className={cn(
-                  "group cursor-pointer",
-                  "p-3 sm:p-4",
-                  "mx-1.5",
-                  "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
-                  "max-w-[28rem]",
-                  "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300",
-                  "flex flex-col h-full"
-                )}
-                containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
-              >
-                <div className="flex flex-col h-full">
-                  {/* Header section with fixed height */}
-                  <div className="flex items-center justify-between h-10 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="relative w-8 h-8 shrink-0">
-                        <Image
-                          src={profileConfig.profileImage}
-                          alt={profileConfig.username}
-                          fill
-                          className="rounded-full object-cover"
-                          unoptimized
-                        />
-                      </div>
-                      <div className="flex flex-col justify-center min-w-0">
-                        <p className="font-medium text-sm leading-tight truncate">{profileConfig.displayName}</p>
-                        <p className="text-xs text-muted-foreground leading-tight truncate">@{profileConfig.username}</p>
-                      </div>
-                    </div>
-                    <span 
-                      className="text-primary hover:text-primary/80 transition-colors text-lg font-bold ml-2 shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCardClick(tweet.id)
-                      }}
-                    >
-                      𝕏
-                    </span>
-                  </div>
+            {(() => {
+              performance.start('tweet_rendering', { 
+                tweetCount: tweets.length,
+                operation: 'batch_render'
+              });
 
-                  {/* Content section with dynamic height */}
-                  <div className="flex-1 overflow-hidden">
-                    {renderTweet(tweet)}
-                    {tweet.referenced_tweets?.map((ref) => (
-                      <div 
-                        key={ref.id}
-                        className="mt-2 rounded-lg border border-border/50 overflow-hidden"
+              const renderedTweets = tweets.map((tweet, index) => (
+                <Card3D
+                  key={tweet.id}
+                  onClick={() => handleCardClick(tweet.id)}
+                  className={cn(
+                    "group cursor-pointer",
+                    "p-3 sm:p-4",
+                    "mx-1.5",
+                    "w-[calc(100vw-4rem)] sm:w-[calc(100vw-8rem)] md:w-[calc(85vw-8rem)] lg:w-[32rem]",
+                    "max-w-[28rem]",
+                    "backdrop-blur-sm bg-background/10 hover:bg-background/20 transition-all duration-300",
+                    "flex flex-col h-full"
+                  )}
+                  containerClassName="min-h-[12rem] sm:min-h-[14rem] rounded-lg sm:rounded-xl"
+                >
+                  <div className="flex flex-col h-full">
+                    {/* Header section with fixed height */}
+                    <div className="flex items-center justify-between h-10 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative w-8 h-8 shrink-0">
+                          <Image
+                            src={profileConfig.profileImage}
+                            alt={profileConfig.username}
+                            fill
+                            className="rounded-full object-cover"
+                            unoptimized
+                          />
+                        </div>
+                        <div className="flex flex-col justify-center min-w-0">
+                          <p className="font-medium text-sm leading-tight truncate">{profileConfig.displayName}</p>
+                          <p className="text-xs text-muted-foreground leading-tight truncate">@{profileConfig.username}</p>
+                        </div>
+                      </div>
+                      <span 
+                        className="text-primary hover:text-primary/80 transition-colors text-lg font-bold ml-2 shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCardClick(tweet.id)
+                        }}
                       >
-                        <blockquote 
-                          className="twitter-tweet" 
-                          data-conversation="none"
-                          data-theme="dark"
-                        >
-                          <a href={`https://twitter.com/x/status/${ref.id}`}></a>
-                        </blockquote>
-                      </div>
-                    ))}
-                  </div>
+                        𝕏
+                      </span>
+                    </div>
 
-                  {/* Footer section with fixed height */}
-                  <div className="h-8 mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5" /> {tweet.public_metrics?.like_count ?? 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageCircle className="h-3.5 w-3.5" /> {tweet.public_metrics?.reply_count ?? 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Repeat2 className="h-3.5 w-3.5" /> {tweet.public_metrics?.retweet_count ?? 0}
-                    </span>
-                    <time className="ml-auto text-[10px]">
-                      {tweet.created_at 
-                        ? new Date(tweet.created_at).toLocaleDateString()
-                        : 'Just now'
-                      }
-                    </time>
+                    {/* Content section with dynamic height */}
+                    <div className="flex-1 overflow-hidden">
+                      {renderTweet(tweet)}
+                      {tweet.referenced_tweets?.map((ref) => (
+                        <div 
+                          key={ref.id}
+                          className="mt-2 rounded-lg border border-border/50 overflow-hidden"
+                        >
+                          <blockquote 
+                            className="twitter-tweet" 
+                            data-conversation="none"
+                            data-theme="dark"
+                          >
+                            <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                          </blockquote>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Footer section with fixed height */}
+                    <div className="h-8 mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Heart className="h-3.5 w-3.5" /> {tweet.public_metrics?.like_count ?? 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MessageCircle className="h-3.5 w-3.5" /> {tweet.public_metrics?.reply_count ?? 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Repeat2 className="h-3.5 w-3.5" /> {tweet.public_metrics?.retweet_count ?? 0}
+                      </span>
+                      <time className="ml-auto text-[10px]">
+                        {tweet.created_at 
+                          ? new Date(tweet.created_at).toLocaleDateString()
+                          : 'Just now'
+                        }
+                      </time>
+                    </div>
                   </div>
-                </div>
-              </Card3D>
-            ))}
+                </Card3D>
+              ));
+
+              performance.end('tweet_rendering', {
+                tweetCount: tweets.length,
+                operation: 'batch_render'
+              });
+
+              return renderedTweets;
+            })()}
           </Carousel>
         </div>
       )}

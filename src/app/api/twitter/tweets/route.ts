@@ -8,6 +8,7 @@ import {
   SELECTED_TWEET_COUNT 
 } from '@/lib/tweet-storage'
 import type { Tweet, TweetEntity } from '@prisma/client'
+import { logger } from '@/lib/logger'
 
 // Define the Tweet type with entities
 type TweetWithEntities = Tweet & {
@@ -18,41 +19,29 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 10
 
-// Helper function to check if a tweet has entities with URLs
+// Helper function to check if a tweet has entities
 function hasTweetEntities(tweet: TweetV2): boolean {
-  // Log the full entities structure for debugging
-  console.log('[Twitter] Checking entities for tweet:', {
-    id: tweet.id,
-    hasEntities: !!tweet.entities,
-    entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
-    urlCount: tweet.entities?.urls?.length || 0,
-    fullEntities: tweet.entities
-  });
-
-  // Check for any type of entity, not just URLs
   if (!tweet.entities) return false;
 
-  // Check for various entity types that exist in TweetEntitiesV2
+  // Check for various entity types
   const hasUrls = !!tweet.entities.urls?.length;
   const hasMentions = !!tweet.entities.mentions?.length;
   const hasHashtags = !!tweet.entities.hashtags?.length;
   const hasAnnotations = !!tweet.entities.annotations?.length;
   const hasCashtags = !!tweet.entities.cashtags?.length;
 
-  const hasAnyEntity = hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
-
-  // Log detailed entity presence
-  console.log('[Twitter] Entity detection result:', {
-    id: tweet.id,
-    hasUrls,
-    hasMentions,
-    hasHashtags,
-    hasAnnotations,
-    hasCashtags,
-    hasAnyEntity
+  logger.debug('Tweet entity check', {
+    tweetId: tweet.id,
+    entities: {
+      urls: hasUrls,
+      mentions: hasMentions,
+      hashtags: hasHashtags,
+      annotations: hasAnnotations,
+      cashtags: hasCashtags
+    }
   });
 
-  return hasAnyEntity;
+  return hasUrls || hasMentions || hasHashtags || hasAnnotations || hasCashtags;
 }
 
 // Helper function to validate and clean tweet data
@@ -60,7 +49,7 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
   try {
     // Handle null/undefined
     if (!tweet) {
-      console.warn('[Twitter] Null or undefined tweet');
+      logger.warn('Null or undefined tweet');
       return null;
     }
 
@@ -80,8 +69,8 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
     };
 
     // Log the full tweet structure for debugging
-    console.log('[Twitter] Validating tweet:', {
-      id: tweet.id,
+    logger.debug('Validating tweet', {
+      tweetId: tweet.id,
       hasEntities: !!tweet.entities,
       entityTypes: tweet.entities ? Object.keys(tweet.entities) : [],
       fullTweet: tweet
@@ -89,8 +78,8 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
 
     // Ensure required fields exist
     if (!cleanTweet.id || !cleanTweet.text || !Array.isArray(cleanTweet.edit_history_tweet_ids)) {
-      console.warn('[Twitter] Invalid tweet structure:', {
-        id: tweet.id,
+      logger.warn('Invalid tweet structure', {
+        tweetId: tweet.id,
         hasText: !!tweet.text,
         hasEditHistory: Array.isArray(tweet.edit_history_tweet_ids)
       });
@@ -112,22 +101,22 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
             if (!isNaN(timestampDate.getTime())) {
               cleanTweet.created_at = timestampDate.toISOString();
             } else {
-              console.warn('[Twitter] Invalid date found in tweet:', {
-                id: tweet.id,
+              logger.warn('Invalid date found in tweet', {
+                tweetId: tweet.id,
                 date: tweet.created_at,
                 timestamp
               });
             }
           } else {
-            console.warn('[Twitter] Invalid date format in tweet:', {
-              id: tweet.id,
+            logger.warn('Invalid date format in tweet', {
+              tweetId: tweet.id,
               date: tweet.created_at
             });
           }
         }
       } catch (error) {
-        console.warn('[Twitter] Error parsing date for tweet:', {
-          id: tweet.id,
+        logger.warn('Error parsing date for tweet', {
+          tweetId: tweet.id,
           date: tweet.created_at,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -194,8 +183,8 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
         }
 
         // Log entity processing results
-        console.log('[Twitter] Processed entities:', {
-          id: tweet.id,
+        logger.debug('Processed entities', {
+          tweetId: tweet.id,
           entityTypes: Object.keys(entities),
           urlCount: entities.urls.length,
           mentionCount: entities.mentions.length,
@@ -204,8 +193,8 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
           cashtagCount: entities.cashtags.length
         });
       } catch (error) {
-        console.warn('[Twitter] Error processing entities:', {
-          id: tweet.id,
+        logger.warn('Error processing entities', {
+          tweetId: tweet.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
@@ -213,9 +202,9 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
 
     return cleanTweet;
   } catch (error) {
-    console.warn('[Twitter] Error validating tweet:', {
+    logger.warn('Error validating tweet', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      tweet: tweet?.id
+      tweetId: tweet?.id
     });
     return null;
   }
@@ -223,14 +212,14 @@ function validateTweet(tweet: TweetV2): TweetV2 | null {
 
 // Helper function to get random items from array with priority for tweets with entities
 function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
-  console.log('[Twitter Selection] Starting tweet selection:', {
+  logger.info('Starting tweet selection', {
     inputCount: array?.length,
     requestedCount: count,
     timestamp: new Date().toISOString()
   });
 
   if (!array?.length || count <= 0) {
-    console.warn('[Twitter Selection] Invalid input for getRandomItems:', {
+    logger.warn('Invalid input for getRandomItems', {
       arrayLength: array?.length,
       requestedCount: count
     });
@@ -242,28 +231,28 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
     .map(tweet => {
       const validated = validateTweet(tweet);
       if (!validated) {
-        console.log('[Twitter Selection] Tweet failed validation:', { id: tweet.id });
+        logger.info('Tweet failed validation', { tweetId: tweet.id });
       }
       return validated;
     })
     .filter((tweet): tweet is TweetV2 => tweet !== null);
 
-  console.log('[Twitter Selection] Validation results:', {
+  logger.info('Validation results', {
     inputCount: array.length,
     validCount: validTweets.length,
     invalidCount: array.length - validTweets.length
   });
 
   if (validTweets.length === 0) {
-    console.warn('[Twitter Selection] No valid tweets found after validation');
+    logger.warn('No valid tweets found after validation');
     return [];
   }
 
   // Separate tweets with and without entities
   const tweetsWithEntities = validTweets.filter(tweet => {
     const hasEntities = hasTweetEntities(tweet);
-    console.log('[Twitter Selection] Entity check:', {
-      id: tweet.id,
+    logger.debug('Entity check', {
+      tweetId: tweet.id,
       hasEntities,
       entityTypes: tweet.entities ? Object.keys(tweet.entities) : []
     });
@@ -271,7 +260,7 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   });
   const tweetsWithoutEntities = validTweets.filter(tweet => !hasTweetEntities(tweet));
   
-  console.log('[Twitter Selection] Tweet categorization:', {
+  logger.info('Tweet categorization', {
     totalValid: validTweets.length,
     withEntities: tweetsWithEntities.length,
     withoutEntities: tweetsWithoutEntities.length,
@@ -289,7 +278,7 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
   if (result.length < count) {
     const remaining = count - result.length;
     const additionalTweets = shuffledWithoutEntities.slice(0, remaining);
-    console.log('[Twitter Selection] Adding tweets without entities:', {
+    logger.info('Adding tweets without entities', {
       needed: remaining,
       available: shuffledWithoutEntities.length,
       adding: additionalTweets.length
@@ -297,7 +286,7 @@ function getRandomItems(array: TweetV2[], count: number): TweetV2[] {
     result.push(...additionalTweets);
   }
   
-  console.log('[Twitter Selection] Final selection:', {
+  logger.info('Final selection', {
     totalSelected: result.length,
     withEntities: result.filter(hasTweetEntities).length,
     withoutEntities: result.filter(t => !hasTweetEntities(t)).length,
@@ -314,96 +303,47 @@ function logStatus(message: string, data?: Record<string, unknown>) {
   const seconds = now.getSeconds().toString().padStart(2, '0');
   const timeString = `${hours}:${minutes}:${seconds}`;
   const dataString = data ? ` ${JSON.stringify(data)}` : '';
-  console.log(`[API ${timeString}] ${message}${dataString}`);
+  logger.info(`API ${timeString} ${message}${dataString}`);
 }
 
 export async function GET() {
-  console.log('[Twitter API] Starting tweet fetch:', {
-    timestamp: new Date().toISOString()
+  logger.info('Starting tweet fetch', {
+    route: 'api/twitter/tweets'
   });
 
   try {
     // First try to get selected tweets
     const selectedTweets = await getSelectedTweets();
-    console.log('[Twitter API] Selected tweets check:', {
-      hasSelected: !!selectedTweets,
-      count: selectedTweets?.length || 0,
-      ids: selectedTweets?.map((t: TweetV2) => t.id) || []
-    });
-
+    
     // Only use selected tweets if we have enough of them
     if (selectedTweets?.length === SELECTED_TWEET_COUNT) {
-      console.log('[Twitter API] Using selected tweets:', {
+      logger.info('Using selected tweets', {
         count: selectedTweets.length,
-        ids: selectedTweets.map((t: TweetV2) => t.id)
+        tweetIds: selectedTweets.map((t: TweetV2) => t.id)
       });
       return NextResponse.json({ tweets: selectedTweets });
     }
 
     // If no selected tweets or not enough, get all available tweets
     const cachedTweets = await getCachedTweets();
-    console.log('[Twitter API] Cache check:', {
-      hasCached: !!cachedTweets?.tweets,
-      count: cachedTweets?.tweets?.length || 0,
-      ids: cachedTweets?.tweets?.map((t: TweetWithEntities) => t.id) || []
-    });
-
+    
     if (!cachedTweets?.tweets?.length) {
-      console.warn('[Twitter API] No cached tweets found');
+      logger.warn('No cached tweets available', {
+        route: 'api/twitter/tweets'
+      });
       return NextResponse.json({ tweets: [] });
     }
 
-    // Get random tweets from the cache, prioritizing those with entities
-    const tweetsWithEntities = (cachedTweets.tweets as TweetWithEntities[]).filter((tweet) => 
-      tweet.entities?.some((e: TweetEntity) => e.type === 'url' || e.type === 'media')
-    );
-
-    console.log('[Twitter API] Entity filtering:', {
-      total: cachedTweets.tweets.length,
-      withEntities: tweetsWithEntities.length,
-      timestamp: new Date().toISOString()
+    logger.info('Using cached tweets', {
+      count: cachedTweets.tweets.length,
+      tweetIds: cachedTweets.tweets.map((t: TweetWithEntities) => t.id)
     });
 
-    // Use tweets with entities if we have enough, otherwise use all tweets
-    const tweetPool = tweetsWithEntities.length >= SELECTED_TWEET_COUNT 
-      ? tweetsWithEntities 
-      : (cachedTweets.tweets as TweetWithEntities[]);
-
-    // Randomly select tweets
-    const selectedIds: string[] = [];
-    // Filter out any undefined or null IDs and explicitly type as string[]
-    const availableIds: string[] = tweetPool
-      .map((t) => t.id)
-      .filter((id): id is string => typeof id === 'string');
-    
-    while (selectedIds.length < SELECTED_TWEET_COUNT && availableIds.length > 0) {
-      const randomIndex = Math.floor(Math.random() * availableIds.length);
-      // Since we filtered for non-null strings above, this access is safe
-      const selectedId: string = availableIds[randomIndex]!;
-      selectedIds.push(selectedId);
-      availableIds.splice(randomIndex, 1);
-    }
-
-    const selectedFromCache = tweetPool.filter((t) => selectedIds.includes(t.id));
-    
-    console.log('[Twitter API] Cache selection complete:', {
-      totalCached: cachedTweets.tweets.length,
-      withEntities: tweetsWithEntities.length,
-      selected: selectedFromCache.length,
-      ids: selectedFromCache.map((t) => t.id)
-    });
-
-    // Update selected tweets with our new selection if we have enough
-    if (selectedFromCache.length === SELECTED_TWEET_COUNT) {
-      await updateSelectedTweets(selectedFromCache.map((t) => t.id));
-      console.log('[Twitter API] Updated selected tweets cache');
-    }
-
-    return NextResponse.json({ tweets: selectedFromCache });
+    return NextResponse.json({ tweets: cachedTweets.tweets });
   } catch (error) {
-    console.error('[Twitter API] Error getting tweets:', {
+    logger.error('Failed to fetch tweets', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      route: 'api/twitter/tweets'
     });
     return NextResponse.json({ tweets: [] });
   }
@@ -414,7 +354,9 @@ export async function POST(req: Request) {
     const accessToken = cookies().get('x_access_token')?.value;
     
     if (!accessToken) {
-      logStatus('Missing access token');
+      logger.warn('Missing access token for tweet post', {
+        route: 'api/twitter/tweets'
+      });
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -424,7 +366,9 @@ export async function POST(req: Request) {
     const { text } = await req.json();
     
     if (!text?.trim()) {
-      logStatus('Missing tweet text');
+      logger.warn('Missing tweet text', {
+        route: 'api/twitter/tweets'
+      });
       return NextResponse.json(
         { error: 'Message is required' },
         { status: 400 }
@@ -433,11 +377,18 @@ export async function POST(req: Request) {
 
     const client = new TwitterApi(accessToken);
     const tweet = await client.v2.tweet(text);
-    logStatus('Tweet posted', { id: tweet.data.id });
+    
+    logger.info('Tweet posted successfully', {
+      tweetId: tweet.data.id,
+      route: 'api/twitter/tweets'
+    });
+    
     return NextResponse.json(tweet);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logStatus('Error posting tweet', { error: errorMessage });
+    logger.error('Failed to post tweet', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      route: 'api/twitter/tweets'
+    });
     return NextResponse.json(
       { error: 'Failed to post tweet' },
       { status: 500 }

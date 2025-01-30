@@ -20,6 +20,11 @@ const serverSchema = z.object({
   // Security
   CRON_SECRET: z.string().min(1).optional(),
   
+  // Monitoring Auth
+  MONITORING_USERNAME: z.string().min(1).optional(),
+  MONITORING_PASSWORD_HASH: z.string().min(64).optional(), // SHA-256 hash
+  MONITORING_AUTH_SALT: z.string().min(1).optional(),
+  
   // Twitter Integration
   TWITTER_API_KEY: z.string().min(1).optional(),
   TWITTER_API_SECRET: z.string().min(1).optional(),
@@ -62,6 +67,30 @@ const serverSchema = z.object({
         path: ["XAI_API_KEY"]
       });
     }
+    // Require monitoring auth in production if monitoring is enabled
+    if (data.MONITORING_ENABLED) {
+      if (!data.MONITORING_USERNAME) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MONITORING_USERNAME is required when monitoring is enabled in production",
+          path: ["MONITORING_USERNAME"]
+        });
+      }
+      if (!data.MONITORING_PASSWORD_HASH) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MONITORING_PASSWORD_HASH is required when monitoring is enabled in production",
+          path: ["MONITORING_PASSWORD_HASH"]
+        });
+      }
+      if (!data.MONITORING_AUTH_SALT) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MONITORING_AUTH_SALT is required when monitoring is enabled in production",
+          path: ["MONITORING_AUTH_SALT"]
+        });
+      }
+    }
   }
 });
 
@@ -91,6 +120,11 @@ const processEnv = {
   
   // Security
   CRON_SECRET: process.env.CRON_SECRET,
+  
+  // Monitoring Auth
+  MONITORING_USERNAME: process.env.MONITORING_USERNAME,
+  MONITORING_PASSWORD_HASH: process.env.MONITORING_PASSWORD_HASH,
+  MONITORING_AUTH_SALT: process.env.MONITORING_AUTH_SALT,
   
   // Twitter Integration
   TWITTER_API_KEY: process.env.TWITTER_API_KEY,

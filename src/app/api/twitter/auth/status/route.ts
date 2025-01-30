@@ -5,7 +5,7 @@ import { logger, withLogging } from '@/lib/logger'
 
 // Mark route as dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 async function handleAuthStatus(request: Request): Promise<Response> {
   try {

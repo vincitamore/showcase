@@ -4,8 +4,8 @@ import { env } from '@/env'
 export class APIError extends Error {
   constructor(
     message: string,
-    public readonly statusCode: number = 500,
-    public readonly code: string = 'INTERNAL_SERVER_ERROR'
+    public statusCode: number,
+    public code: string
   ) {
     super(message)
     this.name = 'APIError'

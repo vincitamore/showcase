@@ -3,6 +3,8 @@ import { env } from '@/env'
 import { prisma } from '@/lib/db'
 import { checkRateLimit, getRateLimitInfo } from '@/lib/rate-limit'
 import { APIError, handleAPIError } from '@/lib/api-error'
+import { logger, withLogging } from '@/lib/logger'
+import { serverPerformance } from '@/lib/server/performance'
 import { 
   MODEL_CONFIGS,
   getSystemPrompt,
@@ -39,17 +41,33 @@ const anthropic = createAnthropic({
 })
 
 // Add debug logging for Anthropic requests
-function logAnthropicRequest(messages: AnthropicMessage[], model: string) {
-  console.log('[Chat API] Anthropic request details:', {
-    model,
-    messageCount: messages.length,
-    messages: messages.map(m => ({
-      role: m.role,
-      contentPreview: JSON.stringify(m.content).slice(0, 100)
-    })),
-    headers: {
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json'
+async function logAnthropicRequest(messages: AnthropicMessage[], model: string, startTime: number) {
+  const duration = Date.now() - startTime
+  await logger.info('Anthropic API request', {
+    metrics: {
+      duration,
+      labels: {
+        type: 'external',
+        service: 'anthropic',
+        model,
+        error: 0
+      }
+    }
+  })
+}
+
+// Add error logging for Anthropic requests
+async function logAnthropicError(error: any, model: string, startTime: number) {
+  const duration = Date.now() - startTime
+  await logger.error('Anthropic API error', {
+    metrics: {
+      duration,
+      labels: {
+        type: 'external',
+        service: 'anthropic',
+        model,
+        error: 1
+      }
     }
   })
 }
@@ -179,11 +197,29 @@ async function listAnthropicModels() {
   }
 }
 
-// Wrap the original POST handler with error handling
-export async function POST(req: Request) {
+// Wrap the original POST handler with error handling and logging
+export const POST = withLogging(async function handleChat(req: Request) {
+  const startTime = Date.now()
+  const route = '/api/chat'
+  const requestId = crypto.randomUUID()
+
   try {
-    console.log('----------------------------------------')
-    console.log('[Chat API] Starting request processing')
+    // Track the API request at the start
+    await logger.info('API request started', {
+      metrics: {
+        labels: {
+          type: 'route',
+          route,
+          method: 'POST',
+          error: 0
+        }
+      },
+      route,
+      method: 'POST',
+      requestId
+    })
+
+    const url = new URL(req.url)
     
     // Get client IP for rate limiting
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown'
@@ -260,7 +296,7 @@ export async function POST(req: Request) {
         ...messages.map(toAnthropicMessage)
       ]
 
-      logAnthropicRequest(formattedMessages, model)
+      logAnthropicRequest(formattedMessages, model, startTime)
     } else {
       // Format for xAI/Grok
       console.log('[Chat API] Formatting messages for Grok')
@@ -292,67 +328,127 @@ export async function POST(req: Request) {
       } : {}
     })
 
-    // Create the stream with provider-specific options
-    const aiStream = await streamText({
-      model: providerInstance,
-      messages: formattedMessages,
-      ...(modelConfig?.provider === 'anthropic' ? {
-        maxTokens: 4096,
-        temperature: 0.7,
-        stream: true
-      } : {})
-    })
+    try {
+      // Create the stream with provider-specific options
+      const streamPromise = streamText({
+        model: providerInstance,
+        messages: formattedMessages,
+        ...(modelConfig?.provider === 'anthropic' ? {
+          maxTokens: 4096,
+          temperature: 0.7,
+          stream: true
+        } : {})
+      })
 
-    // Convert AI SDK stream to web stream
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = aiStream.toDataStreamResponse().body?.getReader()
-        if (!reader) {
-          controller.error(new Error('No reader available'))
-          return
+      // Track the external API call
+      const stream = await serverPerformance.trackExternalCall(
+        'anthropic',
+        Promise.resolve(streamPromise),
+        {
+          model,
+          messageCount: messages.length,
+          route,
+          requestId
         }
+      )
 
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) {
-              controller.close()
-              break
-            }
-
-            // Log raw value before any processing
-            console.log('[Chat API] Raw stream value:', {
-              raw: value,
-              decoded: new TextDecoder().decode(value),
-              byteLength: value.byteLength
-            })
-
-            // Pass through raw value without processing
-            controller.enqueue(value)
+      // Log successful API request completion
+      const duration = Date.now() - startTime
+      await logger.info('API request completed', {
+        metrics: {
+          duration,
+          labels: {
+            type: 'route',
+            route,
+            method: 'POST',
+            error: 0,
+            status: 200
           }
-        } catch (error: any) {
-          console.error('[Chat API] Stream processing error:', {
-            error: error.message,
-            stack: error.stack,
-            type: error?.constructor?.name,
-            timestamp: new Date().toISOString()
-          })
-          controller.error(error)
-        }
-      }
-    })
+        },
+        route,
+        method: 'POST',
+        status: 200,
+        requestId,
+        duration
+      })
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'Transfer-Encoding': 'chunked',
-        'X-Accel-Buffering': 'no'
-      },
-    })
+      // Convert AI SDK stream to web stream
+      const webStream = new ReadableStream({
+        async start(controller) {
+          const reader = (stream as any).toDataStreamResponse().body?.getReader()
+          if (!reader) {
+            controller.error(new Error('No reader available'))
+            return
+          }
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              controller.enqueue(value)
+            }
+            controller.close()
+          } catch (error) {
+            controller.error(error)
+          }
+        }
+      })
+
+      return new Response(webStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          'Connection': 'keep-alive',
+          'Transfer-Encoding': 'chunked',
+          'X-Accel-Buffering': 'no'
+        },
+      })
+
+    } catch (error) {
+      // Log API request error
+      const duration = Date.now() - startTime
+      await logger.error('API request failed', {
+        metrics: {
+          duration,
+          labels: {
+            type: 'route',
+            route,
+            method: 'POST',
+            error: 1,
+            status: 500
+          }
+        },
+        route,
+        method: 'POST',
+        status: 500,
+        requestId,
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+      throw error
+    }
 
   } catch (error) {
+    // Log final error if not already logged
+    const duration = Date.now() - startTime
+    await logger.error('API request failed', {
+      metrics: {
+        duration,
+        labels: {
+          type: 'route',
+          route,
+          method: 'POST',
+          error: 1,
+          status: error instanceof APIError ? error.statusCode : 500
+        }
+      },
+      route,
+      method: 'POST',
+      status: error instanceof APIError ? error.statusCode : 500,
+      requestId,
+      duration,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
     return handleAPIError(error)
   }
-} 
+}, 'api/chat') 

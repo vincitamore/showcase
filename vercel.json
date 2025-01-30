@@ -5,9 +5,15 @@
       "maxDuration": 60
     }
   },
-  "crons": [{
-    "path": "/api/cron/fetch-tweets",
-    "schedule": "*/5 * * * *"
-  }],
+  "crons": [
+    {
+      "path": "/api/cron/fetch-tweets",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/rotate-logs",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "buildCommand": "next build"
 } 

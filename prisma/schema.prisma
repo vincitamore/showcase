@@ -121,3 +121,35 @@ model TempImage {
 
   @@index([expiresAt])
 }
+
+model Log {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  level     String   @default("info")
+  message   String
+  duration  Int?
+  error     Boolean  @default(false)
+  route     String?
+  method    String?
+  status    Int?
+  metadata  Json?
+
+  @@index([timestamp])
+  @@index([route])
+  @@index([level])
+}
+
+model DatabaseMetric {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  duration  Int
+  query     String?
+  error     Boolean  @default(false)
+  route     String?
+  method    String?
+  status    Int?
+  metadata  Json?
+
+  @@index([timestamp(sort: Desc)])
+  @@map("database_metrics")
+}
