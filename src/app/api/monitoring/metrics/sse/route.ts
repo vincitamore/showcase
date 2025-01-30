@@ -374,11 +374,11 @@ export const preferredRegion = 'iad1'
 
 export async function GET(req: Request) {
   // Only log route calls in development
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     console.debug('SSE route called');
   }
 
-  if (!env.MONITORING_ENABLED && process.env.NODE_ENV !== 'development') {
+  if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
     console.debug('Monitoring disabled');
     return new Response('Monitoring is disabled', { status: 404 });
   }
