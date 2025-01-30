@@ -142,7 +142,7 @@ async function getMetrics(timeWindow: number) {
   const startTime = new Date(Date.now() - timeWindow)
 
   // Only log metrics query params in development
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     console.debug('Querying metrics:', {
       timeWindow: `${timeWindow / 1000}s`,
       startTime: startTime.toISOString()
@@ -181,7 +181,7 @@ async function getMetrics(timeWindow: number) {
   ]);
 
   // Only log summary of found data
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     console.debug('Found data:', {
       logs: {
         total: logs.length,
@@ -274,7 +274,7 @@ async function getMetrics(timeWindow: number) {
         if (isError) externalErrors++;
       }
     } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
+      if (env.NODE_ENV === 'development') {
         console.error('Error processing log entry:', error, {
           logId: log.id,
           timestamp: log.timestamp
@@ -322,7 +322,7 @@ async function getMetrics(timeWindow: number) {
     }))
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
-  if (process.env.NODE_ENV === 'development') {
+  if (env.NODE_ENV === 'development') {
     console.debug('Metrics summary:', {
       requests: totalRequests,
       dbQueries: dbMetrics.length,
@@ -414,7 +414,7 @@ export async function GET(req: Request) {
               const message = formatSSEMessage(event, data);
               controller.enqueue(encoder.encode(message));
               // Only log message types in development
-              if (process.env.NODE_ENV === 'development') {
+              if (env.NODE_ENV === 'development') {
                 console.debug(`Sent ${event} message`);
               }
             } catch (error: unknown) {

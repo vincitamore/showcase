@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export const env = createEnv({
   server: {
-    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    NODE_ENV: z.enum(['development', 'test', 'production']),
     DATABASE_URL: z.string().url(),
     DIRECT_URL: z.string().url(),
     XAI_API_KEY: z.string(),
@@ -14,15 +14,15 @@ export const env = createEnv({
     TWITTER_ACCESS_TOKEN: z.string().optional(),
     TWITTER_ACCESS_SECRET: z.string().optional(),
     TWITTER_USERNAME: z.string().optional(),
-    MONITORING_USERNAME: z.string(),
-    MONITORING_PASSWORD_HASH: z.string(),
-    MONITORING_AUTH_SALT: z.string(),
-    MONITORING_ENABLED: z.boolean().default(false),
+    MONITORING_USERNAME: z.string().min(1),
+    MONITORING_PASSWORD_HASH: z.string().min(64), // SHA-256 hash
+    MONITORING_AUTH_SALT: z.string().min(32),
+    MONITORING_ENABLED: z.coerce.boolean().default(false),
   },
   client: {
     NEXT_PUBLIC_URL: z.string().url(),
     NEXT_PUBLIC_TWITTER_USERNAME: z.string().optional(),
-    NEXT_PUBLIC_MONITORING_ENABLED: z.boolean().default(false),
+    NEXT_PUBLIC_MONITORING_ENABLED: z.coerce.boolean().default(false),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -44,4 +44,6 @@ export const env = createEnv({
     MONITORING_ENABLED: process.env.MONITORING_ENABLED === 'true',
     NEXT_PUBLIC_MONITORING_ENABLED: process.env.MONITORING_ENABLED === 'true',
   },
+  skipValidation: process.env.SKIP_ENV_VALIDATION === 'true',
+  emptyStringAsUndefined: true,
 }) 
