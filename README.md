@@ -1,6 +1,4 @@
 # Portfolio Showcase
-> [!CAUTION]
-> This site is a work in progress and the Readme is hit or miss as to the actual state of things right now. Once I get a last few things sorted out I will come back and fix this
 
 A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/ui. This project serves as both a showcase of work and a demonstration of modern web development practices.
 
@@ -69,16 +67,19 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
 - **Cron Jobs**: Vercel Cron
 - **Rate Limiting**: Database-backed with Prisma
 - **Monitoring & Logging**:
+  - Real-time performance dashboard with:
+    - API request metrics and response times
+    - Route performance analysis
+    - Database query monitoring
+    - External service tracking
+    - Memory usage statistics
+    - Log level distribution
   - Structured logging with metadata
   - Performance metrics tracking
   - Service health monitoring
   - Error tracking and reporting
   - Rate limit monitoring
-- **Error Handling**:
-  - Error boundaries for UI components
-  - Centralized API error handling
-  - Fallback UI components
-  - Type-safe error responses
+  - Secure authentication for monitoring access
 
 ## Project Structure
 
@@ -89,40 +90,64 @@ src/
 │   │   ├── chat/         # Chat system endpoints
 │   │   ├── twitter/      # Twitter integration endpoints
 │   │   ├── images/       # Image handling endpoints
+│   │   ├── monitoring/   # Monitoring system endpoints
+│   │   │   ├── auth/     # Authentication endpoints
+│   │   │   ├── logs/     # Log retrieval endpoints
+│   │   │   └── metrics/  # Performance metrics endpoints
 │   │   ├── health/       # Health check endpoint
 │   │   └── contact/      # Contact form endpoint
+│   ├── monitoring/       # Monitoring dashboard pages
+│   │   ├── components/   # Monitoring-specific components
+│   │   │   └── metrics/  # Individual metric visualizations
+│   │   ├── login/        # Monitoring auth pages
+│   │   └── logs/         # Log viewer pages
 │   ├── (auth)/           # Authentication related pages
 │   └── (main)/           # Main application pages
 ├── components/            # React components
 │   ├── ui/               # shadcn/ui components
 │   ├── chat/             # Chat interface components
+│   ├── monitoring/       # Shared monitoring components
+│   │   ├── metrics/      # Metric visualization components
+│   │   └── logs/        # Log viewing components
 │   └── ...               # Feature-specific components
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utility functions and configs
 │   ├── chat-config.ts    # Chat system configuration
 │   ├── utils.ts          # General utilities
-│   ├── logger.ts        # Structured logging utility
-│   ├── api-error.ts     # API error handling
-│   ├── rate-limit.ts    # Rate limiting implementation
+│   ├── logger.ts         # Structured logging utility
+│   ├── api-error.ts      # API error handling
+│   ├── rate-limit.ts     # Rate limiting implementation
+│   ├── metrics.ts        # Metrics collection utilities
+│   ├── chart-config.ts   # Chart.js configuration
 │   └── ...               # Other utilities
-├── types/                # TypeScript type definitions
 ├── middleware/           # Edge middleware
-│   ├── auth.ts          # Authentication middleware
-│   └── ...              # Other middleware
+│   ├── auth.ts           # Authentication middleware
+│   ├── monitoring-auth.ts # Monitoring auth middleware
+│   └── ...               # Other middleware
+├── types/                # TypeScript type definitions
+├── scripts/              # Utility scripts
+│   ├── rotate-logs.ts    # Log rotation script
+│   ├── clear-logs.ts     # Log cleanup script
+│   └── generate-monitoring-hash.ts # Auth setup script
 └── env.ts               # Environment variable validation
 ```
 
 Key directories and their purposes:
 
 - `app/`: Next.js App Router pages and API routes
+  - `api/monitoring/`: Monitoring system API endpoints
+  - `monitoring/`: Monitoring dashboard pages and components
 - `components/`: Reusable React components
   - `ui/`: shadcn/ui component library
-  - `chat/`: Chat interface components
+  - `monitoring/`: Monitoring-specific components
   - Feature-specific components (blog, projects, etc.)
-- `hooks/`: Custom React hooks for shared logic
 - `lib/`: Utility functions and configurations
-- `types/`: TypeScript type definitions
+  - `logger.ts`: Structured logging system
+  - `metrics.ts`: Performance metrics collection
+  - `chart-config.ts`: Chart.js configuration
 - `middleware/`: Edge middleware for auth and routing
+- `scripts/`: Utility scripts for maintenance tasks
+- `types/`: TypeScript type definitions
 
 ## Getting Started
 
@@ -174,7 +199,9 @@ RATE_LIMIT_WINDOW=3600                  # Window size in seconds
 
 # Monitoring Configuration
 MONITORING_ENABLED=true                 # Enable performance monitoring
-ERROR_TRACKING_ENABLED=true            # Enable error tracking
+MONITORING_USERNAME=your-username       # Dashboard access username
+MONITORING_PASSWORD_HASH=your-hash      # SHA-256 hash of password
+MONITORING_AUTH_SALT=your-salt         # Salt for password hashing
 ```
 
 4. Initialize the database:
@@ -284,6 +311,73 @@ The blog section integrates with X (formerly Twitter) to provide:
    - Secure cookie handling
    - Rate limiting and validation
 
+## Monitoring Dashboard
+
+The application includes a comprehensive monitoring suite with real-time metrics:
+
+1. **Real-time Metrics**
+   - API request tracking with response times
+   - Route performance analysis with success/error rates
+   - Database query monitoring with performance stats
+   - External service call tracking
+   - Memory usage statistics
+   - Log level distribution analytics
+
+2. **Security**
+   - Password-protected dashboard access
+   - Secure cookie-based authentication
+   - Environment-based access control
+   - Rate limiting on auth endpoints
+
+3. **Features**
+   - Real-time data updates via SSE
+   - Interactive charts and graphs
+   - Filterable log viewer
+   - Performance trend analysis
+   - Error rate monitoring
+   - Resource usage tracking
+
+4. **Implementation**
+   - Server-sent events for live updates
+   - Prisma query event tracking
+   - Structured logging system
+   - Metric aggregation and analysis
+   - Chart.js for data visualization
+   - Responsive dashboard layout
+
+
+## API Features
+
+1. **Error Handling**
+   - Centralized error handling system
+   - Type-safe error responses
+   - Detailed error context
+   - Fallback mechanisms
+   - Rate limit protection
+
+2. **Logging System**
+   - Structured logging with metadata
+   - Request/response cycle tracking
+   - Operation step tracking
+   - Performance metrics collection
+   - Error context enrichment
+
+3. **Security**
+   - Rate limiting per route
+   - Input validation
+   - Secure file handling
+   - Cookie security
+   - CSRF protection
+
+4. **Monitoring**
+   - Health check endpoint
+   - Service status tracking
+   - Performance metrics
+   - Error rate monitoring
+   - Resource usage tracking
+
+---
+
 ## Project Goals
 
 1. **Visual Appeal**
@@ -309,7 +403,7 @@ The blog section integrates with X (formerly Twitter) to provide:
    - Seamless experience across all devices
    - Adaptive navigation with mobile menu
    - Optimized images and animations
-
+   
 ## Development Roadmap
 
 ### Completed
@@ -389,6 +483,17 @@ The blog section integrates with X (formerly Twitter) to provide:
 - Advanced image optimization
 - Case studies for major projects
 
+---
+
+## Acknowledgments
+
+- [shadcn/ui](https://ui.shadcn.com/) for the beautiful component system
+- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
+- [Next.js](https://nextjs.org/) for the React framework
+- [Vercel](https://vercel.com) for hosting and analytics
+- [Cursor](https://cursor.com/) for the AI-powered development environment
+- GitHub Actions for automated cross-repository workflow management
+
 ## License
 
 MIT License
@@ -400,43 +505,3 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-## Acknowledgments
-
-- [shadcn/ui](https://ui.shadcn.com/) for the beautiful component system
-- [Tailwind CSS](https://tailwindcss.com/) for the utility-first CSS framework
-- [Next.js](https://nextjs.org/) for the React framework
-- [Vercel](https://vercel.com) for hosting and analytics
-- [Cursor](https://cursor.com/) for the AI-powered development environment
-- GitHub Actions for automated cross-repository workflow management
-
-## API Features
-
-1. **Error Handling**
-   - Centralized error handling system
-   - Type-safe error responses
-   - Detailed error context
-   - Fallback mechanisms
-   - Rate limit protection
-
-2. **Logging System**
-   - Structured logging with metadata
-   - Request/response cycle tracking
-   - Operation step tracking
-   - Performance metrics collection
-   - Error context enrichment
-
-3. **Security**
-   - Rate limiting per route
-   - Input validation
-   - Secure file handling
-   - Cookie security
-   - CSRF protection
-
-4. **Monitoring**
-   - Health check endpoint
-   - Service status tracking
-   - Performance metrics
-   - Error rate monitoring
-   - Resource usage tracking
-
