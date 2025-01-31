@@ -373,8 +373,8 @@ export const runtime = 'nodejs'
 export const preferredRegion = 'iad1'
 
 export async function GET(req: Request) {
-  // Check if monitoring is enabled
-  if (!env.MONITORING_ENABLED) {
+  // Check if monitoring is enabled or in development mode
+  if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
     console.debug('Monitoring disabled');
     return new Response('Monitoring is disabled', { status: 404 });
   }

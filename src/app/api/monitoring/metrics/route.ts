@@ -173,8 +173,8 @@ async function getMetrics(timeWindow: number = 3600000): Promise<MetricsResponse
 
 async function handleMetricsRequest(req: Request): Promise<Response> {
   try {
-    // Check if monitoring is enabled
-    if (!process.env.MONITORING_ENABLED) {
+    // Check if monitoring is enabled or in development mode
+    if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
       throw new APIError('Monitoring is not enabled', 404, 'MONITORING_DISABLED')
     }
 
@@ -196,7 +196,8 @@ async function handleMetricsRequest(req: Request): Promise<Response> {
 export const GET = withLogging(handleMetricsRequest, 'api/monitoring/metrics')
 
 export async function POST(req: Request) {
-  if (!env.MONITORING_ENABLED) {
+  // Check if monitoring is enabled or in development mode
+  if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
     return new Response('Monitoring is disabled', { status: 404 })
   }
 

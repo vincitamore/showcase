@@ -79,6 +79,13 @@ export function MetricsProvider({ children }: { children: React.ReactNode }) {
     let retryTimeout: NodeJS.Timeout | null = null
 
     async function connectSSE() {
+      // Allow monitoring in development mode or when explicitly enabled
+      if (!env.NEXT_PUBLIC_MONITORING_ENABLED && process.env.NODE_ENV !== 'development') {
+        setLoading(false)
+        setError(new Error('Monitoring is not enabled'))
+        return
+      }
+
       setLoading(true)
       setError(null)
 
@@ -203,13 +210,7 @@ export function MetricsProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Only connect if monitoring is enabled or in development
-    if (env.NEXT_PUBLIC_MONITORING_ENABLED || process.env.NODE_ENV === 'development') {
-      connectSSE()
-    } else {
-      setLoading(false)
-      setError(new Error('Monitoring is not enabled'))
-    }
+    connectSSE()
 
     return () => {
       if (eventSource) {
