@@ -49,6 +49,13 @@ interface MetricsData {
     external: number
     arrayBuffers: number
   } | null
+  logs: {
+    total: number
+    info: number
+    warn: number
+    error: number
+    debug: number
+  }
 }
 
 interface MetricsContextType {

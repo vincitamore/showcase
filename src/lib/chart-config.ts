@@ -173,6 +173,7 @@ type ChartColorScheme = {
   green: ChartColor;
   red: ChartColor;
   purple: ChartColor;
+  yellow: ChartColor;
 }
 
 export const chartColors: ChartColorScheme = {
@@ -181,16 +182,20 @@ export const chartColors: ChartColorScheme = {
     secondary: 'rgba(59, 130, 246, 0.5)'
   },
   green: {
-    primary: 'rgb(75, 192, 192)',
-    secondary: 'rgba(75, 192, 192, 0.5)'
+    primary: 'rgb(34, 197, 94)',
+    secondary: 'rgba(34, 197, 94, 0.5)'
   },
   red: {
-    primary: 'rgb(255, 99, 132)',
-    secondary: 'rgba(255, 99, 132, 0.5)'
+    primary: 'rgb(239, 68, 68)',
+    secondary: 'rgba(239, 68, 68, 0.5)'
   },
   purple: {
-    primary: 'rgb(153, 102, 255)',
-    secondary: 'rgba(153, 102, 255, 0.5)'
+    primary: 'rgb(168, 85, 247)',
+    secondary: 'rgba(168, 85, 247, 0.5)'
+  },
+  yellow: {
+    primary: 'rgb(234, 179, 8)',
+    secondary: 'rgba(234, 179, 8, 0.5)'
   }
 }
 

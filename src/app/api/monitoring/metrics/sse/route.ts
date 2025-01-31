@@ -56,6 +56,13 @@ interface MetricsData {
     external: number
     arrayBuffers: number
   } | null
+  logs: {
+    total: number
+    info: number
+    warn: number
+    error: number
+    debug: number
+  }
 }
 
 interface MetricLabels {
@@ -158,7 +165,7 @@ async function getMetrics(timeWindow: number) {
         }
       },
       orderBy: {
-        timestamp: 'asc'
+        timestamp: 'desc'
       },
       select: {
         id: true,
@@ -180,11 +187,21 @@ async function getMetrics(timeWindow: number) {
     `
   ]);
 
+  // Calculate log level statistics
+  const logStats = {
+    total: logs.length,
+    info: logs.filter(log => log.level?.toUpperCase() === 'INFO').length,
+    warn: logs.filter(log => log.level?.toUpperCase() === 'WARN').length,
+    error: logs.filter(log => log.level?.toUpperCase() === 'ERROR').length,
+    debug: logs.filter(log => log.level?.toUpperCase() === 'DEBUG').length
+  }
+
   // Only log summary of found data
   if (env.NODE_ENV === 'development') {
     console.debug('Found data:', {
       logs: {
         total: logs.length,
+        byLevel: logStats,
         timeRange: {
           from: logs[0]?.timestamp?.toISOString(),
           to: logs[logs.length - 1]?.timestamp?.toISOString()
@@ -364,7 +381,8 @@ async function getMetrics(timeWindow: number) {
       heapTotal: memory.heapTotal,
       external: memory.external,
       arrayBuffers: memory.arrayBuffers || 0
-    }
+    },
+    logs: logStats
   };
 }
 
@@ -373,6 +391,12 @@ export const runtime = 'nodejs'
 export const preferredRegion = 'iad1'
 
 export async function GET(req: Request) {
+  console.debug('Monitoring status:', {
+    enabled: env.MONITORING_ENABLED,
+    nodeEnv: env.NODE_ENV,
+    rawValue: process.env.MONITORING_ENABLED
+  });
+
   // Check if monitoring is enabled or in development mode
   if (!env.MONITORING_ENABLED && env.NODE_ENV !== 'development') {
     console.debug('Monitoring disabled');

@@ -10,6 +10,7 @@ const RequestMetrics = lazy(() => import('./components/metrics/request-metrics')
 const ExternalMetrics = lazy(() => import('./components/metrics/external-metrics'))
 const MemoryMetrics = lazy(() => import('./components/metrics/memory-metrics'))
 const RouteMetrics = lazy(() => import('./components/metrics/route-metrics'))
+const LogsSummary = lazy(() => import('./components/metrics/logs-summary'))
 const LogsSection = lazy(() => import('./components/logs-section'))
 
 function LoadingCard({ title }: { title: string }) {
@@ -132,6 +133,30 @@ function MonitoringDashboard() {
                       <span>External Memory:</span>
                       <span className="font-mono">
                         {((metrics?.memory?.external ?? 0) / (1024 * 1024)).toFixed(2)} MB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card3D>
+            </Suspense>
+
+            <Suspense fallback={<LoadingCard title="logs summary" />}>
+              <Card3D className="p-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">Log Level Distribution</h3>
+                    <p className="text-sm text-muted-foreground">Log entries by severity level</p>
+                  </div>
+                  <LogsSummary />
+                  <div className="text-sm text-muted-foreground border-t pt-4 mt-4">
+                    <div className="flex justify-between items-center">
+                      <span>Total Logs:</span>
+                      <span className="font-mono">{metrics?.logs?.total ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span>Error Rate:</span>
+                      <span className="font-mono">
+                        {metrics?.logs?.total ? ((metrics.logs.error / metrics.logs.total) * 100).toFixed(2) : '0.00'}%
                       </span>
                     </div>
                   </div>
