@@ -42,42 +42,41 @@ function formatQueryForLogging(query: string): string {
 }
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: env.NODE_ENV === 'development' ? [
+  log: [
     {
       emit: 'event',
       level: 'query',
     },
-  ] : []
+  ]
 })
 
-if (env.NODE_ENV === 'development') {
-  prisma.$on('query' as never, async (e: Prisma.QueryEvent) => {
-    // Skip logging if:
-    // 1. We're already executing a query, or
-    // 2. This is a query we don't want to log
-    if (isExecutingQuery || !shouldLogQuery(e.query)) {
-      return;
-    }
+// Set up query logging for both development and production
+prisma.$on('query' as never, async (e: Prisma.QueryEvent) => {
+  // Skip logging if:
+  // 1. We're already executing a query, or
+  // 2. This is a query we don't want to log
+  if (isExecutingQuery || !shouldLogQuery(e.query)) {
+    return;
+  }
 
-    try {
-      isExecutingQuery = true;
-      await logger.info('Database query executed', {
-        metrics: {
-          duration: e.duration,
-          labels: {
-            type: 'db_query',
-            query: formatQueryForLogging(e.query),
-            error: 0
-          }
+  try {
+    isExecutingQuery = true;
+    await logger.info('Database query executed', {
+      metrics: {
+        duration: e.duration,
+        labels: {
+          type: 'db_query',
+          query: formatQueryForLogging(e.query),
+          error: 0
         }
-      })
-    } catch (error) {
-      // Log error to console but don't throw to prevent breaking the application
-      console.error('Error logging query:', error);
-    } finally {
-      isExecutingQuery = false;
-    }
-  })
-}
+      }
+    })
+  } catch (error) {
+    // Log error to console but don't throw to prevent breaking the application
+    console.error('Error logging query:', error);
+  } finally {
+    isExecutingQuery = false;
+  }
+})
 
 if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma 
