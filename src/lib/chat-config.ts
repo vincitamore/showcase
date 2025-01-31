@@ -14,17 +14,24 @@ export interface ModelConfig {
   features: string[]
 }
 
-export const MODEL_CONFIGS: Record<string, ModelConfig> = {
-  'grok-2-latest': {
+// Get available models based on environment configuration
+export const MODEL_CONFIGS: Record<string, ModelConfig> = {}
+
+// Initialize models based on environment configuration
+if (env.NEXT_PUBLIC_XAI_ENABLED) {
+  MODEL_CONFIGS['grok-2-latest'] = {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
     provider: 'grok',
     name: 'Grok-2',
-    description: 'A powerful multimodal model that can understand text and images.',
-    features: ['text', 'images']
-  },
-  'claude-3-5-sonnet-20241022': {
+    description: 'Latest Grok-2 model, with the latest updates and improvements.',
+    features: ['text']
+  }
+}
+
+if (env.NEXT_PUBLIC_ANTHROPIC_ENABLED) {
+  MODEL_CONFIGS['claude-3-5-sonnet-20241022'] = {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
@@ -32,8 +39,8 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     name: 'Claude 3.5 Sonnet (New)',
     description: 'The latest Claude model, ideal for most tasks.',
     features: ['text', 'images']
-  },
-  'claude-3-5-haiku-20241022': {
+  }
+  MODEL_CONFIGS['claude-3-5-haiku-20241022'] = {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
@@ -41,8 +48,8 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     name: 'Claude 3.5 Haiku',
     description: 'Fast and efficient Claude model.',
     features: ['text', 'images']
-  },
-  'claude-3-opus-20240229': {
+  }
+  MODEL_CONFIGS['claude-3-opus-20240229'] = {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
@@ -51,7 +58,14 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     description: 'The most capable Claude model, ideal for complex tasks.',
     features: ['text', 'images']
   }
-} as const
+}
+
+// Log available models for debugging
+console.log('Environment flags:', {
+  xai: env.NEXT_PUBLIC_XAI_ENABLED,
+  anthropic: env.NEXT_PUBLIC_ANTHROPIC_ENABLED
+})
+console.log('Available models:', Object.keys(MODEL_CONFIGS))
 
 export type Role = 'user' | 'assistant' | 'system'
 
@@ -98,6 +112,7 @@ export async function getSystemPrompt() {
 Key areas of expertise include:
 - TypeScript and modern JavaScript
 - React and Next.js
+- AI generative UI/UX design and development
 - Full-stack development
 - System architecture
 - Network engineering

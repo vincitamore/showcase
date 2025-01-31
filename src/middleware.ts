@@ -18,8 +18,5 @@ export const config = {
     // Monitoring routes
     '/monitoring/:path*',
     '/api/monitoring/:path*',
-    
-    // Exclude SSE and metrics routes
-    '/((?!api/monitoring/metrics|api/monitoring/logs).*)',
   ]
 } 
