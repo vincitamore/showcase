@@ -17,12 +17,16 @@ export const env = createEnv({
     MONITORING_USERNAME: z.string().min(1),
     MONITORING_PASSWORD_HASH: z.string().min(64), // SHA-256 hash
     MONITORING_AUTH_SALT: z.string().min(32),
-    MONITORING_ENABLED: z.enum(['true', 'false']).transform(val => val === 'true'),
+    MONITORING_ENABLED: z.union([z.boolean(), z.string()]).transform(val => 
+      val === true || val === 'true' || val === '1' || val === 'yes'
+    ),
   },
   client: {
     NEXT_PUBLIC_URL: z.string().url(),
     NEXT_PUBLIC_TWITTER_USERNAME: z.string().optional(),
-    NEXT_PUBLIC_MONITORING_ENABLED: z.enum(['true', 'false']).transform(val => val === 'true'),
+    NEXT_PUBLIC_MONITORING_ENABLED: z.union([z.boolean(), z.string()]).transform(val => 
+      val === true || val === 'true' || val === '1' || val === 'yes'
+    ),
     NEXT_PUBLIC_XAI_ENABLED: z.coerce.boolean().default(false),
     NEXT_PUBLIC_ANTHROPIC_ENABLED: z.coerce.boolean().default(false),
   },
