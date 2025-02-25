@@ -122,17 +122,40 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
   let cachedTweets: any[] = [];
   
   try {
-    // Verify cron secret
+    // Check for test mode via query param (development only)
+    const url = new URL(req.url);
+    const isTestMode = url.searchParams.get('test') === 'true';
+    const devBypass = url.searchParams.get('dev_key') === env.DEV_SECRET;
+    
+    // Verify cron secret - allow bypass in development with correct dev_key
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // In production, always require the CRON_SECRET
+    // In development, allow bypass with dev_key
+    const isAuthorized = 
+      authHeader === `Bearer ${env.CRON_SECRET}` || 
+      (!isProduction && devBypass);
+    
+    if (!isAuthorized) {
       logger.error('Unauthorized cron request', {
         hasAuth: !!authHeader,
+        environment: process.env.NODE_ENV,
         step: 'auth-check'
       });
       return NextResponse.json(
         { error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } },
         { status: 401 }
       );
+    }
+
+    // Log test mode usage
+    if (isTestMode || devBypass) {
+      logger.info('Running in test mode', { 
+        isTestMode, 
+        devBypass,
+        step: 'test-mode' 
+      });
     }
 
     logger.info('Starting tweet fetch', { step: 'start' });
