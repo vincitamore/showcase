@@ -25,7 +25,7 @@ A modern, interactive portfolio site built with Next.js, TypeScript, and shadcn/
     - Export options
     - Markdown rendering with syntax highlighting
     - Image understanding (Claude models)(*coming soon*)
-- Built with performance and accessibility in mind
+- Built with performance and accessibility in mind.
 - Automated deployment via GitHub Actions
 - PostgreSQL database with optimized queries
 - Rate-limited API endpoints with fallback mechanisms
