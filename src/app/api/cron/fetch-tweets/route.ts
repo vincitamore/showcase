@@ -361,26 +361,10 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // so we can filter for tech-relevant content
     const searchParams: any = {
       max_results: 20, // Request more than we'll save to filter for quality
-      'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
-      'user.fields': ['profile_image_url', 'username'],
-      'media.fields': [
-        'url',
-        'preview_image_url',
-        'alt_text',
-        'type',
-        'width',
-        'height',
-        'duration_ms',
-        'variants'
-      ],
-      expansions: [
-        'author_id',
-        'attachments.media_keys',
-        'attachments.poll_ids',
-        'entities.mentions.username',
-        'referenced_tweets.id',
-        'referenced_tweets.id.author_id'
-      ]
+      'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments',
+      'user.fields': 'profile_image_url,username',
+      'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
+      'expansions': 'author_id,attachments.media_keys,attachments.poll_ids,entities.mentions.username,referenced_tweets.id,referenced_tweets.id.author_id'
     };
 
     // If we have cached tweets, only fetch newer ones
@@ -393,7 +377,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     logger.info('Making search request', {
       step: 'search-start',
       query,
-      sinceId: searchParams.since_id
+      sinceId: searchParams.since_id,
+      params: searchParams
     });
 
     const response = await client.search(query, searchParams);

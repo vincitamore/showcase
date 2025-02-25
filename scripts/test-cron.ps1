@@ -174,25 +174,111 @@ if ($FetchLogs) {
         # Extract the path portion for log filtering
         $pathForFilter = $Path.TrimStart('/')
         
-        # Try to get the logs
+        # First make sure we're logged in and have a project linked
         try {
-            Write-Host "Fetching logs for $pathForFilter..."
-            $logs = vercel logs --limit 50 | Out-String
+            $projectInfo = vercel project ls --json | ConvertFrom-Json
             
-            # Filter logs to show only relevant ones if possible
-            if ($logs) {
-                if ($logs -match $pathForFilter) {
-                    Write-Host "Found logs mentioning $pathForFilter:" -ForegroundColor Green
-                    Write-Host ($logs -split "`n" | Select-String -Pattern $pathForFilter -Context 5,5)
+            # If we got no projects or an error, we might not be logged in
+            if (-not $projectInfo -or $projectInfo.error) {
+                Write-Host "Please make sure you're logged in with 'vercel login' and have a project linked with 'vercel link'" -ForegroundColor Yellow
+                return
+            }
+            
+            # Try to get the logs - Vercel CLI requires a deployment ID/URL
+            Write-Host "Retrieving latest production deployment..."
+            $deployments = vercel list --prod --json | ConvertFrom-Json
+            
+            if ($deployments -and $deployments.Count -gt 0) {
+                $latestDeployment = $deployments[0].url
+                
+                Write-Host "Fetching logs for ${pathForFilter} from $latestDeployment..."
+                $logs = vercel logs $latestDeployment | Out-String
+                
+                # Filter logs to show only relevant ones if possible
+                if ($logs) {
+                    if ($logs -match $pathForFilter) {
+                        Write-Host "Found logs mentioning ${pathForFilter}:" -ForegroundColor Green
+                        Write-Host ($logs -split "`n" | Select-String -Pattern $pathForFilter -Context 5,5)
+                    } else {
+                        Write-Host "No logs found specifically for ${pathForFilter}. Showing most recent logs:" -ForegroundColor Yellow
+                        Write-Host $logs
+                    }
                 } else {
-                    Write-Host "No logs found specifically for $pathForFilter. Showing most recent logs:" -ForegroundColor Yellow
-                    Write-Host $logs
+                    Write-Host "No logs returned from Vercel." -ForegroundColor Yellow
                 }
             } else {
-                Write-Host "No logs returned from Vercel." -ForegroundColor Yellow
+                Write-Host "No deployments found. Make sure you have deployed your project to Vercel." -ForegroundColor Yellow
             }
         } catch {
             Write-Host "Error fetching Vercel logs: $($_.Exception.Message)" -ForegroundColor Red
         }
+    }
+}
+
+# If we received a rate limit error or invalid request, display helpful recovery info
+if (
+    $DevResponse.cronResponse.error.details.message -match "429" -or 
+    $DirectResponse.error.details.message -match "429" -or
+    $DevResponse.cronResponse.error.details.message -match "400" -or
+    $DirectResponse.error.details.message -match "400" -or
+    ($DevResponse.cronResponse.error.details.message -match "Invalid Request" -or $DirectResponse.error.details.message -match "Invalid Request")
+) {
+    Write-Host "`n----------------------------------------`n"
+    
+    # Determine the type of error
+    $isRateLimit = $DevResponse.cronResponse.error.details.message -match "429" -or $DirectResponse.error.details.message -match "429"
+    $isInvalidRequest = $DevResponse.cronResponse.error.details.message -match "400" -or $DirectResponse.error.details.message -match "400" -or
+                        $DevResponse.cronResponse.error.details.message -match "Invalid Request" -or $DirectResponse.error.details.message -match "Invalid Request"
+    
+    if ($isRateLimit) {
+        Write-Host "TWITTER RATE LIMIT DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        # Parse stack trace to see if we can extract rate limit info
+        $stackTrace = if ($DevResponse.cronResponse.error.details.stack) { 
+            $DevResponse.cronResponse.error.details.stack 
+        } elseif ($DirectResponse.error.details.stack) { 
+            $DirectResponse.error.details.stack 
+        } else { $null }
+        
+        # Look for Twitter API URL in the error to help identify which endpoint is rate limited
+        if ($stackTrace -match "twitter.com/([^/]+)/([^/]+)") {
+            $endpoint = $Matches[1] + "/" + $Matches[2]
+            Write-Host "Rate limited endpoint: $endpoint" -ForegroundColor Yellow
+        }
+        
+        Write-Host "`nTwitter API rate limits typically reset after 15 minutes." -ForegroundColor Yellow
+        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
+        Write-Host "1. Wait for rate limit to reset (typically 15 minutes)" -ForegroundColor White
+        Write-Host "2. Check your Twitter API credential limits in the Twitter Developer Portal" -ForegroundColor White
+        Write-Host "3. Reduce the frequency of your API calls" -ForegroundColor White
+        Write-Host "4. If available, use cached tweets from the database" -ForegroundColor White
+        
+        Write-Host "`nTo check the actual reset time, run the script with the direct endpoint and examine the error response." -ForegroundColor Cyan
+    }
+    
+    if ($isInvalidRequest) {
+        Write-Host "TWITTER API INVALID REQUEST DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        # Extract error details
+        $errorMessage = if ($DevResponse.cronResponse.error.details.message) {
+            $DevResponse.cronResponse.error.details.message
+        } elseif ($DirectResponse.error.details.message) {
+            $DirectResponse.error.details.message
+        } else { "Unknown error" }
+        
+        # Look for API problem URL to help identify the issue
+        if ($errorMessage -match "https://api.twitter.com/2/problems/([^)]+)") {
+            $problemType = $Matches[1]
+            Write-Host "Problem type: $problemType" -ForegroundColor Yellow
+        }
+        
+        Write-Host "`nThe Twitter API rejected the request due to invalid parameters." -ForegroundColor Yellow
+        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
+        Write-Host "1. Check that all parameters are in the correct format (comma-separated strings, not arrays)" -ForegroundColor White
+        Write-Host "2. Verify your Twitter API query syntax is correct" -ForegroundColor White
+        Write-Host "3. Review the Twitter API documentation: https://developer.twitter.com/en/docs/twitter-api" -ForegroundColor White
+        Write-Host "4. Check that you have sufficient permissions for this request" -ForegroundColor White
+        
+        Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
     }
 } 

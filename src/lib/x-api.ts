@@ -371,9 +371,9 @@ export const fetchTechTweets = async (username: string) => {
   // Use search endpoint instead of user lookup
   const tweets = await client.get('tweets/search/recent', {
     query: `from:${cleanUsername} -is:retweet`,
-    expansions: ['author_id', 'attachments.media_keys'],
-    'tweet.fields': ['created_at', 'text', 'public_metrics'],
-    'user.fields': ['profile_image_url', 'username'],
+    expansions: 'author_id,attachments.media_keys',
+    'tweet.fields': 'created_at,text,public_metrics',
+    'user.fields': 'profile_image_url,username',
     max_results: 50,
   });
   
