@@ -391,8 +391,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         endpoint: 'tweets/search/recent'
       });
       
-      // Use the full URL with https://api.x.com/2/ prefix
-      response = await client.get('tweets/search/recent', searchParams, { fullResponse: true });
+      // Use the proper v2.search method instead of the generic get method
+      response = await client.v2.search(query, searchParams);
       
       logger.info('Twitter API request successful', { 
         step: 'twitter-request-success',
@@ -529,7 +529,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       : selectedNewTweets;
 
     // Cache the tweets
-    await cacheTweets(tweetsToCache, 'current', response.data.includes);
+    await cacheTweets(tweetsToCache, 'current', response.includes);
     
     // Select tweets for display
     await selectTweetsForDisplay([...tweetsToCache]);
