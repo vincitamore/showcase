@@ -912,7 +912,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     const includes = response.includes || tweetPaginator._realData?.includes || {};
 
     // Cache the tweets
-    await cacheTweets(tweetsToCache, 'current', includes);
+    await processTweetsForCache(tweetsToCache, 'current', includes);
     
     // Select tweets for display
     await selectTweetsForDisplay([...tweetsToCache]);
@@ -1049,6 +1049,200 @@ async function selectTweetsForDisplay(tweets: TweetV2[]) {
     logger.error('Error selecting tweets for display', {
       error: error instanceof Error ? error.message : 'Unknown error',
       step: 'selection-error'
+    });
+    throw error;
+  }
+}
+
+// Replace the previously added cacheTweets function with this fixed version
+// Fix the tweet caching issue by ensuring authorId is always present
+async function processTweetsForCache(tweets: TweetV2[], type: string, includes?: any) {
+  try {
+    logger.info(`Processing ${tweets.length} tweets of type ${type}`);
+    
+    // Start entity cleanup
+    logger.info('Starting entity cleanup', { timestamp: new Date().toISOString(), step: 'start' });
+    
+    // Get existing tweets to avoid duplicates
+    const existingTweets = await prisma.tweet.findMany({
+      where: {
+        id: {
+          in: tweets.map(t => t.id)
+        }
+      },
+      include: {
+        entities: true
+      }
+    });
+    
+    logger.info('Found tweets to clean', {
+      tweetCount: existingTweets.length,
+      timestamp: new Date().toISOString(),
+      step: 'tweets-found'
+    });
+    
+    // Track duplicates removed
+    let duplicatesRemoved = 0;
+    
+    // Process each tweet
+    const tweetRecords = [];
+    
+    for (const tweet of tweets) {
+      try {
+        // Ensure we have an authorId - this is the critical fix
+        if (!tweet.author_id) {
+          logger.warn(`Tweet ${tweet.id} is missing author_id, using default`, {
+            tweetId: tweet.id,
+            step: 'author-id-check'
+          });
+          // Use a default authorId if missing - this prevents the database error
+          tweet.author_id = 'unknown_author';
+        }
+        
+        // Convert Twitter API date format to Date object
+        const createdAt = tweet.created_at ? new Date(tweet.created_at) : new Date();
+        
+        // Process entities if present
+        const entitiesData = [];
+        
+        if (tweet.entities) {
+          // Process URLs
+          if (tweet.entities.urls?.length) {
+            for (const url of tweet.entities.urls) {
+              entitiesData.push({
+                type: 'url',
+                text: url.display_url || url.url,
+                url: url.url,
+                expandedUrl: url.expanded_url,
+                mediaKey: url.media_key,
+                metadata: JSON.stringify({
+                  status: url.status,
+                  title: url.title,
+                  description: url.description,
+                  images: url.images || []
+                })
+              });
+            }
+          }
+          
+          // Process mentions
+          if (tweet.entities.mentions?.length) {
+            for (const mention of tweet.entities.mentions) {
+              entitiesData.push({
+                type: 'mention',
+                text: mention.username,
+                metadata: JSON.stringify({
+                  id: mention.id
+                })
+              });
+            }
+          }
+          
+          // Process hashtags
+          if (tweet.entities.hashtags?.length) {
+            for (const hashtag of tweet.entities.hashtags) {
+              entitiesData.push({
+                type: 'hashtag',
+                text: hashtag.tag
+              });
+            }
+          }
+        }
+        
+        // Process media from includes if present
+        const mediaKeys = tweet.attachments?.media_keys || [];
+        if (includes?.media && mediaKeys.length > 0) {
+          const mediaItems = includes.media.filter((m: any) => 
+            mediaKeys.includes(m.media_key)
+          );
+          
+          for (const media of mediaItems) {
+            entitiesData.push({
+              type: 'media',
+              text: media.alt_text || '',
+              url: media.url || media.preview_image_url,
+              mediaKey: media.media_key,
+              metadata: JSON.stringify({
+                type: media.type,
+                width: media.width,
+                height: media.height,
+                preview_image_url: media.preview_image_url,
+                duration_ms: media.duration_ms
+              })
+            });
+          }
+        }
+        
+        // Create or update the tweet
+        const tweetData = await prisma.tweet.upsert({
+          where: {
+            id: tweet.id
+          },
+          create: {
+            id: tweet.id,
+            text: tweet.text,
+            createdAt: createdAt,
+            publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
+            authorId: tweet.author_id, // This is the critical field that was missing
+            editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
+            entities: {
+              create: entitiesData
+            }
+          },
+          update: {
+            id: tweet.id,
+            text: tweet.text,
+            createdAt: createdAt,
+            publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
+            authorId: tweet.author_id, // This is the critical field that was missing
+            editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
+            entities: {
+              deleteMany: {},
+              create: entitiesData
+            }
+          }
+        });
+        
+        tweetRecords.push(tweetData);
+      } catch (error) {
+        logger.error('Error processing tweet', {
+          id: tweet.id,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined
+        });
+      }
+    }
+    
+    logger.info('Entity cleanup complete', {
+      totalTweets: existingTweets.length,
+      totalDuplicatesRemoved: duplicatesRemoved,
+      timestamp: new Date().toISOString(),
+      step: 'complete'
+    });
+    
+    // Create a new cache entry with the tweets
+    if (tweetRecords.length > 0) {
+      await prisma.tweetCache.create({
+        data: {
+          type,
+          tweets: {
+            connect: tweetRecords.map(tweet => ({ id: tweet.id }))
+          },
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        }
+      });
+    } else {
+      logger.warn('No tweets to cache', {
+        type,
+        step: 'cache-creation-skipped'
+      });
+    }
+    
+    return tweetRecords;
+  } catch (error) {
+    logger.error('Error processing tweets', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
     throw error;
   }

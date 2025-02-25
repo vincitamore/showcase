@@ -5,15 +5,15 @@ Environment Variables Debug: {
 }
 [Tweet Storage] Getting cached tweets: {
   type: 'current',
-  timestamp: '2025-02-25T22:49:51.970Z',
+  timestamp: '2025-02-25T23:41:37.559Z',
   step: 'start'
 }
 [Tweet Storage] No active cache, fetching all tweets: {
   type: 'current',
-  timestamp: '2025-02-25T22:49:52.089Z',
+  timestamp: '2025-02-25T23:41:37.664Z',
   step: 'fallback'
 }
-[Tweet Storage] Fetched all tweets: { count: 18, timestamp: '2025-02-25T22:49:52.127Z', step: 'complete' }
+[Tweet Storage] Fetched all tweets: { count: 18, timestamp: '2025-02-25T23:41:37.701Z', step: 'complete' }
 [Twitter API] Initializing read-only client...
 [Twitter API] Credentials check: {
   hasApiKey: true,
@@ -26,392 +26,77 @@ Environment Variables Debug: {
 [Twitter API] Client initialized successfully
 [Twitter Storage] Checking if request can be made: {
   endpoint: 'tweets/search/recent',
-  timestamp: '2025-02-25T22:49:52.278Z',
+  timestamp: '2025-02-25T23:41:37.870Z',
   step: 'start-check'
 }
 [Twitter Storage] Fetching rate limit: {
   endpoint: 'tweets/search/recent',
-  timestamp: '2025-02-25T22:49:52.278Z',
+  timestamp: '2025-02-25T23:41:37.871Z',
   step: 'pre-fetch'
 }
 [Twitter Storage] Retrieved rate limit: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T22:39:36.819Z',
+  resetAt: '2025-02-25T23:39:07.383Z',
   remaining: 99,
-  timestamp: '2025-02-25T22:49:52.295Z',
-  durationMs: 17,
+  timestamp: '2025-02-25T23:41:37.889Z',
+  durationMs: 18,
   step: 'post-fetch-found'
 }
 [Twitter Storage] Rate limit reset time passed: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T22:39:36.819Z',
-  now: '2025-02-25T22:49:52.295Z',
+  resetAt: '2025-02-25T23:39:07.383Z',
+  now: '2025-02-25T23:41:37.890Z',
   remaining: 99,
-  durationMs: 17,
+  durationMs: 20,
   step: 'check-reset-passed'
 }
 [Twitter Storage] Resetting rate limit after expiration: {
   endpoint: 'tweets/search/recent',
-  oldResetAt: '2025-02-25T22:39:36.819Z',
-  newResetAt: '2025-02-25T23:04:52.295Z',
+  oldResetAt: '2025-02-25T23:39:07.383Z',
+  newResetAt: '2025-02-25T23:56:37.890Z',
   oldRemaining: 99,
   newRemaining: 99,
   step: 'reset-rate-limit'
 }
 [Twitter Storage] Updating rate limit: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T23:04:52.295Z',
+  resetAt: '2025-02-25T23:56:37.890Z',
   remaining: 99,
-  timestamp: '2025-02-25T22:49:52.296Z',
+  timestamp: '2025-02-25T23:41:37.890Z',
   step: 'pre-update'
 }
 [Twitter Storage] Rate limit updated: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T23:04:52.295Z',
+  resetAt: '2025-02-25T23:56:37.890Z',
   remaining: 99,
-  durationMs: 26,
+  durationMs: 24,
   step: 'post-update'
 }
 [Twitter Storage] Updating rate limit: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T23:04:52.000Z',
+  resetAt: '2025-02-25T23:56:37.000Z',
   remaining: 0,
-  timestamp: '2025-02-25T22:49:52.466Z',
+  timestamp: '2025-02-25T23:41:38.136Z',
   step: 'pre-update'
 }
 [Twitter Storage] Rate limit updated: {
   endpoint: 'tweets/search/recent',
-  resetAt: '2025-02-25T23:04:52.000Z',
+  resetAt: '2025-02-25T23:56:37.000Z',
   remaining: 0,
-  durationMs: 11,
+  durationMs: 12,
   step: 'post-update'
 }
 [Twitter Storage] Caching 22 tweets of type current
-[Twitter Storage] Starting entity cleanup: { timestamp: '2025-02-25T22:49:52.479Z', step: 'start' }
+[Twitter Storage] Starting entity cleanup: { timestamp: '2025-02-25T23:41:38.150Z', step: 'start' }
 [Twitter Storage] Found tweets to clean: {
   tweetCount: 18,
-  timestamp: '2025-02-25T22:49:52.504Z',
+  timestamp: '2025-02-25T23:41:38.174Z',
   step: 'tweets-found'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881557842739806222',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw925e0006ld03494agxqu',
-    'cm6awyaf00006jm03hebj149y',
-    'cm6axonmp0006jv03wffi8bho',
-    'cm6aydzki0006l203431ffwv7'
-  ],
-  timestamp: '2025-02-25T22:49:52.505Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881557842739806222',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.525Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881557842739806222',
-  entityKey: 'url-pic.x.com/ZmcT3sH8c5',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw925e0005ld039gnn01cj',
-    'cm6awyaf00005jm03ckliwqb6',
-    'cm6axonmp0005jv03fe8ywl6k',
-    'cm6aydzki0005l203vubp684f'
-  ],
-  timestamp: '2025-02-25T22:49:52.525Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881557842739806222',
-  entityKey: 'url-pic.x.com/ZmcT3sH8c5',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.533Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881534352351428641',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92820007ld03zywtgi9n',
-    'cm6awyahf0007jm03n95iaqyh',
-    'cm6axonpa0007jv03egfupw92',
-    'cm6aydzn50007l2039pe5l1w9'
-  ],
-  timestamp: '2025-02-25T22:49:52.534Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881534352351428641',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.542Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881531517450756283',
-  entityKey: 'url-pic.x.com/r3jGlefdeh',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92ao0008ld034vhba8fy',
-    'cm6awyajt0008jm037v1i75np',
-    'cm6axonrw0008jv032g53p4kn',
-    'cm6aydzpt0008l203dmxd85ki'
-  ],
-  timestamp: '2025-02-25T22:49:52.542Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881531517450756283',
-  entityKey: 'url-pic.x.com/r3jGlefdeh',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.551Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881313018128302376',
-  entityKey: 'mention-Cursor',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92da000ald0365scqbn1',
-    'cm6awyaow0009jm03k4g1yb3f',
-    'cm6axonui000ajv031rrb36ez',
-    'cm6aydzuu0009l20362rk2f6b'
-  ],
-  timestamp: '2025-02-25T22:49:52.551Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881313018128302376',
-  entityKey: 'mention-Cursor',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.559Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881313018128302376',
-  entityKey: 'url-x.com/IceSolst/statu…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92da0009ld03u4eoodq0',
-    'cm6awyaow000ajm03qo8cccvz',
-    'cm6axonui0009jv0329gbbzcc',
-    'cm6aydzuu000al2038nqobg8k'
-  ],
-  timestamp: '2025-02-25T22:49:52.559Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881313018128302376',
-  entityKey: 'url-x.com/IceSolst/statu…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.569Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881060046844645691',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92k3000cld03zvp3v710',
-    'cm6awyave000cjm03zgge6sdp',
-    'cm6axoo19000cjv03ttd1sp8e',
-    'cm6aye01n000cl203jpioz4xp'
-  ],
-  timestamp: '2025-02-25T22:49:52.569Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881060046844645691',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.577Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1880979105942049254',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92mr000dld03ynrur9bh',
-    'cm6awyaxw000djm03vvtz17rw',
-    'cm6axoo3v000djv03p9vf1xsm',
-    'cm6aye04b000dl2035lwa00qk'
-  ],
-  timestamp: '2025-02-25T22:49:52.578Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1880979105942049254',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.586Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1880707324710658126',
-  entityKey: 'url-x.com/keyladelslay/s…',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92ru000fld03ys5wtg5c',
-    'cm6awyb2x000fjm03c6jj4ybp',
-    'cm6axoo93000fjv03bweiv94c',
-    'cm6aye09m000fl203ozom6hoz'
-  ],
-  timestamp: '2025-02-25T22:49:52.586Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1880707324710658126',
-  entityKey: 'url-x.com/keyladelslay/s…',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.595Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1882221588235612592',
-  entityKey: 'url-pic.x.com/E0dp82Ymnk',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw91pl0001ld0345zncfwc',
-    'cm6awya2f0001jm03bgb3fnig',
-    'cm6axon750001jv03u4970oua',
-    'cm6aydz900002l203swvzbr0p'
-  ],
-  timestamp: '2025-02-25T22:49:52.595Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1882221588235612592',
-  entityKey: 'url-pic.x.com/E0dp82Ymnk',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.603Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1882221588235612592',
-  entityKey: 'mention-xai',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw91r70002ld03x0dqmeqn',
-    'cm6awya3z0002jm03pl4so5r0',
-    'cm6axon8t0002jv03dr50vzs3',
-    'cm6aydz7e0001l203i6k8a5f0'
-  ],
-  timestamp: '2025-02-25T22:49:52.603Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1882221588235612592',
-  entityKey: 'mention-xai',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.612Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1880278138422440206',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicateCount: 2,
-  duplicateIds: [ 'cm6aw92x3000gld03t3tfn23d', 'cm6awyb5g000gjm03t199hsgp' ],
-  timestamp: '2025-02-25T22:49:52.612Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1880278138422440206',
-  entityKey: 'url-x.com/vincit_amore/s…',
-  duplicatesRemoved: 2,
-  timestamp: '2025-02-25T22:49:52.627Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881882560722297236',
-  entityKey: 'mention-cursor_ai',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw91xc0003ld034z3tr7xl',
-    'cm6awya9z0003jm03dc2wpkmh',
-    'cm6axonhg0003jv034xnlj033',
-    'cm6aydzf70003l203fj83zdbf'
-  ],
-  timestamp: '2025-02-25T22:49:52.627Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881882560722297236',
-  entityKey: 'mention-cursor_ai',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.635Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881312032294891596',
-  entityKey: 'url-pic.x.com/JaerJ7ELdU',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92fx000bld03thipo3dv',
-    'cm6awyare000bjm03qbqlc0ja',
-    'cm6axonx2000bjv03n6512ggf',
-    'cm6aydzxg000bl203kbkeustt'
-  ],
-  timestamp: '2025-02-25T22:49:52.635Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881312032294891596',
-  entityKey: 'url-pic.x.com/JaerJ7ELdU',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.644Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1880880684501512239',
-  entityKey: 'url-amore.build',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw92pb000eld03af2gozfz',
-    'cm6awyb0f000ejm03rofhflca',
-    'cm6axoo6h000ejv03c6rugop0',
-    'cm6aye06x000el203f7gnbidy'
-  ],
-  timestamp: '2025-02-25T22:49:52.644Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1880880684501512239',
-  entityKey: 'url-amore.build',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.652Z',
-  step: 'duplicates-removed'
-}
-[Twitter Storage] Removing duplicates for tweet: {
-  tweetId: '1881773333068587233',
-  entityKey: 'url-pic.x.com/FwsRz1gvOo',
-  duplicateCount: 4,
-  duplicateIds: [
-    'cm6aw91zy0004ld03r8gzpjwj',
-    'cm6awyach0004jm03okgu2su4',
-    'cm6axonk20004jv03eqdop447',
-    'cm6aydzhv0004l203rwp3eoyn'
-  ],
-  timestamp: '2025-02-25T22:49:52.652Z',
-  step: 'pre-delete'
-}
-[Twitter Storage] Removed duplicates for tweet: {
-  tweetId: '1881773333068587233',
-  entityKey: 'url-pic.x.com/FwsRz1gvOo',
-  duplicatesRemoved: 4,
-  timestamp: '2025-02-25T22:49:52.661Z',
-  step: 'duplicates-removed'
 }
 [Twitter Storage] Entity cleanup complete: {
   totalTweets: 18,
-  totalDuplicatesRemoved: 62,
-  timestamp: '2025-02-25T22:49:52.661Z',
+  totalDuplicatesRemoved: 0,
+  timestamp: '2025-02-25T23:41:38.174Z',
   step: 'complete'
 }
 prisma:error 
@@ -431,10 +116,26 @@ Invalid `prisma.tweet.upsert()` invocation:
       like_count: 1,
       quote_count: 0,
       bookmark_count: 0,
-      impression_count: 15
+      impression_count: 19
     },
     entities: {
-      create: []
+      create: [
+        {
+          type: "url",
+          text: "https://t.co/IqkyJzkclD",
+          url: "https://t.co/IqkyJzkclD",
+          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",
+          displayUrl: "x.com/vincit_amore/s…",
+          tweet: {
+            connect: {
+              id: "1894492206028701779"
+            }
+          },
+          metadata: {
+            images: []
+          }
+        }
+      ]
     },
 +   authorId: String
   },
@@ -448,11 +149,27 @@ Invalid `prisma.tweet.upsert()` invocation:
       like_count: 1,
       quote_count: 0,
       bookmark_count: 0,
-      impression_count: 15
+      impression_count: 19
     },
     entities: {
       deleteMany: {},
-      create: []
+      create: [
+        {
+          type: "url",
+          text: "https://t.co/IqkyJzkclD",
+          url: "https://t.co/IqkyJzkclD",
+          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",
+          displayUrl: "x.com/vincit_amore/s…",
+          tweet: {
+            connect: {
+              id: "1894492206028701779"
+            }
+          },
+          metadata: {
+            images: []
+          }
+        }
+      ]
     }
   }
 }
@@ -477,10 +194,26 @@ Argument `authorId` is missing.
     '      like_count: 1,\n' +
     '      quote_count: 0,\n' +
     '      bookmark_count: 0,\n' +
-    '      impression_count: 15\n' +
+    '      impression_count: 19\n' +
     '    },\n' +
     '    entities: {\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/IqkyJzkclD",\n' +
+    '          url: "https://t.co/IqkyJzkclD",\n' +
+    '          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",\n' +
+    '          displayUrl: "x.com/vincit_amore/s…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894492206028701779"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    },\n' +
     '+   authorId: String\n' +
     '  },\n' +
@@ -494,11 +227,27 @@ Argument `authorId` is missing.
     '      like_count: 1,\n' +
     '      quote_count: 0,\n' +
     '      bookmark_count: 0,\n' +
-    '      impression_count: 15\n' +
+    '      impression_count: 19\n' +
     '    },\n' +
     '    entities: {\n' +
     '      deleteMany: {},\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/IqkyJzkclD",\n' +
+    '          url: "https://t.co/IqkyJzkclD",\n' +
+    '          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",\n' +
+    '          displayUrl: "x.com/vincit_amore/s…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894492206028701779"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    }\n' +
     '  }\n' +
     '}\n' +
@@ -521,10 +270,26 @@ Argument `authorId` is missing.
     '      like_count: 1,\n' +
     '      quote_count: 0,\n' +
     '      bookmark_count: 0,\n' +
-    '      impression_count: 15\n' +
+    '      impression_count: 19\n' +
     '    },\n' +
     '    entities: {\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/IqkyJzkclD",\n' +
+    '          url: "https://t.co/IqkyJzkclD",\n' +
+    '          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",\n' +
+    '          displayUrl: "x.com/vincit_amore/s…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894492206028701779"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    },\n' +
     '+   authorId: String\n' +
     '  },\n' +
@@ -538,11 +303,27 @@ Argument `authorId` is missing.
     '      like_count: 1,\n' +
     '      quote_count: 0,\n' +
     '      bookmark_count: 0,\n' +
-    '      impression_count: 15\n' +
+    '      impression_count: 19\n' +
     '    },\n' +
     '    entities: {\n' +
     '      deleteMany: {},\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/IqkyJzkclD",\n' +
+    '          url: "https://t.co/IqkyJzkclD",\n' +
+    '          expandedUrl: "https://x.com/vincit_amore/status/1894489618533302727",\n' +
+    '          displayUrl: "x.com/vincit_amore/s…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894492206028701779"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    }\n' +
     '  }\n' +
     '}\n' +
@@ -553,8 +334,8 @@ Argument `authorId` is missing.
     '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
     '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
     '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
-    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
     '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
@@ -698,8 +479,8 @@ Argument `authorId` is missing.
     '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
     '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
     '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
-    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
     '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
@@ -843,8 +624,8 @@ Argument `authorId` is missing.
     '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
     '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
     '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
-    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
     '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
@@ -869,7 +650,23 @@ Invalid `prisma.tweet.upsert()` invocation:
       impression_count: 53
     },
     entities: {
-      create: []
+      create: [
+        {
+          type: "url",
+          text: "https://t.co/vjbHShl6OU",
+          url: "https://t.co/vjbHShl6OU",
+          expandedUrl: "https://x.com/i/web/status/1894458336634179645",
+          displayUrl: "x.com/i/web/status/1…",
+          tweet: {
+            connect: {
+              id: "1894458336634179645"
+            }
+          },
+          metadata: {
+            images: []
+          }
+        }
+      ]
     },
 +   authorId: String
   },
@@ -887,7 +684,23 @@ Invalid `prisma.tweet.upsert()` invocation:
     },
     entities: {
       deleteMany: {},
-      create: []
+      create: [
+        {
+          type: "url",
+          text: "https://t.co/vjbHShl6OU",
+          url: "https://t.co/vjbHShl6OU",
+          expandedUrl: "https://x.com/i/web/status/1894458336634179645",
+          displayUrl: "x.com/i/web/status/1…",
+          tweet: {
+            connect: {
+              id: "1894458336634179645"
+            }
+          },
+          metadata: {
+            images: []
+          }
+        }
+      ]
     }
   }
 }
@@ -915,7 +728,23 @@ Argument `authorId` is missing.
     '      impression_count: 53\n' +
     '    },\n' +
     '    entities: {\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/vjbHShl6OU",\n' +
+    '          url: "https://t.co/vjbHShl6OU",\n' +
+    '          expandedUrl: "https://x.com/i/web/status/1894458336634179645",\n' +
+    '          displayUrl: "x.com/i/web/status/1…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894458336634179645"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    },\n' +
     '+   authorId: String\n' +
     '  },\n' +
@@ -933,7 +762,23 @@ Argument `authorId` is missing.
     '    },\n' +
     '    entities: {\n' +
     '      deleteMany: {},\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/vjbHShl6OU",\n' +
+    '          url: "https://t.co/vjbHShl6OU",\n' +
+    '          expandedUrl: "https://x.com/i/web/status/1894458336634179645",\n' +
+    '          displayUrl: "x.com/i/web/status/1…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894458336634179645"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    }\n' +
     '  }\n' +
     '}\n' +
@@ -959,7 +804,23 @@ Argument `authorId` is missing.
     '      impression_count: 53\n' +
     '    },\n' +
     '    entities: {\n' +
-    '      create: []\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/vjbHShl6OU",\n' +
+    '          url: "https://t.co/vjbHShl6OU",\n' +
+    '          expandedUrl: "https://x.com/i/web/status/1894458336634179645",\n' +
+    '          displayUrl: "x.com/i/web/status/1…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894458336634179645"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
     '    },\n' +
     '+   authorId: String\n' +
     '  },\n' +
@@ -977,6 +838,125 @@ Argument `authorId` is missing.
     '    },\n' +
     '    entities: {\n' +
     '      deleteMany: {},\n' +
+    '      create: [\n' +
+    '        {\n' +
+    '          type: "url",\n' +
+    '          text: "https://t.co/vjbHShl6OU",\n' +
+    '          url: "https://t.co/vjbHShl6OU",\n' +
+    '          expandedUrl: "https://x.com/i/web/status/1894458336634179645",\n' +
+    '          displayUrl: "x.com/i/web/status/1…",\n' +
+    '          tweet: {\n' +
+    '            connect: {\n' +
+    '              id: "1894458336634179645"\n' +
+    '            }\n' +
+    '          },\n' +
+    '          metadata: {\n' +
+    '            images: []\n' +
+    '          }\n' +
+    '        }\n' +
+    '      ]\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1882640627948732627"
+  },
+  create: {
+    id: "1882640627948732627",
+    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",
+    createdAt: new Date("2025-02-25T23:41:38.300Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1882640627948732627",
+    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",
+    createdAt: new Date("2025-02-25T23:41:38.300Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
+[Twitter Storage] Error caching tweet: {
+  id: '1882640627948732627',
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882640627948732627"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882640627948732627",\n' +
+    `    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.300Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882640627948732627",\n' +
+    `    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.300Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882640627948732627"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882640627948732627",\n' +
+    `    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.300Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882640627948732627",\n' +
+    `    text: "Made some updates on my site if anybody but me cares (it's ok i know it's just me). Added the projects, skills, and blog section cards onto carousels, then made the timeline have fade in animations when scrolling. Needs tweaked a bit for mobile optimization but still looks good.",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.300Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
     '      create: []\n' +
     '    }\n' +
     '  }\n' +
@@ -988,278 +968,1765 @@ Argument `authorId` is missing.
     '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
     '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
     '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
-    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
     '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
-[Twitter Storage] Error caching tweet: {
-  id: '1882640627948732627',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
-    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
-    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1882221588235612592"
+  },
+  create: {
+    id: "1882221588235612592",
+    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",
+    createdAt: new Date("2025-02-25T23:41:38.310Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1882221588235612592",
+    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",
+    createdAt: new Date("2025-02-25T23:41:38.310Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
 }
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1882221588235612592',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882221588235612592"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882221588235612592",\n' +
+    `    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.310Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882221588235612592",\n' +
+    `    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.310Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882221588235612592"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882221588235612592",\n' +
+    `    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.310Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882221588235612592",\n' +
+    `    text: "I'll take a free $150/month in xAI usage credits, yes I will; thank you very much @xai I'll try to put them to good use very soon https://t.co/E0dp82Ymnk",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.310Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1882184388827562289"
+  },
+  create: {
+    id: "1882184388827562289",
+    text: "My motto this week has been \"no talking, just obsessively building\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",
+    createdAt: new Date("2025-02-25T23:41:38.320Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1882184388827562289",
+    text: "My motto this week has been \"no talking, just obsessively building\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",
+    createdAt: new Date("2025-02-25T23:41:38.320Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1882184388827562289',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882184388827562289"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882184388827562289",\n' +
+    `    text: "My motto this week has been \\"no talking, just obsessively building\\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.320Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882184388827562289",\n' +
+    `    text: "My motto this week has been \\"no talking, just obsessively building\\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.320Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1882184388827562289"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1882184388827562289",\n' +
+    `    text: "My motto this week has been \\"no talking, just obsessively building\\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.320Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1882184388827562289",\n' +
+    `    text: "My motto this week has been \\"no talking, just obsessively building\\" and boy howdy have I been cooking up a few things I'm excited to share with you guys when they're ready",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.320Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881882560722297236"
+  },
+  create: {
+    id: "1881882560722297236",
+    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",
+    createdAt: new Date("2025-02-25T23:41:38.329Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881882560722297236",
+    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",
+    createdAt: new Date("2025-02-25T23:41:38.329Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881882560722297236',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881882560722297236"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881882560722297236",\n' +
+    `    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.329Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881882560722297236",\n' +
+    `    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.329Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881882560722297236"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881882560722297236",\n' +
+    `    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.329Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881882560722297236",\n' +
+    `    text: "I got to cool it with the coding sessions, its definitely getting a bit obsessive lol; it's just so addictive with @cursor_ai bc I can actually build things the way I've wanted to, and at a pace I never even could've imagined",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.329Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881773333068587233"
+  },
+  create: {
+    id: "1881773333068587233",
+    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",
+    createdAt: new Date("2025-02-25T23:41:38.339Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881773333068587233",
+    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",
+    createdAt: new Date("2025-02-25T23:41:38.339Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881773333068587233',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881773333068587233"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881773333068587233",\n' +
+    `    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.339Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881773333068587233",\n' +
+    `    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.339Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881773333068587233"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881773333068587233",\n' +
+    `    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.339Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881773333068587233",\n' +
+    `    text: "My portfolio site now has a custom xAI integration, and a chat that is larp'ing as me as presented by the information on the site. I'm gonna eventually make it a bit more dynamic but works pretty good rn, if I do say so myself. Will work as long as my $5 in credits with xAI lasts https://t.co/FwsRz1gvOo",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.339Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881557842739806222"
+  },
+  create: {
+    id: "1881557842739806222",
+    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",
+    createdAt: new Date("2025-02-25T23:41:38.349Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881557842739806222",
+    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",
+    createdAt: new Date("2025-02-25T23:41:38.349Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881557842739806222',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881557842739806222"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881557842739806222",\n' +
+    `    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.349Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881557842739806222",\n' +
+    `    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.349Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881557842739806222"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881557842739806222",\n' +
+    `    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.349Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881557842739806222",\n' +
+    `    text: "Wow, will ya look at it; seems like only this morning it was a buggy nightmare that wouldn't build and had a snowballs chance in hell of working https://t.co/ZmcT3sH8c5 https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.349Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881534352351428641"
+  },
+  create: {
+    id: "1881534352351428641",
+    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",
+    createdAt: new Date("2025-02-25T23:41:38.358Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881534352351428641",
+    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",
+    createdAt: new Date("2025-02-25T23:41:38.358Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881534352351428641',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881534352351428641"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881534352351428641",\n' +
+    `    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.358Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881534352351428641",\n' +
+    `    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.358Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881534352351428641"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881534352351428641",\n' +
+    `    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.358Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881534352351428641",\n' +
+    `    text: "I've very self satisfied with this btw, this turned out to give me a bit of trouble to get working right than I thought it would be and had to chase weird bugs and type errors around for hours and hours but I got it in the end! https://t.co/bHEXJKOrTp",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.358Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881531517450756283"
+  },
+  create: {
+    id: "1881531517450756283",
+    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",
+    createdAt: new Date("2025-02-25T23:41:38.368Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881531517450756283",
+    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",
+    createdAt: new Date("2025-02-25T23:41:38.368Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881531517450756283',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881531517450756283"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881531517450756283",\n' +
+    `    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.368Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881531517450756283",\n' +
+    `    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.368Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881531517450756283"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881531517450756283",\n' +
+    `    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.368Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881531517450756283",\n' +
+    `    text: "My website now has a blog section! It automatically fetches recent tweets, caches them, and then randomly displays 4 in this section. I can also make tweets from here too with integrated X SSO. Eventually I'll add a bit of filtering logic and make them only change occasionally https://t.co/r3jGlefdeh",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.368Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881313018128302376"
+  },
+  create: {
+    id: "1881313018128302376",
+    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",
+    createdAt: new Date("2025-02-25T23:41:38.377Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881313018128302376",
+    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",
+    createdAt: new Date("2025-02-25T23:41:38.377Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881313018128302376',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881313018128302376"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881313018128302376",\n' +
+    '    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.377Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881313018128302376",\n' +
+    '    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.377Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881313018128302376"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881313018128302376",\n' +
+    '    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.377Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881313018128302376",\n' +
+    '    text: "Great set of tips for coding with @cursor https://t.co/KtgFuYE489",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.377Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881312032294891596"
+  },
+  create: {
+    id: "1881312032294891596",
+    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",
+    createdAt: new Date("2025-02-25T23:41:38.386Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881312032294891596",
+    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",
+    createdAt: new Date("2025-02-25T23:41:38.386Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881312032294891596',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881312032294891596"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881312032294891596",\n' +
+    '    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.386Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881312032294891596",\n' +
+    '    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.386Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881312032294891596"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881312032294891596",\n' +
+    '    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.386Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881312032294891596",\n' +
+    '    text: "Good morning 🥶 https://t.co/JaerJ7ELdU",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.386Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881097840514224269"
+  },
+  create: {
+    id: "1881097840514224269",
+    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \"ὁ νικῶν\" anyways",
+    createdAt: new Date("2025-02-25T23:41:38.396Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881097840514224269",
+    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \"ὁ νικῶν\" anyways",
+    createdAt: new Date("2025-02-25T23:41:38.396Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881097840514224269',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881097840514224269"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881097840514224269",\n' +
+    '    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \\"ὁ νικῶν\\" anyways",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.396Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881097840514224269",\n' +
+    '    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \\"ὁ νικῶν\\" anyways",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.396Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881097840514224269"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881097840514224269",\n' +
+    '    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \\"ὁ νικῶν\\" anyways",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.396Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881097840514224269",\n' +
+    '    text: "I changed my name again, this will be the last time in awhile, I promise; I figure most people will handle the Latin better than the Greek \\"ὁ νικῶν\\" anyways",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.396Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1881060046844645691"
+  },
+  create: {
+    id: "1881060046844645691",
+    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",
+    createdAt: new Date("2025-02-25T23:41:38.406Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1881060046844645691",
+    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",
+    createdAt: new Date("2025-02-25T23:41:38.406Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1881060046844645691',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881060046844645691"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881060046844645691",\n' +
+    `    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.406Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881060046844645691",\n' +
+    `    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.406Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1881060046844645691"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1881060046844645691",\n' +
+    `    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.406Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1881060046844645691",\n' +
+    `    text: "Got the github for this working now; lost the bulk of my commit history accidentally so most of it is in one big commit, but it's whatever https://t.co/3Tv3onW8d1",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.406Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880979105942049254"
+  },
+  create: {
+    id: "1880979105942049254",
+    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",
+    createdAt: new Date("2025-02-25T23:41:38.415Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880979105942049254",
+    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",
+    createdAt: new Date("2025-02-25T23:41:38.415Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880979105942049254',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880979105942049254"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880979105942049254",\n' +
+    '    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.415Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880979105942049254",\n' +
+    '    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.415Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880979105942049254"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880979105942049254",\n' +
+    '    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.415Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880979105942049254",\n' +
+    '    text: "66 impressions and 0 link clicks, big sad https://t.co/3Tv3onW8d1",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.415Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880880684501512239"
+  },
+  create: {
+    id: "1880880684501512239",
+    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\nhttps://t.co/szwX92sE0D",
+    createdAt: new Date("2025-02-25T23:41:38.425Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880880684501512239",
+    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\nhttps://t.co/szwX92sE0D",
+    createdAt: new Date("2025-02-25T23:41:38.425Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880880684501512239',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880880684501512239"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880880684501512239",\n' +
+    '    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\\nhttps://t.co/szwX92sE0D",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.425Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880880684501512239",\n' +
+    '    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\\nhttps://t.co/szwX92sE0D",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.425Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880880684501512239"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880880684501512239",\n' +
+    '    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\\nhttps://t.co/szwX92sE0D",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.425Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880880684501512239",\n' +
+    '    text: "I present my weekend vanity project, a portfolio site that I put together furiously. The github for the site is posted in the contact section but for whatever reason github has flagged my acct. as spam so I need to sort that at some point\\nhttps://t.co/szwX92sE0D",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.425Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880707324710658126"
+  },
+  create: {
+    id: "1880707324710658126",
+    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",
+    createdAt: new Date("2025-02-25T23:41:38.435Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880707324710658126",
+    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",
+    createdAt: new Date("2025-02-25T23:41:38.435Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880707324710658126',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880707324710658126"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880707324710658126",\n' +
+    '    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.435Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880707324710658126",\n' +
+    '    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.435Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880707324710658126"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880707324710658126",\n' +
+    '    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.435Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880707324710658126",\n' +
+    '    text: "me and who 🥹👉👈 https://t.co/ANzvV7KdGz",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.435Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880278138422440206"
+  },
+  create: {
+    id: "1880278138422440206",
+    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",
+    createdAt: new Date("2025-02-25T23:41:38.444Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880278138422440206",
+    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",
+    createdAt: new Date("2025-02-25T23:41:38.444Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880278138422440206',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880278138422440206"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880278138422440206",\n' +
+    `    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.444Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880278138422440206",\n' +
+    `    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.444Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880278138422440206"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880278138422440206",\n' +
+    `    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.444Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880278138422440206",\n' +
+    `    text: "Also, I forgot to mention, if you're following me but I'm not following you back, this would be the perfect opportunity to drop a line and I'll get you on board. Im too lazy to go through my list and manually follow back lol and if you actually see this and reply is a good filter https://t.co/Zi3sW4ntep",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.444Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880272513529491529"
+  },
+  create: {
+    id: "1880272513529491529",
+    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",
+    createdAt: new Date("2025-02-25T23:41:38.454Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880272513529491529",
+    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",
+    createdAt: new Date("2025-02-25T23:41:38.454Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880272513529491529',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880272513529491529"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880272513529491529",\n' +
+    '    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.454Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880272513529491529",\n' +
+    '    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.454Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880272513529491529"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880272513529491529",\n' +
+    '    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.454Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880272513529491529",\n' +
+    '    text: "Man, X is really hitting me with the dopamine hard this morning, notifs just flooding in hand over fist",\n' +
+    '    createdAt: new Date("2025-02-25T23:41:38.454Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
 }
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1880269705862336767"
+  },
+  create: {
+    id: "1880269705862336767",
+    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",
+    createdAt: new Date("2025-02-25T23:41:38.463Z"),
+    publicMetrics: null,
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1880269705862336767",
+    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",
+    createdAt: new Date("2025-02-25T23:41:38.463Z"),
+    publicMetrics: null,
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
 [Twitter Storage] Error caching tweet: {
   id: '1880269705862336767',
-  error: '"undefined" is not valid JSON',
-  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
-    '    at JSON.parse (<anonymous>)\n' +
-    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
-    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
-    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
-    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880269705862336767"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880269705862336767",\n' +
+    `    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.463Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880269705862336767",\n' +
+    `    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.463Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1880269705862336767"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1880269705862336767",\n' +
+    `    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.463Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1880269705862336767",\n' +
+    `    text: "This morning I beseech you, my beloveds, if you see me cross your feed occasionally and you're not generally opposed as to what you see, please consider following me if you're not already; don't worry I don't make a habit of such requests, just looking for a bit of momentum rn 🙏",\n` +
+    '    createdAt: new Date("2025-02-25T23:41:38.463Z"),\n' +
+    '    publicMetrics: null,\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8585)\n' +
+    '    at async f (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:13610)\n' +
     '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
     '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
-    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
-    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
-    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+prisma:error 
+Invalid `prisma.tweetCache.create()` invocation:
+
+
+An operation failed because it depends on one or more records that were required but not found. Expected 10 records to be connected, found only 7.
