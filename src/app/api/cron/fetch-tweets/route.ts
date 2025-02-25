@@ -22,6 +22,35 @@ import { APIError, handleAPIError } from '@/lib/api-error';
 import { logger, withLogging } from '@/lib/logger';
 import { prisma } from '@/lib/db';
 
+// Helper function to validate Twitter search query format
+function validateTwitterQuery(query: string): { isValid: boolean; reason?: string } {
+  if (!query || query.trim() === '') {
+    return { isValid: false, reason: 'Query cannot be empty' };
+  }
+  
+  // Check for query length limits (512 chars for basic/pro access)
+  if (query.length > 512) {
+    return { isValid: false, reason: 'Query exceeds 512 character limit' };
+  }
+  
+  // Check for standalone operators
+  const hasStandaloneOperator = 
+    query.includes('from:') || 
+    query.includes('@') || 
+    query.includes('#') || 
+    // Check for keywords (non-operator text)
+    /[a-zA-Z0-9]+/.test(query.replace(/(-?from:|@|#|is:|has:|lang:)/g, ''));
+  
+  if (!hasStandaloneOperator) {
+    return { 
+      isValid: false, 
+      reason: 'Query must contain at least one standalone operator (from:, @, #, or keywords)' 
+    };
+  }
+  
+  return { isValid: true };
+}
+
 type TweetWithEntities = {
   id: string;
   text: string;
@@ -301,6 +330,21 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
     const query = `from:${username} -is:retweet`;
     
+    // Validate query format
+    const queryValidation = validateTwitterQuery(query);
+    if (!queryValidation.isValid) {
+      logger.error('Invalid Twitter query format', {
+        step: 'query-validation',
+        query,
+        reason: queryValidation.reason
+      });
+      throw new APIError(
+        `Invalid Twitter query format: ${queryValidation.reason}`,
+        400,
+        'INVALID_QUERY_FORMAT'
+      );
+    }
+    
     // Wrap the rate limit check in a try-catch for more detailed error info
     try {
       // Check if we can make the request - update the endpoint path to match the v2 path
@@ -381,18 +425,38 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       params: searchParams
     });
 
-    // Fix: Use client.get directly with the endpoint and include query in searchParams
-    searchParams.query = query;
+    // Fix: Use client.v2.search correctly with the query as first parameter and searchParams as second parameter
+    // Don't include query in searchParams as it's passed separately
     
     let response;
     try {
       logger.info('Sending request to Twitter API', { 
         step: 'twitter-request-start',
-        endpoint: 'tweets/search/recent'
+        endpoint: 'tweets/search/recent',
+        query
       });
       
-      // Use the proper search method
+      // Use the proper search method with correct parameter order
       response = await client.v2.search(query, searchParams);
+      
+      // Add detailed response logging
+      logger.info('Twitter API raw response structure', {
+        step: 'twitter-response-structure',
+        hasData: !!response.data,
+        hasErrors: !!response.errors?.length,
+        responseKeys: Object.keys(response),
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        metaKeys: response.meta ? Object.keys(response.meta) : [],
+        includesKeys: response.includes ? Object.keys(response.includes) : []
+      });
+      
+      // Log any errors in the response
+      if (response.errors?.length) {
+        logger.warn('Twitter API returned errors in response', {
+          step: 'twitter-response-errors',
+          errors: response.errors
+        });
+      }
       
       logger.info('Twitter API request successful', { 
         step: 'twitter-request-success',
@@ -437,6 +501,22 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
             `Twitter API rate limit exceeded (429)`, 
             429, 
             'TWITTER_RATE_LIMIT'
+          );
+        }
+        
+        // Check for 400 Bad Request errors - likely invalid query format
+        if (errorMessage.includes('400') || errorMessage.toLowerCase().includes('bad request')) {
+          externalApiStatus = 400;
+          logger.error('Twitter API bad request error - likely invalid query format', {
+            externalApiStatus,
+            errorMessage,
+            query,
+            searchParams
+          });
+          throw new APIError(
+            `Twitter API bad request error (400) - Check query format: ${query}`, 
+            400, 
+            'TWITTER_BAD_REQUEST'
           );
         }
         
