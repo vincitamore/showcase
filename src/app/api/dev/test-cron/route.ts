@@ -7,7 +7,25 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   // Only allow in development or with special override
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEV_ENDPOINTS) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const allowDevEndpoints = env.ALLOW_DEV_ENDPOINTS || false;
+  
+  logger.info('Dev test endpoint accessed', {
+    isProduction,
+    allowDevEndpoints,
+    url: req.url,
+    method: req.method,
+    headers: Object.fromEntries(req.headers.entries()),
+    step: 'request-received'
+  });
+  
+  if (isProduction && !allowDevEndpoints) {
+    logger.warn('Dev endpoint access rejected', {
+      isProduction,
+      allowDevEndpoints,
+      step: 'access-rejected'
+    });
+    
     return NextResponse.json(
       { error: { message: 'Not available in production', code: 'DISABLED' } },
       { status: 403 }
@@ -19,6 +37,11 @@ export async function GET(req: Request) {
   const devSecret = process.env.DEV_SECRET || env.CRON_SECRET;
   
   if (authHeader !== `Bearer ${devSecret}`) {
+    logger.warn('Unauthorized dev endpoint access', {
+      hasAuthHeader: !!authHeader,
+      step: 'auth-check-failed'
+    });
+    
     return NextResponse.json(
       { error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } },
       { status: 401 }
@@ -30,11 +53,32 @@ export async function GET(req: Request) {
   const cronPath = searchParams.get('path');
 
   if (!cronPath) {
+    logger.warn('Missing path parameter', {
+      step: 'param-check-failed'
+    });
+    
     return NextResponse.json(
       { error: { message: 'Missing path parameter', code: 'MISSING_PARAM' } },
       { status: 400 }
     );
   }
+
+  // Log important environment variables (without exposing secrets)
+  logger.info('Environment context', {
+    environment: process.env.NODE_ENV,
+    allowDevEndpoints,
+    nextPublicUrl: process.env.NEXT_PUBLIC_URL,
+    hasCronSecret: !!env.CRON_SECRET,
+    hasDevSecret: !!process.env.DEV_SECRET,
+    hasTwitterCredentials: {
+      apiKey: !!env.TWITTER_API_KEY,
+      apiSecret: !!env.TWITTER_API_SECRET,
+      accessToken: !!env.TWITTER_ACCESS_TOKEN,
+      accessSecret: !!env.TWITTER_ACCESS_SECRET,
+      username: !!env.TWITTER_USERNAME
+    },
+    step: 'env-context'
+  });
 
   try {
     logger.info('Testing cron endpoint', { path: cronPath });

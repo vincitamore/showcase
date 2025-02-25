@@ -383,7 +383,42 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
     // Fix: Use client.get directly with the endpoint and include query in searchParams
     searchParams.query = query;
-    const response = await client.get('tweets/search/recent', searchParams, { fullResponse: true });
+    
+    let response;
+    try {
+      logger.info('Sending request to Twitter API', { 
+        step: 'twitter-request-start',
+        endpoint: 'tweets/search/recent'
+      });
+      
+      response = await client.get('tweets/search/recent', searchParams, { fullResponse: true });
+      
+      logger.info('Twitter API request successful', { 
+        step: 'twitter-request-success',
+        hasData: !!response.data,
+        dataCount: response.data?.data?.length || 0,
+        rateLimit: response.rateLimit ? {
+          remaining: response.rateLimit.remaining,
+          reset: response.rateLimit.reset
+        } : null
+      });
+    } catch (twitterError) {
+      logger.error('Failed to fetch from Twitter API', {
+        step: 'twitter-request-error',
+        errorType: twitterError instanceof Error ? twitterError.constructor.name : typeof twitterError,
+        errorMessage: twitterError instanceof Error ? twitterError.message : String(twitterError),
+        errorStack: twitterError instanceof Error ? twitterError.stack : 'No stack trace',
+        params: searchParams
+      });
+      
+      // Check if this is a network error
+      if (twitterError instanceof Error && twitterError.message.includes('network error')) {
+        throw new APIError('Twitter API network error', 500, 'TWITTER_NETWORK_ERROR');
+      }
+      
+      // Re-throw the error for the main error handler
+      throw twitterError;
+    }
 
     // Update rate limit after successful request
     if (response.rateLimit) {

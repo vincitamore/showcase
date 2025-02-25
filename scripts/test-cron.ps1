@@ -217,11 +217,17 @@ if ($FetchLogs) {
 
 # If we received a rate limit error or invalid request, display helpful recovery info
 if (
-    $DevResponse.cronResponse.error.details.message -match "429" -or 
+    ($DevResponse.cronResponse.error -ne $null) -or
+    ($DirectResponse.error -ne $null) -or
+    # Check for common error patterns in responses
+    ($DevResponse.cronResponse.error.details.message -match "429" -or 
     $DirectResponse.error.details.message -match "429" -or
     $DevResponse.cronResponse.error.details.message -match "400" -or
     $DirectResponse.error.details.message -match "400" -or
-    ($DevResponse.cronResponse.error.details.message -match "Invalid Request" -or $DirectResponse.error.details.message -match "Invalid Request")
+    ($DevResponse.cronResponse.error.details.message -match "Request failed" -or 
+     $DirectResponse.error.details.message -match "Request failed") -or
+    ($DevResponse.cronResponse.error.details.message -match "Invalid Request" -or 
+     $DirectResponse.error.details.message -match "Invalid Request"))
 ) {
     Write-Host "`n----------------------------------------`n"
     
@@ -229,6 +235,7 @@ if (
     $isRateLimit = $DevResponse.cronResponse.error.details.message -match "429" -or $DirectResponse.error.details.message -match "429"
     $isInvalidRequest = $DevResponse.cronResponse.error.details.message -match "400" -or $DirectResponse.error.details.message -match "400" -or
                         $DevResponse.cronResponse.error.details.message -match "Invalid Request" -or $DirectResponse.error.details.message -match "Invalid Request"
+    $isNetworkError = $DevResponse.cronResponse.error.details.message -match "Request failed" -or $DirectResponse.error.details.message -match "Request failed"
     
     if ($isRateLimit) {
         Write-Host "TWITTER RATE LIMIT DETECTED" -ForegroundColor Red -BackgroundColor Black
@@ -281,17 +288,56 @@ if (
         
         Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
     }
+    
+    if ($isNetworkError) {
+        Write-Host "TWITTER API NETWORK ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        # Extract error details
+        $errorMessage = if ($DevResponse.cronResponse.error.details.message) {
+            $DevResponse.cronResponse.error.details.message
+        } elseif ($DirectResponse.error.details.message) {
+            $DirectResponse.error.details.message
+        } else { "Unknown error" }
+        
+        $stackTrace = if ($DevResponse.cronResponse.error.details.stack) { 
+            $DevResponse.cronResponse.error.details.stack 
+        } elseif ($DirectResponse.error.details.stack) { 
+            $DirectResponse.error.details.stack 
+        } else { $null }
+        
+        Write-Host "`nThere was a network error while connecting to the Twitter API." -ForegroundColor Yellow
+        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
+        Write-Host "1. Check your internet connection" -ForegroundColor White
+        Write-Host "2. Verify that X/Twitter services are online" -ForegroundColor White
+        Write-Host "3. Check if your API credentials have been revoked or expired" -ForegroundColor White
+        Write-Host "4. Examine if there are any IP restrictions on your Twitter developer account" -ForegroundColor White
+        
+        Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
+        
+        if ($Verbose -and $stackTrace) {
+            Write-Host "`nStack trace:" -ForegroundColor Yellow
+            Write-Host $stackTrace -ForegroundColor Gray
+        }
+    }
 }
 # If we received a successful response, display a success message
 elseif (
-    ($DevResponse -and $DevResponse.status -eq "success") -or
-    ($DirectResponse -and $DirectResponse.status -eq "success")
+    # Make sure the response actually has content and not just empty fields
+    (($DevResponse -and $DevResponse.status -eq "success" -and 
+     ($DevResponse.cronResponse.tweetCount -gt 0 -or 
+      ($DevResponse.cronResponse.source -eq "cache" -and $DevResponse.cronResponse.tweetCount -ne $null))) -or
+     
+    ($DirectResponse -and $DirectResponse.status -eq "success" -and 
+     ($DirectResponse.tweetCount -gt 0 -or 
+      ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null))))
 ) {
     Write-Host "`n----------------------------------------`n"
     Write-Host "TWITTER API REQUEST SUCCESSFUL!" -ForegroundColor Green -BackgroundColor Black
     
     # Show details from the successful response
-    if ($DevResponse -and $DevResponse.status -eq "success") {
+    if ($DevResponse -and $DevResponse.status -eq "success" -and 
+        ($DevResponse.cronResponse.tweetCount -gt 0 -or 
+         ($DevResponse.cronResponse.source -eq "cache" -and $DevResponse.cronResponse.tweetCount -ne $null))) {
         $tweetCount = $DevResponse.cronResponse.tweetCount
         $source = $DevResponse.cronResponse.source
         
@@ -308,7 +354,9 @@ elseif (
         }
     }
     
-    if ($DirectResponse -and $DirectResponse.status -eq "success") {
+    if ($DirectResponse -and $DirectResponse.status -eq "success" -and 
+        ($DirectResponse.tweetCount -gt 0 -or 
+         ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null))) {
         $tweetCount = $DirectResponse.tweetCount
         $source = $DirectResponse.source
         
@@ -327,4 +375,43 @@ elseif (
     
     Write-Host "`nThe Twitter API request completed successfully." -ForegroundColor Green
     Write-Host "Your cron job is working properly!" -ForegroundColor Green
+}
+else {
+    # Catch-all for confusing status cases - could be partial success or odd error format
+    Write-Host "`n----------------------------------------`n"
+    Write-Host "INCONSISTENT OR EMPTY RESPONSE DETECTED" -ForegroundColor Yellow -BackgroundColor Black
+    
+    Write-Host "`nYour request received a response, but it doesn't contain the expected data." -ForegroundColor Yellow
+    Write-Host "This could indicate:" -ForegroundColor Cyan
+    Write-Host "1. A successful connection but no content found (empty tweet list)" -ForegroundColor White
+    Write-Host "2. A problem with parsing the Twitter API response" -ForegroundColor White
+    Write-Host "3. A successful connection to cache but the cache is empty" -ForegroundColor White
+    
+    if ($DevResponse) {
+        Write-Host "`nDev endpoint details:" -ForegroundColor Yellow
+        Write-Host "Status: $($DevResponse.status)" -ForegroundColor White
+        
+        if ($DevResponse.cronResponse) {
+            if ($DevResponse.cronResponse.tweetCount -ne $null) {
+                Write-Host "Tweet count: $($DevResponse.cronResponse.tweetCount)" -ForegroundColor White
+            }
+            if ($DevResponse.cronResponse.source) {
+                Write-Host "Source: $($DevResponse.cronResponse.source)" -ForegroundColor White
+            }
+        }
+    }
+    
+    if ($DirectResponse) {
+        Write-Host "`nDirect endpoint details:" -ForegroundColor Yellow
+        Write-Host "Status: $($DirectResponse.status)" -ForegroundColor White
+        
+        if ($DirectResponse.tweetCount -ne $null) {
+            Write-Host "Tweet count: $($DirectResponse.tweetCount)" -ForegroundColor White
+        }
+        if ($DirectResponse.source) {
+            Write-Host "Source: $($DirectResponse.source)" -ForegroundColor White
+        }
+    }
+    
+    Write-Host "`nCheck the cron job logs for more detailed information." -ForegroundColor Yellow
 } 
