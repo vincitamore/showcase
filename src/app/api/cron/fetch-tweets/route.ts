@@ -303,7 +303,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     
     // Wrap the rate limit check in a try-catch for more detailed error info
     try {
-      // Check if we can make the request
+      // Check if we can make the request - update the endpoint path to match the v2 path
       const canMakeReq = await canMakeRequest('tweets/search/recent');
       
       if (!canMakeReq) {
@@ -391,6 +391,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         endpoint: 'tweets/search/recent'
       });
       
+      // Use the full URL with https://api.x.com/2/ prefix
       response = await client.get('tweets/search/recent', searchParams, { fullResponse: true });
       
       logger.info('Twitter API request successful', { 
@@ -412,8 +413,16 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       });
       
       // Check if this is a network error
-      if (twitterError instanceof Error && twitterError.message.includes('network error')) {
-        throw new APIError('Twitter API network error', 500, 'TWITTER_NETWORK_ERROR');
+      if (twitterError instanceof Error && 
+          (twitterError.message.includes('network error') || 
+           twitterError.message.includes('timeout') ||
+           twitterError.message.includes('Request failed'))) {
+        throw new APIError('Twitter API connection error (timeout or network issue)', 500, 'TWITTER_NETWORK_ERROR');
+      }
+      
+      // Check if this is a rate limit error
+      if (twitterError instanceof Error && twitterError.message.includes('429')) {
+        throw new APIError('Twitter API rate limit exceeded', 429, 'TWITTER_RATE_LIMIT');
       }
       
       // Re-throw the error for the main error handler
