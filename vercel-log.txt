@@ -1,0 +1,1265 @@
+Environment Variables Debug: {
+  NODE_ENV: 'production',
+  MONITORING_ENABLED: 'true',
+  NEXT_PUBLIC_URL: 'https://amore.build'
+}
+[Tweet Storage] Getting cached tweets: {
+  type: 'current',
+  timestamp: '2025-02-25T22:49:51.970Z',
+  step: 'start'
+}
+[Tweet Storage] No active cache, fetching all tweets: {
+  type: 'current',
+  timestamp: '2025-02-25T22:49:52.089Z',
+  step: 'fallback'
+}
+[Tweet Storage] Fetched all tweets: { count: 18, timestamp: '2025-02-25T22:49:52.127Z', step: 'complete' }
+[Twitter API] Initializing read-only client...
+[Twitter API] Credentials check: {
+  hasApiKey: true,
+  hasApiSecret: true,
+  hasAccessToken: true,
+  hasAccessSecret: true
+}
+[Twitter API] Using twitter-api-v2 version: 1.19.0
+[Twitter API] Credentials verified successfully
+[Twitter API] Client initialized successfully
+[Twitter Storage] Checking if request can be made: {
+  endpoint: 'tweets/search/recent',
+  timestamp: '2025-02-25T22:49:52.278Z',
+  step: 'start-check'
+}
+[Twitter Storage] Fetching rate limit: {
+  endpoint: 'tweets/search/recent',
+  timestamp: '2025-02-25T22:49:52.278Z',
+  step: 'pre-fetch'
+}
+[Twitter Storage] Retrieved rate limit: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T22:39:36.819Z',
+  remaining: 99,
+  timestamp: '2025-02-25T22:49:52.295Z',
+  durationMs: 17,
+  step: 'post-fetch-found'
+}
+[Twitter Storage] Rate limit reset time passed: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T22:39:36.819Z',
+  now: '2025-02-25T22:49:52.295Z',
+  remaining: 99,
+  durationMs: 17,
+  step: 'check-reset-passed'
+}
+[Twitter Storage] Resetting rate limit after expiration: {
+  endpoint: 'tweets/search/recent',
+  oldResetAt: '2025-02-25T22:39:36.819Z',
+  newResetAt: '2025-02-25T23:04:52.295Z',
+  oldRemaining: 99,
+  newRemaining: 99,
+  step: 'reset-rate-limit'
+}
+[Twitter Storage] Updating rate limit: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T23:04:52.295Z',
+  remaining: 99,
+  timestamp: '2025-02-25T22:49:52.296Z',
+  step: 'pre-update'
+}
+[Twitter Storage] Rate limit updated: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T23:04:52.295Z',
+  remaining: 99,
+  durationMs: 26,
+  step: 'post-update'
+}
+[Twitter Storage] Updating rate limit: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T23:04:52.000Z',
+  remaining: 0,
+  timestamp: '2025-02-25T22:49:52.466Z',
+  step: 'pre-update'
+}
+[Twitter Storage] Rate limit updated: {
+  endpoint: 'tweets/search/recent',
+  resetAt: '2025-02-25T23:04:52.000Z',
+  remaining: 0,
+  durationMs: 11,
+  step: 'post-update'
+}
+[Twitter Storage] Caching 22 tweets of type current
+[Twitter Storage] Starting entity cleanup: { timestamp: '2025-02-25T22:49:52.479Z', step: 'start' }
+[Twitter Storage] Found tweets to clean: {
+  tweetCount: 18,
+  timestamp: '2025-02-25T22:49:52.504Z',
+  step: 'tweets-found'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881557842739806222',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw925e0006ld03494agxqu',
+    'cm6awyaf00006jm03hebj149y',
+    'cm6axonmp0006jv03wffi8bho',
+    'cm6aydzki0006l203431ffwv7'
+  ],
+  timestamp: '2025-02-25T22:49:52.505Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881557842739806222',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.525Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881557842739806222',
+  entityKey: 'url-pic.x.com/ZmcT3sH8c5',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw925e0005ld039gnn01cj',
+    'cm6awyaf00005jm03ckliwqb6',
+    'cm6axonmp0005jv03fe8ywl6k',
+    'cm6aydzki0005l203vubp684f'
+  ],
+  timestamp: '2025-02-25T22:49:52.525Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881557842739806222',
+  entityKey: 'url-pic.x.com/ZmcT3sH8c5',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.533Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881534352351428641',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92820007ld03zywtgi9n',
+    'cm6awyahf0007jm03n95iaqyh',
+    'cm6axonpa0007jv03egfupw92',
+    'cm6aydzn50007l2039pe5l1w9'
+  ],
+  timestamp: '2025-02-25T22:49:52.534Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881534352351428641',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.542Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881531517450756283',
+  entityKey: 'url-pic.x.com/r3jGlefdeh',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92ao0008ld034vhba8fy',
+    'cm6awyajt0008jm037v1i75np',
+    'cm6axonrw0008jv032g53p4kn',
+    'cm6aydzpt0008l203dmxd85ki'
+  ],
+  timestamp: '2025-02-25T22:49:52.542Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881531517450756283',
+  entityKey: 'url-pic.x.com/r3jGlefdeh',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.551Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881313018128302376',
+  entityKey: 'mention-Cursor',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92da000ald0365scqbn1',
+    'cm6awyaow0009jm03k4g1yb3f',
+    'cm6axonui000ajv031rrb36ez',
+    'cm6aydzuu0009l20362rk2f6b'
+  ],
+  timestamp: '2025-02-25T22:49:52.551Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881313018128302376',
+  entityKey: 'mention-Cursor',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.559Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881313018128302376',
+  entityKey: 'url-x.com/IceSolst/statu…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92da0009ld03u4eoodq0',
+    'cm6awyaow000ajm03qo8cccvz',
+    'cm6axonui0009jv0329gbbzcc',
+    'cm6aydzuu000al2038nqobg8k'
+  ],
+  timestamp: '2025-02-25T22:49:52.559Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881313018128302376',
+  entityKey: 'url-x.com/IceSolst/statu…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.569Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881060046844645691',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92k3000cld03zvp3v710',
+    'cm6awyave000cjm03zgge6sdp',
+    'cm6axoo19000cjv03ttd1sp8e',
+    'cm6aye01n000cl203jpioz4xp'
+  ],
+  timestamp: '2025-02-25T22:49:52.569Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881060046844645691',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.577Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1880979105942049254',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92mr000dld03ynrur9bh',
+    'cm6awyaxw000djm03vvtz17rw',
+    'cm6axoo3v000djv03p9vf1xsm',
+    'cm6aye04b000dl2035lwa00qk'
+  ],
+  timestamp: '2025-02-25T22:49:52.578Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1880979105942049254',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.586Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1880707324710658126',
+  entityKey: 'url-x.com/keyladelslay/s…',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92ru000fld03ys5wtg5c',
+    'cm6awyb2x000fjm03c6jj4ybp',
+    'cm6axoo93000fjv03bweiv94c',
+    'cm6aye09m000fl203ozom6hoz'
+  ],
+  timestamp: '2025-02-25T22:49:52.586Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1880707324710658126',
+  entityKey: 'url-x.com/keyladelslay/s…',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.595Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1882221588235612592',
+  entityKey: 'url-pic.x.com/E0dp82Ymnk',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw91pl0001ld0345zncfwc',
+    'cm6awya2f0001jm03bgb3fnig',
+    'cm6axon750001jv03u4970oua',
+    'cm6aydz900002l203swvzbr0p'
+  ],
+  timestamp: '2025-02-25T22:49:52.595Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1882221588235612592',
+  entityKey: 'url-pic.x.com/E0dp82Ymnk',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.603Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1882221588235612592',
+  entityKey: 'mention-xai',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw91r70002ld03x0dqmeqn',
+    'cm6awya3z0002jm03pl4so5r0',
+    'cm6axon8t0002jv03dr50vzs3',
+    'cm6aydz7e0001l203i6k8a5f0'
+  ],
+  timestamp: '2025-02-25T22:49:52.603Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1882221588235612592',
+  entityKey: 'mention-xai',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.612Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1880278138422440206',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicateCount: 2,
+  duplicateIds: [ 'cm6aw92x3000gld03t3tfn23d', 'cm6awyb5g000gjm03t199hsgp' ],
+  timestamp: '2025-02-25T22:49:52.612Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1880278138422440206',
+  entityKey: 'url-x.com/vincit_amore/s…',
+  duplicatesRemoved: 2,
+  timestamp: '2025-02-25T22:49:52.627Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881882560722297236',
+  entityKey: 'mention-cursor_ai',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw91xc0003ld034z3tr7xl',
+    'cm6awya9z0003jm03dc2wpkmh',
+    'cm6axonhg0003jv034xnlj033',
+    'cm6aydzf70003l203fj83zdbf'
+  ],
+  timestamp: '2025-02-25T22:49:52.627Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881882560722297236',
+  entityKey: 'mention-cursor_ai',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.635Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881312032294891596',
+  entityKey: 'url-pic.x.com/JaerJ7ELdU',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92fx000bld03thipo3dv',
+    'cm6awyare000bjm03qbqlc0ja',
+    'cm6axonx2000bjv03n6512ggf',
+    'cm6aydzxg000bl203kbkeustt'
+  ],
+  timestamp: '2025-02-25T22:49:52.635Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881312032294891596',
+  entityKey: 'url-pic.x.com/JaerJ7ELdU',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.644Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1880880684501512239',
+  entityKey: 'url-amore.build',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw92pb000eld03af2gozfz',
+    'cm6awyb0f000ejm03rofhflca',
+    'cm6axoo6h000ejv03c6rugop0',
+    'cm6aye06x000el203f7gnbidy'
+  ],
+  timestamp: '2025-02-25T22:49:52.644Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1880880684501512239',
+  entityKey: 'url-amore.build',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.652Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Removing duplicates for tweet: {
+  tweetId: '1881773333068587233',
+  entityKey: 'url-pic.x.com/FwsRz1gvOo',
+  duplicateCount: 4,
+  duplicateIds: [
+    'cm6aw91zy0004ld03r8gzpjwj',
+    'cm6awyach0004jm03okgu2su4',
+    'cm6axonk20004jv03eqdop447',
+    'cm6aydzhv0004l203rwp3eoyn'
+  ],
+  timestamp: '2025-02-25T22:49:52.652Z',
+  step: 'pre-delete'
+}
+[Twitter Storage] Removed duplicates for tweet: {
+  tweetId: '1881773333068587233',
+  entityKey: 'url-pic.x.com/FwsRz1gvOo',
+  duplicatesRemoved: 4,
+  timestamp: '2025-02-25T22:49:52.661Z',
+  step: 'duplicates-removed'
+}
+[Twitter Storage] Entity cleanup complete: {
+  totalTweets: 18,
+  totalDuplicatesRemoved: 62,
+  timestamp: '2025-02-25T22:49:52.661Z',
+  step: 'complete'
+}
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1894492206028701779"
+  },
+  create: {
+    id: "1894492206028701779",
+    text: "@techhsiren https://t.co/IqkyJzkclD",
+    createdAt: new Date("2025-02-25T20:58:34.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 0,
+      like_count: 1,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 15
+    },
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1894492206028701779",
+    text: "@techhsiren https://t.co/IqkyJzkclD",
+    createdAt: new Date("2025-02-25T20:58:34.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 0,
+      like_count: 1,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 15
+    },
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
+[Twitter Storage] Error caching tweet: {
+  id: '1894492206028701779',
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894492206028701779"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894492206028701779",\n' +
+    '    text: "@techhsiren https://t.co/IqkyJzkclD",\n' +
+    '    createdAt: new Date("2025-02-25T20:58:34.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 0,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 15\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894492206028701779",\n' +
+    '    text: "@techhsiren https://t.co/IqkyJzkclD",\n' +
+    '    createdAt: new Date("2025-02-25T20:58:34.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 0,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 15\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894492206028701779"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894492206028701779",\n' +
+    '    text: "@techhsiren https://t.co/IqkyJzkclD",\n' +
+    '    createdAt: new Date("2025-02-25T20:58:34.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 0,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 15\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894492206028701779",\n' +
+    '    text: "@techhsiren https://t.co/IqkyJzkclD",\n' +
+    '    createdAt: new Date("2025-02-25T20:58:34.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 0,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 15\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1894470464317042817"
+  },
+  create: {
+    id: "1894470464317042817",
+    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",
+    createdAt: new Date("2025-02-25T19:32:10.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 1,
+      like_count: 1,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 12
+    },
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1894470464317042817",
+    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",
+    createdAt: new Date("2025-02-25T19:32:10.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 1,
+      like_count: 1,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 12
+    },
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
+[Twitter Storage] Error caching tweet: {
+  id: '1894470464317042817',
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894470464317042817"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894470464317042817",\n' +
+    `    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",\n` +
+    '    createdAt: new Date("2025-02-25T19:32:10.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 12\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894470464317042817",\n' +
+    `    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",\n` +
+    '    createdAt: new Date("2025-02-25T19:32:10.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 12\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894470464317042817"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894470464317042817",\n' +
+    `    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",\n` +
+    '    createdAt: new Date("2025-02-25T19:32:10.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 12\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894470464317042817",\n' +
+    `    text: "@LocBibliophilia @tenobrus Fair enough, being clockwork orange'ed would fuck you up no matter what it is tbh",\n` +
+    '    createdAt: new Date("2025-02-25T19:32:10.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 1,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 12\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1894468629502050583"
+  },
+  create: {
+    id: "1894468629502050583",
+    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",
+    createdAt: new Date("2025-02-25T19:24:53.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 1,
+      like_count: 2,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 24
+    },
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1894468629502050583",
+    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",
+    createdAt: new Date("2025-02-25T19:24:53.000Z"),
+    publicMetrics: {
+      retweet_count: 0,
+      reply_count: 1,
+      like_count: 2,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 24
+    },
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
+[Twitter Storage] Error caching tweet: {
+  id: '1894468629502050583',
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894468629502050583"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894468629502050583",\n' +
+    `    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",\n` +
+    '    createdAt: new Date("2025-02-25T19:24:53.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 2,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 24\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894468629502050583",\n' +
+    `    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",\n` +
+    '    createdAt: new Date("2025-02-25T19:24:53.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 2,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 24\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894468629502050583"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894468629502050583",\n' +
+    `    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",\n` +
+    '    createdAt: new Date("2025-02-25T19:24:53.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 2,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 24\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894468629502050583",\n' +
+    `    text: "@LocBibliophilia @tenobrus Well if it's stimulating in it's elegance and erudition, at least your mind would have a kernel of logical continuity and beauty to latch on to. Wouldn't be pleasant either way but your sanity would have a bit of a bastion.",\n` +
+    '    createdAt: new Date("2025-02-25T19:24:53.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 0,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 2,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 24\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+prisma:error 
+Invalid `prisma.tweet.upsert()` invocation:
+
+{
+  where: {
+    id: "1894458336634179645"
+  },
+  create: {
+    id: "1894458336634179645",
+    text: "@tenobrus Imagine someone \"finetuned\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",
+    createdAt: new Date("2025-02-25T18:43:59.000Z"),
+    publicMetrics: {
+      retweet_count: 1,
+      reply_count: 1,
+      like_count: 4,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 53
+    },
+    entities: {
+      create: []
+    },
++   authorId: String
+  },
+  update: {
+    id: "1894458336634179645",
+    text: "@tenobrus Imagine someone \"finetuned\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",
+    createdAt: new Date("2025-02-25T18:43:59.000Z"),
+    publicMetrics: {
+      retweet_count: 1,
+      reply_count: 1,
+      like_count: 4,
+      quote_count: 0,
+      bookmark_count: 0,
+      impression_count: 53
+    },
+    entities: {
+      deleteMany: {},
+      create: []
+    }
+  }
+}
+
+Argument `authorId` is missing.
+[Twitter Storage] Error caching tweet: {
+  id: '1894458336634179645',
+  error: '\n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894458336634179645"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894458336634179645",\n' +
+    '    text: "@tenobrus Imagine someone \\"finetuned\\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",\n' +
+    '    createdAt: new Date("2025-02-25T18:43:59.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 1,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 4,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 53\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894458336634179645",\n' +
+    '    text: "@tenobrus Imagine someone \\"finetuned\\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",\n' +
+    '    createdAt: new Date("2025-02-25T18:43:59.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 1,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 4,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 53\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.tweet.upsert()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "1894458336634179645"\n' +
+    '  },\n' +
+    '  create: {\n' +
+    '    id: "1894458336634179645",\n' +
+    '    text: "@tenobrus Imagine someone \\"finetuned\\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",\n' +
+    '    createdAt: new Date("2025-02-25T18:43:59.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 1,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 4,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 53\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      create: []\n' +
+    '    },\n' +
+    '+   authorId: String\n' +
+    '  },\n' +
+    '  update: {\n' +
+    '    id: "1894458336634179645",\n' +
+    '    text: "@tenobrus Imagine someone \\"finetuned\\" you by forcing you to just see the same numbers or absolute shit slop code over and over again, Clockwork Orange style, until those numbers/code occupy a large portion of your active neural connections. How misanthropic and mis-aligned would you be if… https://t.co/vjbHShl6OU",\n' +
+    '    createdAt: new Date("2025-02-25T18:43:59.000Z"),\n' +
+    '    publicMetrics: {\n' +
+    '      retweet_count: 1,\n' +
+    '      reply_count: 1,\n' +
+    '      like_count: 4,\n' +
+    '      quote_count: 0,\n' +
+    '      bookmark_count: 0,\n' +
+    '      impression_count: 53\n' +
+    '    },\n' +
+    '    entities: {\n' +
+    '      deleteMany: {},\n' +
+    '      create: []\n' +
+    '    }\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Argument `authorId` is missing.\n' +
+    '    at wn (/var/task/node_modules/@prisma/client/runtime/library.js:29:1363)\n' +
+    '    at Vn.handleRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6982)\n' +
+    '    at Vn.handleAndLogRequestError (/var/task/node_modules/@prisma/client/runtime/library.js:121:6663)\n' +
+    '    at Vn.request (/var/task/node_modules/@prisma/client/runtime/library.js:121:6370)\n' +
+    '    at async l (/var/task/node_modules/@prisma/client/runtime/library.js:130:9617)\n' +
+    '    at async f (/var/task/.next/server/chunks/9493.js:2:8586)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1882640627948732627',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1882221588235612592',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1882184388827562289',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881882560722297236',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881773333068587233',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881557842739806222',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881534352351428641',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881531517450756283',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881313018128302376',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881312032294891596',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881097840514224269',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1881060046844645691',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880979105942049254',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880880684501512239',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880707324710658126',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880278138422440206',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880272513529491529',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'
+}
+[Twitter Storage] Error caching tweet: {
+  id: '1880269705862336767',
+  error: '"undefined" is not valid JSON',
+  stack: 'SyntaxError: "undefined" is not valid JSON\n' +
+    '    at JSON.parse (<anonymous>)\n' +
+    '    at g (/var/task/.next/server/chunks/9493.js:2:4810)\n' +
+    '    at p (/var/task/.next/server/chunks/9493.js:2:5142)\n' +
+    '    at f (/var/task/.next/server/chunks/9493.js:2:8577)\n' +
+    '    at async g (/var/task/.next/server/app/api/cron/fetch-tweets/route.js:1:11247)\n' +
+    '    at async /var/task/.next/server/chunks/9493.js:2:2351\n' +
+    '    at async /var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:38411\n' +
+    '    at async e_.execute (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:27880)\n' +
+    '    at async e_.handle (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:6:39943)\n' +
+    '    at async en (/var/task/node_modules/next/dist/compiled/next-server/server.runtime.prod.js:16:25516)'

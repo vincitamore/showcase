@@ -445,8 +445,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments',
       'user.fields': 'profile_image_url,username',
       'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
-      // Use camelCase for expansions parameter as expected by the Twitter API v2 client
-      expansions: 'author_id,attachments.media_keys,attachments.poll_ids,entities.mentions.username,referenced_tweets.id,referenced_tweets.id.author_id'
+      'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
     };
 
     // If we have cached tweets, only fetch newer ones
@@ -486,10 +485,11 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
-        max_results: 10, // Reduce to a small number
-        'tweet.fields': 'created_at,public_metrics', // Use dot notation as expected by Twitter API
-        'user.fields': 'username',
-        // Remove other parameters to isolate the issue
+        max_results: 10, // Keep the reduced number for testing
+        'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments', // Restore full fields
+        'user.fields': 'profile_image_url,username',
+        'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
+        'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
       });
       
       // Add detailed response logging
@@ -511,10 +511,20 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         });
       }
       
+      // Validate response structure
+      if (!response.data || !Array.isArray(response.data)) {
+        logger.error('Twitter API response missing data array', {
+          step: 'response-validation',
+          responseType: typeof response.data,
+          isArray: Array.isArray(response.data)
+        });
+        throw new APIError('Twitter API response missing data array', 500, 'INVALID_RESPONSE_FORMAT');
+      }
+      
       logger.info('Twitter API request successful', { 
         step: 'twitter-request-success',
         hasData: !!response.data,
-        dataCount: response.data?.data?.length || 0,
+        dataCount: response.data?.length || 0,
         rateLimit: response.rateLimit ? {
           remaining: response.rateLimit.remaining,
           reset: response.rateLimit.reset
@@ -525,9 +535,9 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       logger.info('Twitter API quota usage', {
         step: 'quota-tracking',
         requestedTweets: DAILY_TWEET_FETCH_LIMIT,
-        receivedTweets: response.data?.data?.length || 0,
+        receivedTweets: response.data?.length || 0,
         monthlyQuota: 100, // Total monthly post quota
-        quotaUsage: `${response.data?.data?.length || 0}/100 posts for this request`
+        quotaUsage: `${response.data?.length || 0}/100 posts for this request`
       });
     } catch (twitterError: unknown) {
       const errorMessage = twitterError instanceof Error 
@@ -706,7 +716,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     }
 
     // Get tweets from the response
-    const newTweets = response.data.data;
+    const newTweets = response.data;
     
     if (!newTweets?.length) {
       logger.info('No new tweets found', {
@@ -792,6 +802,15 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     const tweetsToCache = searchParams.since_id
       ? [...selectedNewTweets, ...cachedTweets].slice(0, MAX_TWEETS)
       : selectedNewTweets;
+
+    // Log the includes object for debugging
+    logger.info('Twitter API response includes', {
+      step: 'includes-debug',
+      hasIncludes: !!response.includes,
+      includesKeys: response.includes ? Object.keys(response.includes) : [],
+      mediaCount: response.includes?.media?.length || 0,
+      usersCount: response.includes?.users?.length || 0
+    });
 
     // Cache the tweets
     await cacheTweets(tweetsToCache, 'current', response.includes);

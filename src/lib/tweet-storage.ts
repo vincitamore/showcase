@@ -44,7 +44,7 @@ type CacheType = (typeof CACHE_TYPES)[keyof typeof CACHE_TYPES]
 
 // Helper function to safely convert to Prisma JSON
 function toPrismaJson<T>(data: T) {
-  if (data === null) return null;
+  if (data === null || data === undefined) return null;
   return JSON.parse(JSON.stringify(data));
 }
 
@@ -181,7 +181,7 @@ async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) 
         tweet: { connect: { id: tweet.id } },
         metadata: toPrismaJson(mediaMetadata)
       } as EntityCreateInput;
-    }).filter((item): item is EntityCreateInput => item !== null);
+    }).filter(item => item !== null) as EntityCreateInput[];
 
     entityPromises.push(...mediaItems.map(item => Promise.resolve(item)));
   }
