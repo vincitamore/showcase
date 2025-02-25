@@ -12,12 +12,33 @@ export const CACHE_TYPES = {
   SELECTED: 'selected'
 } as const
 
+// New constants for tweet limiting and selection
+export const DAILY_TWEET_FETCH_LIMIT = 4 // Fetch only 4 tweets per day
+export const TECH_SCORE_THRESHOLD = 0.5 // Minimum tech relevance score to be considered (0-1)
+
 // Default rate limits per endpoint (requests per 15 minutes)
 export const DEFAULT_RATE_LIMITS = {
   'users/by/username': 900,
   'users/:id/tweets': 1500,
   'default': 100
 } as const
+
+// Tech-related keywords for filtering
+export const TECH_KEYWORDS = [
+  'tech', 'technology', 'software', 'development', 'code', 'coding', 'programming',
+  'developer', 'engineer', 'cybersecurity', 'security', 'infosec', 'javascript', 'typescript',
+  'python', 'java', 'csharp', 'c#', 'react', 'angular', 'vue', 'nodejs', 'node.js', 
+  'database', 'sql', 'nosql', 'cloud', 'aws', 'azure', 'gcp', 'devops', 'github',
+  'git', 'stackoverflow', 'docker', 'kubernetes', 'k8s', 'api', 'microservices',
+  'frontend', 'backend', 'fullstack', 'web', 'app', 'mobile', 'ios', 'android',
+  'machine learning', 'ml', 'ai', 'artificial intelligence', 'data science',
+  'algorithm', 'framework', 'library', 'package', 'module', 'function', 'agile',
+  'scrum', 'kanban', 'ci/cd', 'architecture', 'infrastructure', 'networking',
+  'network', 'encryption', 'protocol', 'server', 'client', 'authentication',
+  'authorization', 'cache', 'performance', 'optimization', 'responsive',
+  'scalable', 'testing', 'debug', 'open source', 'oss', 'hardware', 'automation',
+  'linux', 'windows', 'unix', 'macos', 'ui', 'ux', 'user interface', 'design'
+]
 
 type CacheType = (typeof CACHE_TYPES)[keyof typeof CACHE_TYPES]
 
@@ -318,6 +339,38 @@ async function cleanupDuplicateEntities() {
   });
 }
 
+// Added function to score tweets based on tech relevance
+export function scoreTweetRelevance(tweet: TweetV2): number {
+  if (!tweet.text) return 0;
+  
+  const text = tweet.text.toLowerCase();
+  const hashtags = tweet.entities?.hashtags?.map(h => h.tag.toLowerCase()) || [];
+  
+  // Count tech keyword mentions in the tweet text
+  const textMatches = TECH_KEYWORDS.filter(keyword => 
+    text.includes(keyword.toLowerCase())
+  ).length;
+  
+  // Count tech keyword mentions in hashtags
+  const hashtagMatches = hashtags.filter(tag =>
+    TECH_KEYWORDS.some(keyword => tag.includes(keyword.toLowerCase()))
+  ).length;
+  
+  // Calculate a base score (0-1) based on keyword density
+  const textLength = text.split(/\s+/).length || 1; // Prevent division by zero
+  const keywordDensity = (textMatches + hashtagMatches) / textLength;
+  
+  // Quality factors - check for links (often indicates more substantive content)
+  const hasLinks = tweet.entities?.urls && tweet.entities.urls.length > 0 ? 0.2 : 0;
+  
+  // Check tweet length - longer tweets often have more substance
+  const lengthBonus = textLength > 15 ? 0.1 : 0;
+  
+  // Calculate final score (capped at 1.0)
+  const rawScore = keywordDensity * 5 + hasLinks + lengthBonus;
+  return Math.min(rawScore, 1.0);
+}
+
 // Cache tweets in the database
 export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYPES.CURRENT, includes?: ApiV2Includes) {
   console.log(`[Twitter Storage] Caching ${tweets.length} tweets of type ${type}`);
@@ -344,7 +397,14 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
     }
   });
 
-  for (const tweet of tweets) {
+  // Sort tweets by creation date with newest first
+  const sortedTweets = [...tweets].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  for (const tweet of sortedTweets) {
     try {
       // First, delete any existing entities for this tweet to prevent duplicates
       await (prisma as any).tweetEntity.deleteMany({
@@ -523,25 +583,38 @@ export async function getSelectedTweets(): Promise<TweetV2[]> {
   
   // Ensure we return exactly SELECTED_TWEET_COUNT tweets
   const tweets = cache?.tweets || [];
-  if (tweets.length > SELECTED_TWEET_COUNT) {
+  
+  // Sort by creation date (newer first) with a small boost for newer tweets
+  const sortedTweets = [...tweets].sort((a: any, b: any) => {
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    
+    // Prioritize newer tweets, but with some randomness to avoid always showing the same ones
+    const recencyBoost = Math.random() * 0.3; // Random boost factor between 0-0.3
+    const normalizedDateDiff = (dateB - dateA) / (7 * 24 * 60 * 60 * 1000); // Normalize to a week scale
+    
+    return normalizedDateDiff * (1 + recencyBoost);
+  });
+  
+  if (sortedTweets.length > SELECTED_TWEET_COUNT) {
     console.log('[Tweet Storage] Trimming selected tweets to limit:', {
-      total: tweets.length,
+      total: sortedTweets.length,
       limit: SELECTED_TWEET_COUNT,
-      removing: tweets.length - SELECTED_TWEET_COUNT,
+      removing: sortedTweets.length - SELECTED_TWEET_COUNT,
       timestamp: new Date().toISOString(),
       step: 'trimming'
     });
-    return tweets.slice(0, SELECTED_TWEET_COUNT);
+    return sortedTweets.slice(0, SELECTED_TWEET_COUNT);
   }
   
   console.log('[Tweet Storage] Returning selected tweets:', {
-    count: tweets.length,
-    ids: tweets.map((t: TweetV2) => t.id),
+    count: sortedTweets.length,
+    ids: sortedTweets.map((t: TweetV2) => t.id),
     timestamp: new Date().toISOString(),
     step: 'complete'
   });
   
-  return tweets;
+  return sortedTweets;
 }
 
 // Rate limit management

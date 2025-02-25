@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/fetch-tweets",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/rotate-logs",

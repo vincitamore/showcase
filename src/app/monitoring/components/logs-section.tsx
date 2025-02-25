@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Card3D } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LogsTable, type LogEntry } from '@/components/logs/logs-table'
 
@@ -25,33 +25,16 @@ export default function LogsSection() {
         }
       })
       
-      console.debug('[LogsSection] Fetch response:', {
-        status: response.status,
-        ok: response.ok,
-        statusText: response.statusText
-      })
-      
       if (!response.ok) {
         throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
-      console.debug('[LogsSection] Received data:', {
-        logCount: data.logs?.length,
-        total: data.total,
-        query: data.query
-      })
       
       // Sort logs by timestamp in descending order
       const sortedLogs = [...data.logs].sort((a, b) => 
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
-      
-      console.debug('[LogsSection] Sorted logs:', {
-        count: sortedLogs.length,
-        latest: sortedLogs[0]?.timestamp,
-        oldest: sortedLogs[sortedLogs.length - 1]?.timestamp
-      })
       
       setLogs(sortedLogs)
       setTotal(data.total)
@@ -62,13 +45,11 @@ export default function LogsSection() {
     }
   }, [])
 
-  // Initial fetch
   useEffect(() => {
     console.debug('[LogsSection] Running initial fetch')
     fetchLogs()
   }, [fetchLogs])
 
-  // Set up auto-refresh
   useEffect(() => {
     if (!isAutoRefresh) {
       console.debug('[LogsSection] Auto-refresh disabled')
@@ -76,7 +57,6 @@ export default function LogsSection() {
     }
 
     console.debug('[LogsSection] Setting up auto-refresh')
-    fetchLogs() // Fetch immediately when auto-refresh is enabled
     const interval = setInterval(fetchLogs, REFRESH_INTERVAL)
     return () => {
       console.debug('[LogsSection] Cleaning up auto-refresh')
@@ -84,14 +64,10 @@ export default function LogsSection() {
     }
   }, [isAutoRefresh, fetchLogs])
 
-  const toggleAutoRefresh = useCallback(() => {
-    setIsAutoRefresh(prev => !prev)
-  }, [])
-
   return (
     <section>
       <h2 className="text-2xl font-semibold mb-4">System Logs</h2>
-      <Card3D className="p-6">
+      <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -103,7 +79,7 @@ export default function LogsSection() {
             <Button
               variant="outline"
               size="default"
-              onClick={toggleAutoRefresh}
+              onClick={() => setIsAutoRefresh(prev => !prev)}
               className="shrink-0"
             >
               {isAutoRefresh ? 'Pause Updates' : 'Resume Updates'}
@@ -111,14 +87,10 @@ export default function LogsSection() {
           </div>
 
           <div className="rounded-md border">
-            <LogsTable logs={logs} />
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            Showing {logs.length} of {total} logs
+            <LogsTable logs={logs} total={total} />
           </div>
         </div>
-      </Card3D>
+      </Card>
     </section>
   )
 } 

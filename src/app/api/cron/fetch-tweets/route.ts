@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getReadOnlyClient } from '@/lib/x-api';
-import { cacheTweets, getCachedTweets, updateSelectedTweets, SELECTED_TWEET_COUNT, FIFTEEN_MINUTES } from '@/lib/tweet-storage';
+import { 
+  cacheTweets,
+  getCachedTweets,
+  updateSelectedTweets,
+  scoreTweetRelevance,  
+  SELECTED_TWEET_COUNT,
+  FIFTEEN_MINUTES,
+  DAILY_TWEET_FETCH_LIMIT,
+  TECH_SCORE_THRESHOLD
+} from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError } from 'twitter-api-v2';
 import { 
@@ -11,6 +20,7 @@ import {
 } from '@/lib/tweet-storage';
 import { APIError, handleAPIError } from '@/lib/api-error';
 import { logger, withLogging } from '@/lib/logger';
+import { prisma } from '@/lib/db';
 
 type TweetWithEntities = {
   id: string;
@@ -137,6 +147,62 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     });
     cachedTweets = tweets;
 
+    // Check if we already fetched tweets today to respect the daily limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const latestCache = await prisma.tweetCache.findFirst({
+      where: {
+        type: 'current',
+        createdAt: {
+          gte: today
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    // Count how many times we've fetched tweets today
+    const fetchCountToday = await prisma.tweetCache.count({
+      where: {
+        type: 'current',
+        createdAt: {
+          gte: today
+        }
+      }
+    });
+    
+    logger.info('Checking daily fetch count', { 
+      fetchCountToday,
+      dailyLimit: DAILY_TWEET_FETCH_LIMIT,
+      step: 'daily-limit-check'
+    });
+    
+    // If we've already hit our daily limit, just use cached tweets
+    if (fetchCountToday >= DAILY_TWEET_FETCH_LIMIT) {
+      logger.info('Daily fetch limit reached, using cache', {
+        fetchCountToday,
+        dailyLimit: DAILY_TWEET_FETCH_LIMIT,
+        cachedTweetCount: cachedTweets.length,
+        step: 'daily-limit-reached'
+      });
+      
+      // Still select a fresh set of tweets to display, even if we don't fetch new ones
+      await selectTweetsForDisplay(cachedTweets);
+      
+      return NextResponse.json({
+        status: 'success',
+        tweetCount: cachedTweets.length,
+        source: 'cache',
+        dailyLimit: {
+          reached: true,
+          count: fetchCountToday,
+          limit: DAILY_TWEET_FETCH_LIMIT
+        }
+      });
+    }
+
     // If we have enough recent tweets, skip the API call
     if (cachedTweets.length >= MAX_TWEETS) {
       const mostRecentTweet = cachedTweets[0];
@@ -149,6 +215,10 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
           tweetCount: cachedTweets.length,
           cacheAgeMinutes: Math.floor(cacheAge / 60000)
         });
+        
+        // Still select a fresh set of tweets to display
+        await selectTweetsForDisplay(cachedTweets);
+        
         return NextResponse.json({
           status: 'success',
           tweetCount: cachedTweets.length,
@@ -200,6 +270,9 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
       // Return cached tweets if available
       if (cachedTweets.length > 0) {
+        // Still select a fresh set of tweets for display
+        await selectTweetsForDisplay(cachedTweets);
+        
         return NextResponse.json({
           status: 'success',
           tweetCount: cachedTweets.length,
@@ -223,9 +296,10 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       );
     }
 
-    // Prepare search parameters
+    // Prepare search parameters - request more tweets than we'll store
+    // so we can filter for tech-relevant content
     const searchParams: any = {
-      max_results: MAX_TWEETS,
+      max_results: 20, // Request more than we'll save to filter for quality
       'tweet.fields': ['created_at', 'public_metrics', 'entities', 'author_id', 'attachments'],
       'user.fields': ['profile_image_url', 'username'],
       'media.fields': [
@@ -287,6 +361,9 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         cachedCount: cachedTweets.length
       });
       
+      // Still refresh the selected tweets from cache
+      await selectTweetsForDisplay(cachedTweets);
+      
       return NextResponse.json({
         status: 'success',
         tweetCount: cachedTweets.length,
@@ -300,18 +377,71 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       newTweetCount: newTweets.length
     });
 
+    // Score tweets by tech relevance
+    const scoredTweets = newTweets.map(tweet => ({
+      tweet,
+      score: scoreTweetRelevance(tweet)
+    }));
+    
+    // Log tech scores
+    logger.info('Tweet tech relevance scores', {
+      scores: scoredTweets.map(t => ({
+        id: t.tweet.id,
+        score: t.score,
+        text: t.tweet.text.substring(0, 50) + (t.tweet.text.length > 50 ? '...' : '')
+      })),
+      step: 'tech-scoring'
+    });
+    
+    // First take high-quality tech tweets
+    const highQualityTweets = scoredTweets
+      .filter(t => t.score >= TECH_SCORE_THRESHOLD)
+      .map(t => t.tweet);
+    
+    // If we need more to meet our daily limit, add lower quality tweets sorted by score
+    let selectedNewTweets = highQualityTweets;
+    if (highQualityTweets.length < DAILY_TWEET_FETCH_LIMIT) {
+      const lowerQualityNeeded = DAILY_TWEET_FETCH_LIMIT - highQualityTweets.length;
+      const lowerQualityTweets = scoredTweets
+        .filter(t => t.score < TECH_SCORE_THRESHOLD)
+        .sort((a, b) => b.score - a.score) // Higher score first
+        .slice(0, lowerQualityNeeded)
+        .map(t => t.tweet);
+      
+      selectedNewTweets = [...highQualityTweets, ...lowerQualityTweets];
+    } else if (highQualityTweets.length > DAILY_TWEET_FETCH_LIMIT) {
+      // If we have more quality tweets than our limit, take the highest scoring ones
+      selectedNewTweets = scoredTweets
+        .sort((a, b) => b.score - a.score)
+        .slice(0, DAILY_TWEET_FETCH_LIMIT)
+        .map(t => t.tweet);
+    }
+    
+    logger.info('Selected tweets to cache', {
+      highQualityCount: highQualityTweets.length,
+      selectedCount: selectedNewTweets.length,
+      dailyLimit: DAILY_TWEET_FETCH_LIMIT,
+      ids: selectedNewTweets.map(t => t.id),
+      step: 'tweet-selection'
+    });
+
     // Merge with existing tweets if needed
     const tweetsToCache = searchParams.since_id
-      ? [...newTweets, ...cachedTweets].slice(0, MAX_TWEETS)
-      : newTweets;
+      ? [...selectedNewTweets, ...cachedTweets].slice(0, MAX_TWEETS)
+      : selectedNewTweets;
 
     // Cache the tweets
     await cacheTweets(tweetsToCache, 'current', response.includes);
+    
+    // Select tweets for display
+    await selectTweetsForDisplay([...tweetsToCache]);
 
     return NextResponse.json({
       status: 'success',
       tweetCount: tweetsToCache.length,
-      newTweets: newTweets.length,
+      filteredCount: selectedNewTweets.length,
+      highQualityCount: highQualityTweets.length,
+      totalNewTweets: newTweets.length,
       source: 'api'
     });
 
@@ -348,4 +478,79 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
 // Wrap the handler with logging and ensure it returns Response
 export const GET = withLogging(fetchTweetsHandler, 'api/cron/fetch-tweets'); 
+
+// New helper function to select and update tweets for display
+async function selectTweetsForDisplay(tweets: TweetV2[]) {
+  try {
+    logger.info('Selecting tweets for display', { 
+      totalTweets: tweets.length,
+      step: 'selection-start'
+    });
+    
+    // Score tweets for tech relevance
+    const scoredTweets = tweets.map(tweet => ({
+      tweet,
+      score: scoreTweetRelevance(tweet),
+      // For tweets created within the last week, give them a freshness boost
+      freshness: tweet.created_at ? 
+        Math.max(0, 7 - (Date.now() - new Date(tweet.created_at).getTime()) / (24 * 60 * 60 * 1000)) / 7 :
+        0
+    }));
+    
+    // Log the scoring results
+    logger.info('Tweet scoring results', {
+      scores: scoredTweets.map(t => ({
+        id: t.tweet.id,
+        score: t.score,
+        freshness: t.freshness,
+        combined: t.score * 0.7 + t.freshness * 0.3,
+        text: t.tweet.text.substring(0, 50) + (t.tweet.text.length > 50 ? '...' : '')
+      })),
+      step: 'tweet-scoring'
+    });
+    
+    // First, prioritize tech-relevant tweets (score above threshold)
+    const qualityTweets = scoredTweets.filter(t => t.score >= TECH_SCORE_THRESHOLD);
+    
+    // If we don't have enough quality tweets, include some lower-scored ones
+    let selectedTweets = qualityTweets;
+    if (qualityTweets.length < SELECTED_TWEET_COUNT) {
+      const remainingCount = SELECTED_TWEET_COUNT - qualityTweets.length;
+      const lowerQualityTweets = scoredTweets
+        .filter(t => t.score < TECH_SCORE_THRESHOLD)
+        .sort((a, b) => b.score - a.score) // Higher score first
+        .slice(0, remainingCount);
+      
+      selectedTweets = [...qualityTweets, ...lowerQualityTweets];
+    }
+    
+    // Final sorting: combine tech score (70%) with freshness (30%)
+    selectedTweets.sort((a, b) => {
+      const scoreA = a.score * 0.7 + a.freshness * 0.3;
+      const scoreB = b.score * 0.7 + b.freshness * 0.3;
+      return scoreB - scoreA; // Higher combined score first
+    });
+    
+    // Select the top tweets up to our limit
+    const finalSelection = selectedTweets.slice(0, SELECTED_TWEET_COUNT).map(t => t.tweet.id);
+    
+    // Update the selected tweets in the database
+    await updateSelectedTweets(finalSelection);
+    
+    logger.info('Selected tweets for display', {
+      selectedCount: finalSelection.length,
+      qualityTweetCount: qualityTweets.length,
+      ids: finalSelection,
+      step: 'selection-complete'
+    });
+    
+    return finalSelection;
+  } catch (error) {
+    logger.error('Error selecting tweets for display', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      step: 'selection-error'
+    });
+    throw error;
+  }
+}
 

@@ -57,9 +57,10 @@ const levelColors = {
 
 interface LogsTableProps {
   logs: LogEntry[]
+  total?: number
 }
 
-export function LogsTable({ logs }: LogsTableProps) {
+export function LogsTable({ logs, total }: LogsTableProps) {
   const [mounted, setMounted] = useState(false)
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange')
@@ -385,6 +386,9 @@ export function LogsTable({ logs }: LogsTableProps) {
     )
   }
 
+  // Count filtered logs for display purposes
+  const visibleCount = table.getFilteredRowModel().rows.length
+
   return (
     <div className="rounded-md border">
       <ScrollArea className="h-[calc(100vh-300px)]">
@@ -459,6 +463,14 @@ export function LogsTable({ logs }: LogsTableProps) {
           <ScrollBar orientation="horizontal" />
         </div>
       </ScrollArea>
+
+      {/* Table footer with count information */}
+      <div className="px-4 py-2 text-sm text-muted-foreground border-t">
+        Showing {visibleCount} {visibleCount === 1 ? 'log' : 'logs'}
+        {total !== undefined && total > 0 && visibleCount !== total && (
+          <span> of {total} total</span>
+        )}
+      </div>
 
       <LogModal
         log={selectedLog}

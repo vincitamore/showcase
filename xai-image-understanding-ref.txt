@@ -1,0 +1,383 @@
+Image Understanding
+The vision model can receive both text and image inputs. You can pass images into the model in one of two ways: base64 encoded strings or web URLs.
+
+Under the hood, image understanding shares the same API route and the same message body schema consisted of 
+system
+/
+user
+/
+assistant
+ messages. The difference is having image in the message content body instead of text.
+
+As the knowledge in this guide is built upon understanding of the chat capability. It is suggested that you familiarize yourself with the chat capability before following this guide.
+
+#Prerequisites
+xAI Account: You need an xAI account to access the API.
+API Key: Ensure that your API key has access to the vision endpoint and a model supporting image input is enabled.
+If you don't have these and are unsure of how to create one, follow the Hitchhiker's Guide to Grok.
+
+Set your API key in your environment:
+
+bash
+
+
+export XAI_API_KEY="your_api_key"
+#Reminder on image understanding model general limitations
+It might be easier to run into model limit with these models than chat models:
+
+Maximum image size: 
+10MiB
+Maximum number of images: No limit
+Any image/text input order is accepted (e.g. text prompt can precede image prompt)
+#Constructing the Message Body - Difference from Chat
+The request message to image understanding is similar to chat. The main difference is that instead of text input:
+
+json
+
+
+[
+    {
+        "role": "user",
+        "content": "What is in this image ?",
+    }
+]
+We send in 
+content
+ as a list of objects:
+
+json
+
+
+[
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/jpeg;base64,<base64_image_string>",
+                    "detail": "high",
+                },
+            },
+            {
+                "type": "text",
+                "text": "What is in this image ?",
+            },
+        ],
+    }
+]
+The 
+image_url.url
+ can also be the image's url on the Internet.
+
+You can use the text prompt to ask questions about the image(s), or discuss topics with the image as context to the discussion, etc.
+
+#Web URL Input
+The model supports web URL as inputs for images. The API will fetch the image from the public URL and handle it as part of the chat. Integrating with URLs is as simple as:
+
+
+python
+
+
+import os
+from openai import OpenAI
+
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+image_url = (
+    "https://science.nasa.gov/wp-content/uploads/2023/09/web-first-images-release.png"
+)
+
+client = OpenAI(
+    api_key=XAI_API_KEY,
+    base_url="https://api.x.ai/v1",
+)
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_url,
+                    "detail": "high",
+                },
+            },
+            {
+                "type": "text",
+                "text": "What's in this image?",
+            },
+        ],
+    },
+]
+
+completion = client.chat.completions.create(
+    model="grok-2-vision-1212",
+    messages=messages,
+    temperature=0.01,
+)
+
+print(completion.choices[0].message.content)
+#Base64 string input
+You will need to pass in base64 encoded image directly in the request, in the user messages.
+
+Here is an example of how you can load a local image, encode it in Base64 and use it as part of your conversation:
+
+
+python
+
+
+import os
+from openai import OpenAI
+import os
+import base64
+
+XAI_API_KEY = os.getenv("XAI_API_KEY")
+image_path = "..."
+
+client = OpenAI(
+    api_key=XAI_API_KEY,
+    base_url="https://api.x.ai/v1",
+)
+
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+    return encoded_string
+
+# Getting the base64 string
+base64_image = encode_image(image_path)
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}",
+                    "detail": "high",
+                },
+            },
+            {
+                "type": "text",
+                "text": "What's in this image?",
+            },
+        ],
+    },
+]
+
+completion = client.chat.completions.create(
+    model="grok-2-vision-1212",
+    messages=messages,
+    stream=True,
+    temperature=0.01,
+)
+
+print(completion.choices[0].message.content)
+#Multiple images input
+You can send multiple images in the prompt, for example:
+
+
+python
+
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image1}",
+                    "detail": "high"
+                }
+            },
+            {
+                "type": "text",
+                "text": "What are in these images?"
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image2}",
+                    "detail": "high",
+                }
+            }
+        ],
+    },
+]
+The image prompts can interleave with text prompts in any order.
+
+#Image token usage
+The prompt image token usage is provided in the API response.
+
+python
+
+
+# Stream response
+print(next(stream).usage.prompt_tokens_details.image_tokens)
+
+# Non-stream response
+print(response.usage.prompt_tokens_details.image_tokens)
+#Parameters
+Request body
+Search
+messages
+
+array
+
+required
+
+A list of messages that make up the the chat conversation. Different models support different message types, such as image and text.
+
+model
+
+string
+
+required
+
+Model name for the model to use.
+
+deferred
+
+boolean | null
+
+If set, the request returns a request id.
+
+frequency_penalty
+
+number | null
+
+default: 0
+
+min: -2
+
+max: 2
+
+Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
+
+logit_bias
+
+object | null
+
+A JSON object that maps tokens (specified by their token ID in the tokenizer) to an associated bias value from -100 to 100. Mathematically, the bias is added to the logits generated by the model prior to sampling. The exact effect will vary per model, but values between -1 and 1 should decrease or increase likelihood of selection; values like -100 or 100 should result in a ban or exclusive selection of the relevant token.
+
+logprobs
+
+boolean | null
+
+default: false
+
+Whether to return log probabilities of the output tokens or not. If true, returns the log probabilities of each output token returned in the content of message.
+
+max_tokens
+
+integer | null
+
+default: 16384
+
+The maximum number of tokens that can be generated in the chat completion. This value can be used to control costs for text generated via API. The default value will be 16,384 if not specified.
+
+n
+
+integer | null
+
+default: 1
+
+min: 1
+
+How many chat completion choices to generate for each input message. Note that you will be charged based on the number of generated tokens across all of the choices. Keep n as 1 to minimize costs.
+
+presence_penalty
+
+number | null
+
+default: 0
+
+min: -2
+
+max: 2
+
+Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
+
+response_format
+
+null | object
+
+
+seed
+
+integer | null
+
+If specified, our system will make a best effort to sample deterministically, such that repeated requests with the same `seed` and parameters should return the same result. Determinism is not guaranteed, and you should refer to the `system_fingerprint` response parameter to monitor changes in the backend.
+
+stop
+
+array | null
+
+Up to 4 sequences where the API will stop generating further tokens.
+
+stream
+
+boolean | null
+
+default: false
+
+If set, partial message deltas will be sent. Tokens will be sent as data-only server-sent events as they become available, with the stream terminated by a `data: [DONE]` message.
+
+stream_options
+
+null | object
+
+
+temperature
+
+number | null
+
+default: 1
+
+min: 0
+
+max: 2
+
+What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
+
+tool_choice
+
+null | string | object
+
+
+tools
+
+array | null
+
+A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for. A max of 128 functions are supported.
+
+top_logprobs
+
+integer | null
+
+min: 0
+
+max: 20
+
+An integer between 0 and 20 specifying the number of most likely tokens to return at each token position, each with an associated log probability. logprobs must be set to true if this parameter is used.
+
+top_p
+
+number | null
+
+default: 1
+
+min(exclusive): 0
+
+max: 2
+
+An alternative to sampling with `temperature`, called nucleus sampling, where the model considers the results of the tokens with `top_p` probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. It is generally recommended to alter this or `temperature` but not both.
+
+user
+
+string | null
+
+A unique identifier representing your end-user, which can help xAI to monitor and detect abuse.
