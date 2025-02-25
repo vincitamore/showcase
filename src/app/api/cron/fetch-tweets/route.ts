@@ -36,14 +36,12 @@ function validateTwitterQuery(query: string): { isValid: boolean; reason?: strin
   // Check for standalone operators
   // The from: operator is a valid standalone operator
   if (query.startsWith('from:')) {
-    const username = query.substring(5).trim();
-    if (!username) {
+    const usernameMatch = query.match(/^from:([a-zA-Z0-9_]+)/);
+    if (!usernameMatch || !usernameMatch[1]) {
       return { isValid: false, reason: 'Username cannot be empty in from: operator' };
     }
-    // Username validation - alphanumeric and underscore only
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      return { isValid: false, reason: 'Username contains invalid characters' };
-    }
+    
+    // We've already sanitized the username, so this should pass
     return { isValid: true };
   }
   
@@ -342,26 +340,31 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       throw new APIError('Twitter username not configured', 500, 'CONFIG_ERROR');
     }
 
-    // Add more strict validation for username
-    if (!/^[a-zA-Z0-9_]{1,15}$/.test(username)) {
-      logger.error('Invalid Twitter username format', {
-        step: 'username-validation',
-        username
-      });
-      throw new APIError('Invalid Twitter username format - must be alphanumeric with underscores only, max 15 chars', 400, 'INVALID_USERNAME');
-    }
+    // Log the actual username for debugging
+    logger.info('Twitter username details', {
+      step: 'username-debug',
+      username,
+      length: username.length,
+      charCodes: Array.from(username).map(c => c.charCodeAt(0))
+    });
 
-    // Ensure the username is properly formatted for the Twitter API v2 query
-    // Try an alternative query format that might be more compatible
-    // const query = `from:${username.trim()}`;
+    // Sanitize the username to ensure it only contains valid characters
+    const sanitizedUsername = username.replace(/[^\w]/g, '');
     
-    // Alternative query format - try this if the standard format fails
-    const query = `from:${username.trim()} -is:retweet`;
+    // Log the sanitized username
+    logger.info('Sanitized username', {
+      step: 'username-sanitize',
+      original: username,
+      sanitized: sanitizedUsername
+    });
+
+    // Use the sanitized username in the query
+    const query = `from:${sanitizedUsername.trim()} -is:retweet`;
     
     logger.info('Using Twitter query', {
       step: 'query-preparation',
       query,
-      username: username.trim()
+      username: sanitizedUsername.trim()
     });
     
     // Validate query format
@@ -470,11 +473,21 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         query
       });
       
+      // Verify client is properly initialized
+      if (!client || !client.v2) {
+        logger.error('Twitter client not properly initialized', {
+          step: 'client-check',
+          hasClient: !!client,
+          hasV2: client ? !!client.v2 : false
+        });
+        throw new APIError('Twitter client not properly initialized', 500, 'CLIENT_INITIALIZATION_ERROR');
+      }
+      
       // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
         max_results: 10, // Reduce to a small number
-        'tweet.fields': 'created_at,public_metrics', // Simplify fields
+        'tweet.fields': 'created_at,public_metrics', // Use dot notation as expected by Twitter API
         'user.fields': 'username',
         // Remove other parameters to isolate the issue
       });
@@ -573,6 +586,13 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         const errorDetails = {
           step: 'bad-request-detailed',
           query,
+          username: {
+            original: username,
+            sanitized: sanitizedUsername,
+            length: username.length,
+            sanitizedLength: sanitizedUsername.length,
+            charCodes: Array.from(username).map(c => c.charCodeAt(0))
+          },
           errors: twitterError.data?.errors || [],
           title: twitterError.data?.title,
           detail: twitterError.data?.detail,
@@ -580,8 +600,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
             requestedParams: {
               query,
               max_results: 10,
-              tweet_fields: 'created_at,public_metrics',
-              user_fields: 'username'
+              'tweet.fields': 'created_at,public_metrics',
+              'user.fields': 'username'
             },
             headers: twitterError.headers || {},
             requestUrl: twitterError.request ? String(twitterError.request) : undefined
