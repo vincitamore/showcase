@@ -34,6 +34,20 @@ function validateTwitterQuery(query: string): { isValid: boolean; reason?: strin
   }
   
   // Check for standalone operators
+  // The from: operator is a valid standalone operator
+  if (query.startsWith('from:')) {
+    const username = query.substring(5).trim();
+    if (!username) {
+      return { isValid: false, reason: 'Username cannot be empty in from: operator' };
+    }
+    // Username validation - alphanumeric and underscore only
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return { isValid: false, reason: 'Username contains invalid characters' };
+    }
+    return { isValid: true };
+  }
+  
+  // Check for other standalone operators
   const hasStandaloneOperator = 
     query.includes('from:') || 
     query.includes('@') || 
@@ -328,10 +342,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       throw new APIError('Twitter username not configured', 500, 'CONFIG_ERROR');
     }
 
-    // Modified query format to ensure compatibility with Twitter API v2
-    // Use proper spacing and formatting according to Twitter API docs
-    // Ensure the username is properly formatted and the query is valid
-    // The Twitter API v2 search endpoint expects the query in a specific format
+    // Ensure the username is properly formatted for the Twitter API v2 query
+    // The from: operator is a standalone operator that requires the username without the @ symbol
     const query = `from:${username.trim()}`;
     
     logger.info('Using Twitter query', {
@@ -445,7 +457,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         query
       });
       
-      // Use client.v2.search which is the recommended method for the Twitter API v2
+      // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
+      // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
         max_results: searchParams.max_results,
         'tweet.fields': searchParams['tweet.fields'],
@@ -498,75 +511,66 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         : String(twitterError);
         
       // Log the full error object for detailed inspection
-      logger.error('Failed to fetch from Twitter API', {
+      logger.error('Twitter API request failed', {
         step: 'twitter-request-error',
-        errorType: twitterError instanceof Error ? twitterError.constructor.name : typeof twitterError,
-        errorMessage,
-        errorStack: twitterError instanceof Error ? twitterError.stack : 'No stack trace',
-        params: searchParams,
-        fullError: JSON.stringify(twitterError, Object.getOwnPropertyNames(twitterError instanceof Error ? twitterError : {}))
+        error: errorMessage,
+        query,
+        errorObject: twitterError instanceof Error ? {
+          name: twitterError.name,
+          message: twitterError.message,
+          stack: twitterError.stack,
+          // For ApiResponseError, include additional details
+          ...(twitterError instanceof ApiResponseError ? {
+            code: twitterError.code,
+            data: twitterError.data,
+            rateLimit: twitterError.rateLimit,
+            request: {
+              method: twitterError.request?.method,
+              urlPath: twitterError.request ? String(twitterError.request) : undefined
+            },
+            headers: twitterError.headers
+          } : {})
+        } : twitterError
       });
       
-      // Check if it's an ApiResponseError which contains more details
-      if (twitterError instanceof ApiResponseError) {
-        logger.error('Twitter API response error details', {
-          step: 'twitter-api-response-error',
-          statusCode: twitterError.code,
-          rateLimitInfo: twitterError.rateLimit,
-          errors: twitterError.errors,
-          data: twitterError.data
+      // Check if this is a rate limit error (429)
+      if (twitterError instanceof ApiResponseError && twitterError.code === 429) {
+        logger.warn('Twitter API rate limit exceeded', {
+          step: 'rate-limit-exceeded',
+          resetAt: twitterError.rateLimit?.reset ? new Date(twitterError.rateLimit.reset * 1000).toISOString() : 'unknown',
+          endpoint: 'tweets/search/recent'
         });
         
-        // Extract specific error details from the Twitter API response
-        if (twitterError.errors?.length) {
-          // Log the errors in a type-safe way
-          logger.error('Twitter API specific errors', {
-            step: 'twitter-api-specific-errors',
-            errors: twitterError.errors
-          });
-          
-          // Check for specific error types in a type-safe way
-          const hasRateLimitError = twitterError.errors.some(err => 
-            // Check for rate limit error (code 88 or rate limit message)
-            (err as any).code === 88 || 
-            String(err).toLowerCase().includes('rate limit')
-          );
-          
-          const hasAuthError = twitterError.errors.some(err => 
-            // Check for authentication error (code 32 or auth message)
-            (err as any).code === 32 || 
-            String(err).toLowerCase().includes('authentication') ||
-            String(err).toLowerCase().includes('unauthorized')
-          );
-          
-          const hasInvalidRequestError = twitterError.errors.some(err => 
-            String(err).toLowerCase().includes('invalid')
-          );
-          
-          if (hasRateLimitError) {
-            throw new APIError(
-              `Twitter API rate limit exceeded`,
-              429,
-              'TWITTER_RATE_LIMIT'
-            );
-          }
-          
-          if (hasAuthError) {
-            throw new APIError(
-              `Twitter API authentication error`,
-              401,
-              'TWITTER_AUTH_ERROR'
-            );
-          }
-          
-          if (hasInvalidRequestError) {
-            throw new APIError(
-              `Twitter API invalid request error - Check query format: ${query}`,
-              400,
-              'TWITTER_BAD_REQUEST'
-            );
-          }
+        // Return cached tweets if available
+        if (cachedTweets.length > 0) {
+          await selectTweetsForDisplay(cachedTweets);
+          return NextResponse.json({
+            message: 'Rate limit exceeded, returning cached tweets',
+            tweets: cachedTweets
+          }, { status: 200 });
         }
+        
+        return NextResponse.json({
+          message: 'Rate limit exceeded and no cached tweets available',
+          error: 'RATE_LIMIT_EXCEEDED'
+        }, { status: 429 });
+      }
+      
+      // Handle other specific error types
+      if (twitterError instanceof ApiResponseError && twitterError.code === 400) {
+        logger.error('Twitter API bad request', {
+          step: 'bad-request',
+          query,
+          errors: twitterError.data?.errors || [],
+          title: twitterError.data?.title,
+          detail: twitterError.data?.detail
+        });
+        
+        throw new APIError(
+          `Twitter API bad request: ${twitterError.data?.detail || errorMessage}`,
+          400,
+          'TWITTER_BAD_REQUEST'
+        );
       }
       
       // Extract status code if available

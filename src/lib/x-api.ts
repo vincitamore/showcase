@@ -8,11 +8,11 @@ import {
 } from '@/lib/tweet-storage';
 import { env } from '@/env';
 
-// Rate limit configuration
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
+// Re-export ApiResponseError for use in other files
+export { ApiResponseError } from 'twitter-api-v2';
 
-// Interface to match TweetV2 structure but only include what we need
-interface StoredTweet {
+// Export StoredTweet interface
+export interface StoredTweet {
   id: string;
   text: string;
   edit_history_tweet_ids: string[];
@@ -20,6 +20,9 @@ interface StoredTweet {
   public_metrics?: TweetPublicMetricsV2;
   entities?: TweetEntitiesV2;
 }
+
+// Rate limit configuration
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 interface TwitterApiResponse<T> {
   data: T;
