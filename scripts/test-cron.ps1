@@ -18,6 +18,9 @@ Base URL of the application, defaults to NEXT_PUBLIC_URL environment variable or
 .PARAMETER Verbose
 Shows additional debug information about the requests
 
+.PARAMETER FetchLogs
+When set, attempts to fetch recent Vercel logs for the project (requires Vercel CLI to be installed)
+
 .EXAMPLE
 .\test-cron.ps1
 Tests the default fetch-tweets cron job
@@ -27,15 +30,16 @@ Tests the default fetch-tweets cron job
 Tests the rotate-logs cron job with a specific secret
 
 .EXAMPLE
-.\test-cron.ps1 -Verbose
-Tests the default cron job with detailed logging
+.\test-cron.ps1 -Verbose -FetchLogs
+Tests the default cron job with detailed logging and fetches recent Vercel logs
 #>
 
 param(
     [string]$Path = "/api/cron/fetch-tweets",
     [string]$DevSecret = $env:DEV_SECRET,
     [string]$BaseUrl = $env:NEXT_PUBLIC_URL,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$FetchLogs
 )
 
 # Set defaults if not provided
@@ -152,6 +156,43 @@ try {
             }
         } catch {
             Write-Host $_.ErrorDetails.Message
+        }
+    }
+}
+
+# Fetch logs from Vercel if requested and Vercel CLI is installed
+if ($FetchLogs) {
+    Write-Host "`n----------------------------------------`n"
+    Write-Host "Fetching recent Vercel logs..." -ForegroundColor Cyan
+    
+    # Check if Vercel CLI is installed
+    $hasVercel = $null -ne (Get-Command -Name "vercel" -ErrorAction SilentlyContinue)
+    
+    if (-not $hasVercel) {
+        Write-Host "Vercel CLI not found. Please install it with 'npm i -g vercel' to use this feature." -ForegroundColor Red
+    } else {
+        # Extract the path portion for log filtering
+        $pathForFilter = $Path.TrimStart('/')
+        
+        # Try to get the logs
+        try {
+            Write-Host "Fetching logs for $pathForFilter..."
+            $logs = vercel logs --limit 50 | Out-String
+            
+            # Filter logs to show only relevant ones if possible
+            if ($logs) {
+                if ($logs -match $pathForFilter) {
+                    Write-Host "Found logs mentioning $pathForFilter:" -ForegroundColor Green
+                    Write-Host ($logs -split "`n" | Select-String -Pattern $pathForFilter -Context 5,5)
+                } else {
+                    Write-Host "No logs found specifically for $pathForFilter. Showing most recent logs:" -ForegroundColor Yellow
+                    Write-Host $logs
+                }
+            } else {
+                Write-Host "No logs returned from Vercel." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "Error fetching Vercel logs: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 } 

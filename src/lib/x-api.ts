@@ -187,12 +187,51 @@ function validateTweetResponse(response: { data?: any }, endpoint: string): bool
 // Initialize read-only client for fetching tweets
 export async function getReadOnlyClient() {
   console.log('[Twitter API] Initializing read-only client...');
-  return new TwitterApi({
-    appKey: env.TWITTER_API_KEY ?? '',
-    appSecret: env.TWITTER_API_SECRET ?? '',
-    accessToken: env.TWITTER_ACCESS_TOKEN ?? '',
-    accessSecret: env.TWITTER_ACCESS_SECRET ?? '',
-  }).readOnly;
+  
+  // Check if all required credentials are present
+  const missingCredentials = [];
+  if (!env.TWITTER_API_KEY) missingCredentials.push('TWITTER_API_KEY');
+  if (!env.TWITTER_API_SECRET) missingCredentials.push('TWITTER_API_SECRET');
+  if (!env.TWITTER_ACCESS_TOKEN) missingCredentials.push('TWITTER_ACCESS_TOKEN');
+  if (!env.TWITTER_ACCESS_SECRET) missingCredentials.push('TWITTER_ACCESS_SECRET');
+  
+  if (missingCredentials.length > 0) {
+    const errorMessage = `Missing Twitter API credentials: ${missingCredentials.join(', ')}`;
+    console.error('[Twitter API] Initialization failed:', errorMessage);
+    throw new Error(errorMessage);
+  }
+  
+  // Log credential presence (not the actual values for security)
+  console.log('[Twitter API] Credentials check:', {
+    hasApiKey: !!env.TWITTER_API_KEY,
+    hasApiSecret: !!env.TWITTER_API_SECRET,
+    hasAccessToken: !!env.TWITTER_ACCESS_TOKEN,
+    hasAccessSecret: !!env.TWITTER_ACCESS_SECRET
+  });
+  
+  try {
+    // Use the original credential names - these are the ones used by twitter-api-v2
+    const client = new TwitterApi({
+      appKey: env.TWITTER_API_KEY as string,
+      appSecret: env.TWITTER_API_SECRET as string,
+      accessToken: env.TWITTER_ACCESS_TOKEN as string,
+      accessSecret: env.TWITTER_ACCESS_SECRET as string,
+    } as any); // Use 'as any' to bypass TypeScript errors
+    
+    const readOnlyClient = client.readOnly;
+    console.log('[Twitter API] Client initialized successfully');
+    
+    return readOnlyClient;
+  } catch (error) {
+    console.error('[Twitter API] Failed to initialize Twitter client:', 
+      error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : error
+    );
+    throw error;
+  }
 }
 
 // Execute a Twitter API request with rate limit handling

@@ -48,8 +48,33 @@ export async function GET(req: Request) {
         'Authorization': `Bearer ${env.CRON_SECRET}`
       }
     });
-    
-    const response = await fetch(cronReq);
+
+    // Fetch with detailed error handling
+    let response;
+    try {
+      response = await fetch(cronReq);
+    } catch (fetchError) {
+      logger.error('Network error when calling cron endpoint', {
+        error: fetchError instanceof Error ? {
+          name: fetchError.name,
+          message: fetchError.message,
+          stack: fetchError.stack
+        } : fetchError,
+        path: cronPath,
+        targetUrl
+      });
+      
+      return NextResponse.json(
+        { 
+          error: { 
+            message: 'Network error connecting to cron endpoint', 
+            code: 'NETWORK_ERROR',
+            details: fetchError instanceof Error ? fetchError.message : String(fetchError)
+          } 
+        },
+        { status: 502 }
+      );
+    }
     
     // Detailed response logging
     logger.info('Cron endpoint response', { 
@@ -62,18 +87,56 @@ export async function GET(req: Request) {
     let data;
     const contentType = response.headers.get('content-type');
     
-    if (contentType && contentType.includes('application/json')) {
-      data = await response.json();
-    } else {
-      // Handle non-JSON responses
-      data = {
-        text: await response.text(),
-        contentType: contentType || 'unknown'
-      };
+    try {
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+        logger.info('Parsed JSON response data', { 
+          dataKeys: Object.keys(data),
+          hasError: !!data.error
+        });
+      } else {
+        // Handle non-JSON responses
+        const text = await response.text();
+        logger.info('Received non-JSON response', { 
+          contentType: contentType || 'unknown',
+          textLength: text.length,
+          textPreview: text.substring(0, 200)
+        });
+        
+        data = {
+          text,
+          contentType: contentType || 'unknown'
+        };
+      }
+    } catch (parseError) {
+      logger.error('Error parsing response', { 
+        error: parseError instanceof Error ? {
+          name: parseError.name,
+          message: parseError.message,
+          stack: parseError.stack
+        } : parseError,
+        contentType,
+        status: response.status
+      });
+      
+      // Try to get the raw text as fallback
+      try {
+        const text = await response.clone().text();
+        data = { 
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          rawText: text.substring(0, 1000) // Limit to avoid huge logs
+        };
+      } catch (textError) {
+        data = { 
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          textError: textError instanceof Error ? textError.message : String(textError),
+          unableToGetRawResponse: true
+        };
+      }
     }
     
     // Include additional response info
-    return NextResponse.json({
+    const result = {
       status: 'success',
       cronResponse: data,
       responseStatus: response.status,
@@ -81,9 +144,22 @@ export async function GET(req: Request) {
         url: response.url,
         ok: response.ok,
         redirected: response.redirected,
-        statusText: response.statusText
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
       }
-    });
+    };
+    
+    // If the cron endpoint returned an error, log it
+    if (response.status >= 400 || data?.error) {
+      logger.warn('Cron endpoint returned an error', {
+        status: response.status,
+        statusText: response.statusText,
+        error: data?.error,
+        path: cronPath
+      });
+    }
+    
+    return NextResponse.json(result);
   } catch (error) {
     // Enhanced error logging
     logger.error('Error testing cron endpoint', { 
@@ -94,8 +170,24 @@ export async function GET(req: Request) {
       } : error,
       path: cronPath
     });
+    
+    // Provide detailed error information in the response
+    const errorDetails = process.env.NODE_ENV !== 'production' || env.ALLOW_DEV_ENDPOINTS ? {
+      message: error instanceof Error ? error.message : String(error),
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      stack: error instanceof Error ? error.stack : undefined
+    } : {
+      message: 'Internal server error'
+    };
+    
     return NextResponse.json(
-      { error: { message: 'Error executing cron job', code: 'EXECUTION_ERROR' } },
+      { 
+        error: { 
+          message: 'Error executing cron job', 
+          code: 'EXECUTION_ERROR',
+          details: errorDetails
+        } 
+      },
       { status: 500 }
     );
   }

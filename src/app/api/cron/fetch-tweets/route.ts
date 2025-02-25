@@ -11,7 +11,7 @@ import {
   TECH_SCORE_THRESHOLD
 } from '@/lib/tweet-storage';
 import { env } from '@/env';
-import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiv2, ApiResponseError } from 'twitter-api-v2';
+import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiReadOnly, ApiResponseError } from 'twitter-api-v2';
 import { 
   canMakeRequest,
   getRateLimit,
@@ -263,14 +263,32 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       }
     }
 
-    // Initialize Twitter client
-    const client = await getReadOnlyClient().catch(error => {
+    // Initialize Twitter client with detailed error handling
+    let client: TwitterApiReadOnly;
+    try {
+      // Log environment variable presence (not values)
+      logger.info('Twitter API environment variables', {
+        hasApiKey: !!env.TWITTER_API_KEY,
+        hasApiSecret: !!env.TWITTER_API_SECRET,
+        hasAccessToken: !!env.TWITTER_ACCESS_TOKEN,
+        hasAccessSecret: !!env.TWITTER_ACCESS_SECRET,
+        hasUsername: !!env.TWITTER_USERNAME,
+        step: 'twitter-env-check'
+      });
+      
+      client = await getReadOnlyClient();
+      logger.info('Twitter client initialized successfully', { step: 'client-init-success' });
+    } catch (initError) {
       logger.error('Failed to initialize Twitter client', {
-        step: 'client-init',
-        error
+        step: 'client-init-failure',
+        error: initError instanceof Error ? {
+          name: initError.name,
+          message: initError.message,
+          stack: initError.stack
+        } : String(initError)
       });
       throw new APIError('Failed to initialize Twitter client', 500, 'TWITTER_CLIENT_ERROR');
-    });
+    }
     
     // Get user info for query
     const username = env.TWITTER_USERNAME?.replace('@', '');
@@ -282,54 +300,61 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     }
 
     const query = `from:${username} -is:retweet`;
+    
+    // Wrap the rate limit check in a try-catch for more detailed error info
+    try {
+      // Check if we can make the request
+      const canMakeReq = await canMakeRequest('tweets/search/recent');
+      
+      if (!canMakeReq) {
+        const rateLimit = await getRateLimit('tweets/search/recent');
+        const resetAt = new Date(rateLimit.resetAt);
+        
+        logger.warn('Rate limited, using cache', {
+          step: 'rate-limited',
+          endpoint: 'tweets/search/recent',
+          resetAt: resetAt.toISOString(),
+          remaining: rateLimit.remaining,
+          cachedTweetCount: cachedTweets.length
+        });
 
-    // Check if we can make the request
-    const canMakeReq = await canMakeRequest('tweets/search/recent').catch(error => {
-      logger.error('Failed to check rate limit', {
-        step: 'rate-limit-check',
-        error
+        // Return cached tweets if available
+        if (cachedTweets.length > 0) {
+          // Still select a fresh set of tweets for display
+          await selectTweetsForDisplay(cachedTweets);
+          
+          return NextResponse.json({
+            status: 'success',
+            tweetCount: cachedTweets.length,
+            source: 'cache',
+            rateLimit: {
+              resetAt: resetAt.toISOString(),
+              message: 'Using cached tweets due to rate limit'
+            }
+          });
+        }
+
+        return NextResponse.json(
+          {
+            error: {
+              message: 'Rate limit exceeded',
+              code: 'RATE_LIMIT_EXCEEDED',
+              resetAt: resetAt.toISOString()
+            }
+          },
+          { status: 429 }
+        );
+      }
+    } catch (rateLimitError) {
+      logger.error('Error checking rate limit', {
+        step: 'rate-limit-check-error',
+        error: rateLimitError instanceof Error ? {
+          name: rateLimitError.name,
+          message: rateLimitError.message,
+          stack: rateLimitError.stack
+        } : String(rateLimitError)
       });
       throw new APIError('Failed to check rate limit', 500, 'RATE_LIMIT_CHECK_ERROR');
-    });
-
-    if (!canMakeReq) {
-      const rateLimit = await getRateLimit('tweets/search/recent');
-      const resetAt = new Date(rateLimit.resetAt);
-      
-      logger.warn('Rate limited, using cache', {
-        step: 'rate-limited',
-        endpoint: 'tweets/search/recent',
-        resetAt: resetAt.toISOString(),
-        remaining: rateLimit.remaining,
-        cachedTweetCount: cachedTweets.length
-      });
-
-      // Return cached tweets if available
-      if (cachedTweets.length > 0) {
-        // Still select a fresh set of tweets for display
-        await selectTweetsForDisplay(cachedTweets);
-        
-        return NextResponse.json({
-          status: 'success',
-          tweetCount: cachedTweets.length,
-          source: 'cache',
-          rateLimit: {
-            resetAt: resetAt.toISOString(),
-            message: 'Using cached tweets due to rate limit'
-          }
-        });
-      }
-
-      return NextResponse.json(
-        {
-          error: {
-            message: 'Rate limit exceeded',
-            code: 'RATE_LIMIT_EXCEEDED',
-            resetAt: resetAt.toISOString()
-          }
-        },
-        { status: 429 }
-      );
     }
 
     // Prepare search parameters - request more tweets than we'll store
@@ -482,9 +507,18 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     });
 
   } catch (error) {
+    // Enhanced error logging with detailed information
     logger.error('Error in tweet fetch', {
       step: 'error',
-      error,
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : 'No stack trace',
+      errorDetails: error instanceof ApiResponseError ? {
+        rateLimit: error.rateLimit,
+        request: error.request,
+        headers: error.headers,
+        data: error.data
+      } : error,
       duration: Date.now() - startTime
     });
     
@@ -500,11 +534,21 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       );
     }
 
+    // Include more error details in the response for debugging
+    const errorDetails = process.env.NODE_ENV !== 'production' || env.ALLOW_DEV_ENDPOINTS ? {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      type: error instanceof Error ? error.constructor.name : typeof error,
+      stack: error instanceof Error ? error.stack : undefined
+    } : {
+      message: 'Internal server error',
+    };
+
     return NextResponse.json(
       {
         error: {
           message: 'Internal server error',
-          code: 'INTERNAL_SERVER_ERROR'
+          code: 'INTERNAL_SERVER_ERROR',
+          details: errorDetails
         }
       },
       { status: 500 }
