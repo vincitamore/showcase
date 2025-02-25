@@ -1054,8 +1054,7 @@ async function selectTweetsForDisplay(tweets: TweetV2[]) {
   }
 }
 
-// Replace the previously added cacheTweets function with this fixed version
-// Fix the tweet caching issue by ensuring authorId is always present
+// Simplify the processTweetsForCache function to use the username directly
 async function processTweetsForCache(tweets: TweetV2[], type: string, includes?: any) {
   try {
     logger.info(`Processing ${tweets.length} tweets of type ${type}`);
@@ -1087,18 +1086,17 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
     // Process each tweet
     const tweetRecords = [];
     
+    // Get the username directly from environment - this is the user we're searching for
+    // So we know all tweets are from this user
+    const username = env.TWITTER_USERNAME?.replace('@', '') || 'unknown';
+    
+    logger.info('Using username as authorId for all tweets', {
+      username,
+      step: 'using-username-as-authorid'
+    });
+    
     for (const tweet of tweets) {
       try {
-        // Ensure we have an authorId - this is the critical fix
-        if (!tweet.author_id) {
-          logger.warn(`Tweet ${tweet.id} is missing author_id, using default`, {
-            tweetId: tweet.id,
-            step: 'author-id-check'
-          });
-          // Use a default authorId if missing - this prevents the database error
-          tweet.author_id = 'unknown_author';
-        }
-        
         // Convert Twitter API date format to Date object
         const createdAt = tweet.created_at ? new Date(tweet.created_at) : new Date();
         
@@ -1173,7 +1171,7 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
           }
         }
         
-        // Create or update the tweet
+        // Create or update the tweet - use the username directly as authorId
         const tweetData = await prisma.tweet.upsert({
           where: {
             id: tweet.id
@@ -1183,7 +1181,7 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
             text: tweet.text,
             createdAt: createdAt,
             publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
-            authorId: tweet.author_id, // This is the critical field that was missing
+            authorId: username, // Use the username directly as authorId
             editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
             entities: {
               create: entitiesData
@@ -1194,7 +1192,7 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
             text: tweet.text,
             createdAt: createdAt,
             publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
-            authorId: tweet.author_id, // This is the critical field that was missing
+            authorId: username, // Use the username directly as authorId
             editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
             entities: {
               deleteMany: {},
