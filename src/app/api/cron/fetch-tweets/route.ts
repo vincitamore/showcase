@@ -434,7 +434,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       params: searchParams
     });
 
-    // Fix: Use client.v2.searchRecent instead of client.v2.search for recent search endpoint
+    // Fix: Use client.v2.search instead of client.v2.get for recent search endpoint
     
     let response;
     try {
@@ -444,10 +444,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         query
       });
       
-      // Try a different approach: use the client's get method directly
-      // This bypasses any potential issues with the search method
-      response = await client.v2.get('tweets/search/recent', {
-        query,
+      // Use the proper search method from the Twitter API client
+      response = await client.v2.search(query, {
         max_results: searchParams.max_results,
         'tweet.fields': searchParams['tweet.fields'],
         'user.fields': searchParams['user.fields'],

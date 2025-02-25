@@ -1,0 +1,146 @@
+Search
+Recent search
+Returns Posts from the last 7 days that match a search query.
+
+GET
+/
+2
+/
+tweets
+/
+search
+/
+recent
+
+Try it
+Authorizations
+
+BearerToken
+​
+Authorization
+string
+header
+required
+Bearer authentication header of the form Bearer <token>, where <token> is your auth token.
+
+Query Parameters
+​
+query
+string
+required
+One query/rule/filter for matching Posts. Refer to https://t.co/rulelength to identify the max query length.
+
+Required string length: 1 - 4096
+​
+start_time
+string
+YYYY-MM-DDTHH:mm:ssZ. The oldest UTC timestamp from which the Posts will be provided. Timestamp is in second granularity and is inclusive (i.e. 12:00:01 includes the first second of the minute).
+
+​
+end_time
+string
+YYYY-MM-DDTHH:mm:ssZ. The newest, most recent UTC timestamp to which the Posts will be provided. Timestamp is in second granularity and is exclusive (i.e. 12:00:01 excludes the first second of the minute).
+
+​
+since_id
+string
+Returns results with a Post ID greater than (that is, more recent than) the specified ID.
+
+​
+until_id
+string
+Returns results with a Post ID less than (that is, older than) the specified ID.
+
+​
+max_results
+integer
+default:
+10
+The maximum number of search results to be returned by a request.
+
+Required range: 10 < x < 100
+​
+next_token
+string
+This parameter is used to get the next 'page' of results. The value used with the parameter is pulled directly from the response provided by the API, and should not be modified.
+
+Minimum length: 1
+​
+pagination_token
+string
+This parameter is used to get the next 'page' of results. The value used with the parameter is pulled directly from the response provided by the API, and should not be modified.
+
+Minimum length: 1
+​
+sort_order
+enum<string>
+This order in which to return results.
+
+Available options: recency, relevancy 
+​
+tweet.fields
+enum<string>[]
+A comma separated list of Tweet fields to display.
+
+Available options: article, attachments, author_id, card_uri, community_id, context_annotations, conversation_id, created_at, display_text_range, edit_controls, edit_history_tweet_ids, entities, geo, id, in_reply_to_user_id, lang, media_metadata, non_public_metrics, note_tweet, organic_metrics, possibly_sensitive, promoted_metrics, public_metrics, referenced_tweets, reply_settings, scopes, source, text, withheld 
+​
+expansions
+enum<string>[]
+A comma separated list of fields to expand.
+
+Available options: article.cover_media, article.media_entities, attachments.media_keys, attachments.media_source_tweet, attachments.poll_ids, author_id, edit_history_tweet_ids, entities.mentions.username, geo.place_id, in_reply_to_user_id, entities.note.mentions.username, referenced_tweets.id, referenced_tweets.id.author_id 
+​
+media.fields
+enum<string>[]
+A comma separated list of Media fields to display.
+
+Available options: alt_text, duration_ms, height, media_key, non_public_metrics, organic_metrics, preview_image_url, promoted_metrics, public_metrics, type, url, variants, width 
+​
+poll.fields
+enum<string>[]
+A comma separated list of Poll fields to display.
+
+Available options: duration_minutes, end_datetime, id, options, voting_status 
+​
+user.fields
+enum<string>[]
+A comma separated list of User fields to display.
+
+Available options: affiliation, connection_status, created_at, description, entities, id, is_identity_verified, location, most_recent_tweet_id, name, parody, pinned_tweet_id, profile_banner_url, profile_image_url, protected, public_metrics, receives_your_dm, subscription, subscription_type, url, username, verified, verified_followers_count, verified_type, withheld 
+​
+place.fields
+enum<string>[]
+A comma separated list of Place fields to display.
+
+Available options: contained_within, country, country_code, full_name, geo, id, name, place_type 
+Response
+200
+
+200
+application/json
+The request has succeeded.
+​
+data
+object[]
+
+Show child attributes
+
+​
+errors
+object[]
+An HTTP Problem Details object, as defined in IETF RFC 7807 (https://tools.ietf.org/html/rfc7807).
+
+
+Show child attributes
+
+​
+includes
+object
+
+Show child attributes
+
+​
+meta
+object
+
+Show child attributes
