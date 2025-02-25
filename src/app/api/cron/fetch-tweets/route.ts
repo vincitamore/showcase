@@ -342,9 +342,21 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       throw new APIError('Twitter username not configured', 500, 'CONFIG_ERROR');
     }
 
+    // Add more strict validation for username
+    if (!/^[a-zA-Z0-9_]{1,15}$/.test(username)) {
+      logger.error('Invalid Twitter username format', {
+        step: 'username-validation',
+        username
+      });
+      throw new APIError('Invalid Twitter username format - must be alphanumeric with underscores only, max 15 chars', 400, 'INVALID_USERNAME');
+    }
+
     // Ensure the username is properly formatted for the Twitter API v2 query
-    // The from: operator is a standalone operator that requires the username without the @ symbol
-    const query = `from:${username.trim()}`;
+    // Try an alternative query format that might be more compatible
+    // const query = `from:${username.trim()}`;
+    
+    // Alternative query format - try this if the standard format fails
+    const query = `from:${username.trim()} -is:retweet`;
     
     logger.info('Using Twitter query', {
       step: 'query-preparation',
@@ -461,13 +473,10 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
-        max_results: searchParams.max_results,
-        'tweet.fields': searchParams['tweet.fields'],
-        'user.fields': searchParams['user.fields'],
-        'media.fields': searchParams['media.fields'],
-        // Use camelCase for expansions parameter as expected by the Twitter API v2 client
-        expansions: searchParams.expansions,
-        ...(searchParams.since_id ? { since_id: searchParams.since_id } : {})
+        max_results: 10, // Reduce to a small number
+        'tweet.fields': 'created_at,public_metrics', // Simplify fields
+        'user.fields': 'username',
+        // Remove other parameters to isolate the issue
       });
       
       // Add detailed response logging
@@ -560,16 +569,29 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       
       // Handle other specific error types
       if (twitterError instanceof ApiResponseError && twitterError.code === 400) {
-        logger.error('Twitter API bad request', {
-          step: 'bad-request',
+        // Enhanced logging for 400 errors
+        const errorDetails = {
+          step: 'bad-request-detailed',
           query,
           errors: twitterError.data?.errors || [],
           title: twitterError.data?.title,
-          detail: twitterError.data?.detail
-        });
+          detail: twitterError.data?.detail,
+          parameters: {
+            requestedParams: {
+              query,
+              max_results: 10,
+              tweet_fields: 'created_at,public_metrics',
+              user_fields: 'username'
+            },
+            headers: twitterError.headers || {},
+            requestUrl: twitterError.request ? String(twitterError.request) : undefined
+          }
+        };
+        
+        logger.error('Twitter API bad request - detailed', errorDetails);
         
         throw new APIError(
-          `Twitter API bad request: ${twitterError.data?.detail || errorMessage}`,
+          `Twitter API bad request: ${twitterError.data?.detail || errorMessage}. Error details: ${JSON.stringify(errorDetails)}`,
           400,
           'TWITTER_BAD_REQUEST'
         );

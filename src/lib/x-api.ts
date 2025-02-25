@@ -213,6 +213,20 @@ export async function getReadOnlyClient() {
   });
   
   try {
+    // Check package version for compatibility
+    try {
+      const packageJson = require('twitter-api-v2/package.json');
+      console.log('[Twitter API] Using twitter-api-v2 version:', packageJson.version);
+      
+      // Log warning if using an older version
+      const versionParts = packageJson.version.split('.').map(Number);
+      if (versionParts[0] < 1 || (versionParts[0] === 1 && versionParts[1] < 14)) {
+        console.warn('[Twitter API] Warning: Using an older version of twitter-api-v2. Consider upgrading to 1.14.0 or newer for better compatibility.');
+      }
+    } catch (versionError) {
+      console.warn('[Twitter API] Could not determine twitter-api-v2 version:', versionError);
+    }
+    
     // Use the original credential names - these are the ones used by twitter-api-v2
     const client = new TwitterApi({
       appKey: env.TWITTER_API_KEY as string,
