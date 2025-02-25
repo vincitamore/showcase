@@ -282,7 +282,9 @@ if ($errorDetails) {
     if ($errorDetails.code -eq "TWITTER_RATE_LIMIT" -or 
         $errorDetails.code -eq "RATE_LIMIT_EXCEEDED" -or
         $errorDetails.message -match "429" -or
-        $errorDetails.message -match "rate limit") {
+        $errorDetails.message -match "rate limit" -or
+        # Look for 429 in the external API status from the screenshot
+        ($DirectResponse -and $DirectResponse.error -and $DirectResponse.error.externalApiStatus -eq 429)) {
         
         Write-Host "TWITTER RATE LIMIT DETECTED" -ForegroundColor Red -BackgroundColor Black
         
@@ -295,6 +297,31 @@ if ($errorDetails) {
         
         if ($errorDetails.resetAt) {
             Write-Host "`nRate limit will reset at: $($errorDetails.resetAt)" -ForegroundColor Yellow
+        }
+    }
+    # Check for network errors - but make sure it's not actually a rate limit error
+    elseif (($errorDetails.code -eq "TWITTER_NETWORK_ERROR" -or
+            $errorDetails.message -match "timeout" -or
+            $errorDetails.message -match "network" -or
+            $errorDetails.message -match "Request failed") -and
+            # Make sure it's not actually a rate limit error from the screenshot
+            !($DirectResponse -and $DirectResponse.error -and $DirectResponse.error.externalApiStatus -eq 429)) {
+        
+        Write-Host "TWITTER API NETWORK ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        Write-Host "`nThere was a network error while connecting to the Twitter API." -ForegroundColor Yellow
+        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
+        Write-Host "1. Check your internet connection" -ForegroundColor White
+        Write-Host "2. Verify that X/Twitter services are online" -ForegroundColor White
+        Write-Host "3. Check if your API credentials have been revoked or expired" -ForegroundColor White
+        Write-Host "4. Examine if there are any IP restrictions on your Twitter developer account" -ForegroundColor White
+        Write-Host "5. Verify that your Twitter API endpoint URL is correct" -ForegroundColor White
+        
+        Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
+        
+        if ($Verbose -and $errorDetails.details -and $errorDetails.details.stack) {
+            Write-Host "`nStack trace:" -ForegroundColor Yellow
+            Write-Host $errorDetails.details.stack -ForegroundColor Gray
         }
     }
     # Check for invalid request errors (400)
@@ -313,29 +340,6 @@ if ($errorDetails) {
         Write-Host "4. Check that you have sufficient permissions for this request" -ForegroundColor White
         
         Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
-    }
-    # Check for network errors
-    elseif ($errorDetails.code -eq "TWITTER_NETWORK_ERROR" -or
-            $errorDetails.message -match "timeout" -or
-            $errorDetails.message -match "network" -or
-            $errorDetails.message -match "Request failed") {
-        
-        Write-Host "TWITTER API NETWORK ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
-        
-        Write-Host "`nThere was a network error while connecting to the Twitter API." -ForegroundColor Yellow
-        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
-        Write-Host "1. Check your internet connection" -ForegroundColor White
-        Write-Host "2. Verify that X/Twitter services are online" -ForegroundColor White
-        Write-Host "3. Check if your API credentials have been revoked or expired" -ForegroundColor White
-        Write-Host "4. Examine if there are any IP restrictions on your Twitter developer account" -ForegroundColor White
-        Write-Host "5. Verify that your Twitter API endpoint URL is correct" -ForegroundColor White
-        
-        Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
-        
-        if ($Verbose -and $errorDetails.details -and $errorDetails.details.stack) {
-            Write-Host "`nStack trace:" -ForegroundColor Yellow
-            Write-Host $errorDetails.details.stack -ForegroundColor Gray
-        }
     }
     # Check for authentication errors
     elseif ($errorDetails.code -eq "UNAUTHORIZED" -or

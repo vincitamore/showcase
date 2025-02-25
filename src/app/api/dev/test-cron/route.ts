@@ -180,7 +180,19 @@ export async function GET(req: Request) {
     }
     
     // Include additional response info
-    const result = {
+    const result: {
+      status: string;
+      cronResponse: any;
+      responseStatus: number;
+      responseInfo: {
+        url: string;
+        ok: boolean;
+        redirected: boolean;
+        statusText: string;
+        headers: Record<string, string>;
+        externalApiStatus?: number;
+      };
+    } = {
       status: 'success',
       cronResponse: data,
       responseStatus: response.status,
@@ -193,12 +205,22 @@ export async function GET(req: Request) {
       }
     };
     
+    // Extract external API status if present in the error response
+    if (data?.error?.externalApiStatus) {
+      result.responseInfo.externalApiStatus = data.error.externalApiStatus;
+      logger.info('External API status detected', {
+        externalApiStatus: data.error.externalApiStatus,
+        internalStatus: response.status
+      });
+    }
+    
     // If the cron endpoint returned an error, log it
     if (response.status >= 400 || data?.error) {
       logger.warn('Cron endpoint returned an error', {
         status: response.status,
         statusText: response.statusText,
         error: data?.error,
+        externalApiStatus: data?.error?.externalApiStatus,
         path: cronPath
       });
     }

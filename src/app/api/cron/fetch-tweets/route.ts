@@ -403,30 +403,74 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
           reset: response.rateLimit.reset
         } : null
       });
-    } catch (twitterError) {
+    } catch (twitterError: unknown) {
+      const errorMessage = twitterError instanceof Error 
+        ? twitterError.message 
+        : String(twitterError);
+        
       logger.error('Failed to fetch from Twitter API', {
         step: 'twitter-request-error',
         errorType: twitterError instanceof Error ? twitterError.constructor.name : typeof twitterError,
-        errorMessage: twitterError instanceof Error ? twitterError.message : String(twitterError),
+        errorMessage,
         errorStack: twitterError instanceof Error ? twitterError.stack : 'No stack trace',
         params: searchParams
       });
       
-      // Check if this is a network error
-      if (twitterError instanceof Error && 
-          (twitterError.message.includes('network error') || 
-           twitterError.message.includes('timeout') ||
-           twitterError.message.includes('Request failed'))) {
-        throw new APIError('Twitter API connection error (timeout or network issue)', 500, 'TWITTER_NETWORK_ERROR');
+      // Extract status code if available
+      let externalApiStatus: number | null = null;
+      if (twitterError instanceof Error) {
+        // Try to extract status code from error message
+        const statusMatch = errorMessage.match(/(\d{3})/);
+        if (statusMatch && statusMatch[1]) {
+          externalApiStatus = parseInt(statusMatch[1]);
+        }
+        
+        // Check for specific error types in the message
+        if (errorMessage.includes('429') || errorMessage.includes('rate limit')) {
+          externalApiStatus = 429;
+          // Add external API status to the log
+          logger.error('Twitter API rate limit exceeded', {
+            externalApiStatus,
+            errorMessage
+          });
+          throw new APIError(
+            `Twitter API rate limit exceeded (429)`, 
+            429, 
+            'TWITTER_RATE_LIMIT'
+          );
+        }
+        
+        // Check if this is a network error
+        if (errorMessage.includes('network error') || 
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('Request failed')) {
+          // Add external API status to the log
+          logger.error('Twitter API network error', {
+            externalApiStatus,
+            errorMessage
+          });
+          throw new APIError(
+            `Twitter API connection error (timeout or network issue)${externalApiStatus ? ` - Status: ${externalApiStatus}` : ''}`, 
+            500, 
+            'TWITTER_NETWORK_ERROR'
+          );
+        }
       }
       
-      // Check if this is a rate limit error
-      if (twitterError instanceof Error && twitterError.message.includes('429')) {
-        throw new APIError('Twitter API rate limit exceeded', 429, 'TWITTER_RATE_LIMIT');
+      // Re-throw the error for the main error handler with the status code
+      if (externalApiStatus && twitterError instanceof Error) {
+        logger.error('Twitter API error with status code', {
+          externalApiStatus,
+          errorMessage
+        });
+        throw new APIError(
+          `Twitter API error: ${errorMessage} - Status: ${externalApiStatus}`, 
+          500, 
+          'TWITTER_API_ERROR'
+        );
+      } else {
+        throw twitterError;
       }
-      
-      // Re-throw the error for the main error handler
-      throw twitterError;
     }
 
     // Update rate limit after successful request
