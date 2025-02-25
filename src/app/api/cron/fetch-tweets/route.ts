@@ -161,6 +161,9 @@ export const maxDuration = 58 // Just under Vercel's 60s limit
 async function fetchTweetsHandler(req: Request): Promise<Response> {
   const startTime = Date.now();
   let cachedTweets: any[] = [];
+  let response: any;
+  let tweetPaginator: any;
+  let extractedTweets: any[] = [];
   
   try {
     // Check for test mode via query param (development only)
@@ -464,7 +467,6 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
     // Fix: Use client.v2.search instead of client.get for recent search endpoint
     
-    let response;
     try {
       logger.info('Sending request to Twitter API', { 
         step: 'twitter-request-start',
@@ -492,6 +494,75 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
       });
       
+      // Extract tweets from the paginator
+      tweetPaginator = response;
+      
+      // Add detailed logging of the paginator structure
+      logger.info('Twitter API paginator structure', {
+        step: 'paginator-structure',
+        paginatorKeys: Object.keys(tweetPaginator),
+        hasTweets: !!tweetPaginator.tweets,
+        hasData: !!tweetPaginator.data,
+        hasMeta: !!tweetPaginator.meta,
+        hasIncludes: !!tweetPaginator.includes,
+        hasRateLimit: !!tweetPaginator.rateLimit,
+        hasFetchNext: typeof tweetPaginator.fetchNext === 'function',
+        hasNext: typeof tweetPaginator.next === 'function',
+        hasRealData: !!tweetPaginator._realData,
+        realDataKeys: tweetPaginator._realData ? Object.keys(tweetPaginator._realData) : []
+      });
+      
+      // Try different ways to access the tweets
+      let tweetsFromData = [];
+      if (tweetPaginator.data) {
+        if (Array.isArray(tweetPaginator.data)) {
+          tweetsFromData = tweetPaginator.data;
+          logger.info('Found tweets in paginator.data array', {
+            step: 'tweets-location',
+            count: tweetsFromData.length
+          });
+        } else if (tweetPaginator.data.data && Array.isArray(tweetPaginator.data.data)) {
+          tweetsFromData = tweetPaginator.data.data;
+          logger.info('Found tweets in paginator.data.data array', {
+            step: 'tweets-location',
+            count: tweetsFromData.length
+          });
+        }
+      }
+      
+      // Check if tweets are directly available
+      let tweetsFromTweets = [];
+      if (tweetPaginator.tweets && Array.isArray(tweetPaginator.tweets)) {
+        tweetsFromTweets = tweetPaginator.tweets;
+        logger.info('Found tweets in paginator.tweets array', {
+          step: 'tweets-location',
+          count: tweetsFromTweets.length
+        });
+      }
+      
+      // Check for _realData property (sometimes used in twitter-api-v2)
+      let tweetsFromRealData = [];
+      if (tweetPaginator._realData && Array.isArray(tweetPaginator._realData.data)) {
+        tweetsFromRealData = tweetPaginator._realData.data;
+        logger.info('Found tweets in paginator._realData.data array', {
+          step: 'tweets-location',
+          count: tweetsFromRealData.length
+        });
+      }
+      
+      // Use the best source of tweets
+      extractedTweets = tweetsFromTweets.length > 0 ? tweetsFromTweets : 
+                        tweetsFromData.length > 0 ? tweetsFromData :
+                        tweetsFromRealData.length > 0 ? tweetsFromRealData : [];
+      
+      logger.info('Final extracted tweets', {
+        step: 'tweets-extraction',
+        count: extractedTweets.length,
+        source: tweetsFromTweets.length > 0 ? 'paginator.tweets' : 
+                tweetsFromData.length > 0 ? 'paginator.data' :
+                tweetsFromRealData.length > 0 ? 'paginator._realData.data' : 'none'
+      });
+      
       // Add detailed response logging
       logger.info('Twitter API raw response structure', {
         step: 'twitter-response-structure',
@@ -511,20 +582,24 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         });
       }
       
-      // Validate response structure
-      if (!response.data || !Array.isArray(response.data)) {
-        logger.error('Twitter API response missing data array', {
+      // Validate response structure - twitter-api-v2 client returns a paginator object
+      // The actual tweets are in the .data property of the paginator
+      if (!response || !extractedTweets) {
+        logger.error('Twitter API response missing data', {
           step: 'response-validation',
-          responseType: typeof response.data,
-          isArray: Array.isArray(response.data)
+          responseType: typeof response,
+          hasData: !!response?.data,
+          hasTweets: !!extractedTweets
         });
-        throw new APIError('Twitter API response missing data array', 500, 'INVALID_RESPONSE_FORMAT');
+        throw new APIError('Twitter API response missing data', 500, 'INVALID_RESPONSE_FORMAT');
       }
       
       logger.info('Twitter API request successful', { 
         step: 'twitter-request-success',
         hasData: !!response.data,
-        dataCount: response.data?.length || 0,
+        dataCount: extractedTweets.length,
+        hasMeta: !!response.meta,
+        hasIncludes: !!response.includes,
         rateLimit: response.rateLimit ? {
           remaining: response.rateLimit.remaining,
           reset: response.rateLimit.reset
@@ -535,9 +610,9 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       logger.info('Twitter API quota usage', {
         step: 'quota-tracking',
         requestedTweets: DAILY_TWEET_FETCH_LIMIT,
-        receivedTweets: response.data?.length || 0,
+        receivedTweets: extractedTweets.length,
         monthlyQuota: 100, // Total monthly post quota
-        quotaUsage: `${response.data?.length || 0}/100 posts for this request`
+        quotaUsage: `${extractedTweets.length}/100 posts for this request`
       });
     } catch (twitterError: unknown) {
       const errorMessage = twitterError instanceof Error 
@@ -715,10 +790,29 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       });
     }
 
-    // Get tweets from the response
-    const newTweets = response.data;
+    // Get tweets from the response - handle paginator response structure
+    // The twitter-api-v2 client returns a paginator object where the tweets are in the .data property
+    // We already extracted the tweets earlier
+    const newTweets = extractedTweets;
     
-    if (!newTweets?.length) {
+    // Log the actual structure of the response for debugging
+    logger.info('Twitter API response structure details', {
+      step: 'response-structure-debug',
+      responseType: typeof response,
+      isPaginator: typeof response.fetchNext === 'function',
+      hasTweets: Array.isArray(extractedTweets),
+      tweetsLength: extractedTweets.length,
+      hasData: !!response.data,
+      hasMeta: !!response.meta,
+      hasIncludes: !!response.includes,
+      sampleTweet: extractedTweets.length > 0 ? 
+        { 
+          id: extractedTweets[0]?.id || 'unknown', 
+          text: extractedTweets[0]?.text?.substring(0, 50) || 'no text' 
+        } : 'no tweets'
+    });
+    
+    if (!newTweets.length) {
       logger.info('No new tweets found', {
         step: 'no-new-tweets',
         cachedCount: cachedTweets.length
@@ -809,11 +903,16 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       hasIncludes: !!response.includes,
       includesKeys: response.includes ? Object.keys(response.includes) : [],
       mediaCount: response.includes?.media?.length || 0,
-      usersCount: response.includes?.users?.length || 0
+      usersCount: response.includes?.users?.length || 0,
+      hasRealDataIncludes: !!tweetPaginator._realData?.includes,
+      realDataIncludesKeys: tweetPaginator._realData?.includes ? Object.keys(tweetPaginator._realData.includes) : []
     });
 
+    // Get the includes from the best available source
+    const includes = response.includes || tweetPaginator._realData?.includes || {};
+
     // Cache the tweets
-    await cacheTweets(tweetsToCache, 'current', response.includes);
+    await cacheTweets(tweetsToCache, 'current', includes);
     
     // Select tweets for display
     await selectTweetsForDisplay([...tweetsToCache]);
