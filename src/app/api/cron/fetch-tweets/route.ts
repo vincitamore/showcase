@@ -127,20 +127,33 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     const isTestMode = url.searchParams.get('test') === 'true';
     const devBypass = url.searchParams.get('dev_key') === env.DEV_SECRET;
     
-    // Verify cron secret - allow bypass in development with correct dev_key
+    // Verify cron secret - allow bypass with correct dev_key if development or ALLOW_DEV_ENDPOINTS is enabled
     const authHeader = req.headers.get('authorization');
     const isProduction = process.env.NODE_ENV === 'production';
+    const allowDevEndpoints = env.ALLOW_DEV_ENDPOINTS || false;
     
-    // In production, always require the CRON_SECRET
-    // In development, allow bypass with dev_key
+    // Check authorization:
+    // 1. Always accept proper CRON_SECRET Bearer token
+    // 2. Allow dev_key bypass if in development OR ALLOW_DEV_ENDPOINTS is true
     const isAuthorized = 
       authHeader === `Bearer ${env.CRON_SECRET}` || 
-      (!isProduction && devBypass);
+      ((!isProduction || allowDevEndpoints) && devBypass);
+    
+    logger.info('Authorization check', { 
+      hasAuthHeader: !!authHeader, 
+      isProduction, 
+      allowDevEndpoints,
+      isDevBypass: devBypass,
+      isTestMode,
+      isAuthorized,
+      step: 'auth-check-details'
+    });
     
     if (!isAuthorized) {
       logger.error('Unauthorized cron request', {
         hasAuth: !!authHeader,
         environment: process.env.NODE_ENV,
+        allowDevEndpoints,
         step: 'auth-check'
       });
       return NextResponse.json(

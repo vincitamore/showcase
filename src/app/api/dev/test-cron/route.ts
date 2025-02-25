@@ -40,21 +40,60 @@ export async function GET(req: Request) {
     logger.info('Testing cron endpoint', { path: cronPath });
     
     // Forward the request to the actual cron endpoint with the proper auth
-    const cronReq = new Request(`${process.env.NEXT_PUBLIC_URL}${cronPath}`, {
+    const targetUrl = `${process.env.NEXT_PUBLIC_URL}${cronPath}`;
+    logger.info('Forwarding request to cron endpoint', { targetUrl });
+    
+    const cronReq = new Request(targetUrl, {
       headers: {
         'Authorization': `Bearer ${env.CRON_SECRET}`
       }
     });
     
     const response = await fetch(cronReq);
-    const data = await response.json();
     
+    // Detailed response logging
+    logger.info('Cron endpoint response', { 
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    
+    // Handle different response types
+    let data;
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      // Handle non-JSON responses
+      data = {
+        text: await response.text(),
+        contentType: contentType || 'unknown'
+      };
+    }
+    
+    // Include additional response info
     return NextResponse.json({
       status: 'success',
-      cronResponse: data
+      cronResponse: data,
+      responseStatus: response.status,
+      responseInfo: {
+        url: response.url,
+        ok: response.ok,
+        redirected: response.redirected,
+        statusText: response.statusText
+      }
     });
   } catch (error) {
-    logger.error('Error testing cron endpoint', { error, path: cronPath });
+    // Enhanced error logging
+    logger.error('Error testing cron endpoint', { 
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : error,
+      path: cronPath
+    });
     return NextResponse.json(
       { error: { message: 'Error executing cron job', code: 'EXECUTION_ERROR' } },
       { status: 500 }
