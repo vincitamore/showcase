@@ -331,8 +331,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // Modified query format to ensure compatibility with Twitter API v2
     // Use proper spacing and formatting according to Twitter API docs
     // Ensure the username is properly formatted and the query is valid
-    // Add quotes around the username to ensure it's treated as a single entity
-    const query = `from:"${username.trim()}"`;
+    // The Twitter API v2 search endpoint expects the query in a specific format
+    const query = `from:${username.trim()}`;
     
     logger.info('Using Twitter query', {
       step: 'query-preparation',
@@ -435,7 +435,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       params: searchParams
     });
 
-    // Fix: Use client.v2.search instead of client.v2.get for recent search endpoint
+    // Fix: Use client.v2.search instead of client.get for recent search endpoint
     
     let response;
     try {
@@ -445,14 +445,13 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         query
       });
       
-      // Simplify the request to match successful implementations in the codebase
-      // Convert parameters to the format expected by the Twitter API client
+      // Use client.v2.search which is the recommended method for the Twitter API v2
       response = await client.v2.search(query, {
         max_results: searchParams.max_results,
-        'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments',
-        'user.fields': 'profile_image_url,username',
-        'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
-        'expansions': 'author_id,attachments.media_keys,attachments.poll_ids,entities.mentions.username,referenced_tweets.id,referenced_tweets.id.author_id',
+        'tweet.fields': searchParams['tweet.fields'],
+        'user.fields': searchParams['user.fields'],
+        'media.fields': searchParams['media.fields'],
+        expansions: searchParams.expansions,
         ...(searchParams.since_id ? { since_id: searchParams.since_id } : {})
       });
       
