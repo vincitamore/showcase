@@ -755,6 +755,23 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
       durationMs: Date.now() - startTime,
       step: 'check-reset-passed'
     });
+    
+    // Reset the rate limit since the reset time has passed
+    const defaultLimit = DEFAULT_RATE_LIMITS[endpoint as keyof typeof DEFAULT_RATE_LIMITS] || DEFAULT_RATE_LIMITS.default;
+    const newResetAt = new Date(now.getTime() + FIFTEEN_MINUTES);
+    
+    console.log('[Twitter Storage] Resetting rate limit after expiration:', {
+      endpoint,
+      oldResetAt: resetAt.toISOString(),
+      newResetAt: newResetAt.toISOString(),
+      oldRemaining: rateLimit.remaining,
+      newRemaining: defaultLimit - 1, // Pre-decrement for the upcoming request
+      step: 'reset-rate-limit'
+    });
+    
+    // Update the rate limit in the database
+    await updateRateLimit(endpoint, newResetAt, defaultLimit - 1);
+    
     return true;
   }
 
@@ -781,4 +798,56 @@ export async function canMakeRequest(endpoint: string): Promise<boolean> {
     step: 'check-rate-limited'
   });
   return false;
+}
+
+// Function to manually reset expired rate limits
+export async function resetExpiredRateLimits() {
+  const startTime = Date.now();
+  console.log('[Twitter Storage] Checking for expired rate limits', {
+    timestamp: new Date().toISOString(),
+    step: 'start-check'
+  });
+  
+  // Get all rate limits from the database
+  const allRateLimits = await (prisma as any).twitterRateLimit.findMany();
+  const now = new Date();
+  let resetCount = 0;
+  
+  for (const limit of allRateLimits) {
+    const resetAt = toValidDate(limit.resetAt);
+    
+    // If the reset time has passed, update the rate limit
+    if (now > resetAt) {
+      const defaultLimit = DEFAULT_RATE_LIMITS[limit.endpoint as keyof typeof DEFAULT_RATE_LIMITS] || DEFAULT_RATE_LIMITS.default;
+      const newResetAt = new Date(now.getTime() + FIFTEEN_MINUTES);
+      
+      console.log('[Twitter Storage] Resetting expired rate limit:', {
+        endpoint: limit.endpoint,
+        oldResetAt: resetAt.toISOString(),
+        newResetAt: newResetAt.toISOString(),
+        oldRemaining: limit.remaining,
+        newRemaining: defaultLimit,
+        step: 'reset-limit'
+      });
+      
+      await (prisma as any).twitterRateLimit.update({
+        where: { endpoint: limit.endpoint },
+        data: {
+          resetAt: newResetAt,
+          remaining: defaultLimit
+        }
+      });
+      
+      resetCount++;
+    }
+  }
+  
+  console.log('[Twitter Storage] Completed rate limit check:', {
+    totalLimits: allRateLimits.length,
+    resetCount,
+    durationMs: Date.now() - startTime,
+    step: 'check-complete'
+  });
+  
+  return { checked: allRateLimits.length, reset: resetCount };
 } 
