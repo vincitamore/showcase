@@ -381,7 +381,9 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       params: searchParams
     });
 
-    const response = await client.search(query, searchParams);
+    // Fix: Use client.get directly with the endpoint and include query in searchParams
+    searchParams.query = query;
+    const response = await client.get('tweets/search/recent', searchParams, { fullResponse: true });
 
     // Update rate limit after successful request
     if (response.rateLimit) {
@@ -424,14 +426,20 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     });
 
     // Score tweets by tech relevance
-    const scoredTweets = newTweets.map(tweet => ({
+    const scoredTweets = newTweets.map((tweet: TweetV2) => ({
       tweet,
       score: scoreTweetRelevance(tweet)
     }));
     
+    // Define interface for scored tweet
+    interface ScoredTweet {
+      tweet: TweetV2;
+      score: number;
+    }
+    
     // Log tech scores
     logger.info('Tweet tech relevance scores', {
-      scores: scoredTweets.map(t => ({
+      scores: scoredTweets.map((t: ScoredTweet) => ({
         id: t.tweet.id,
         score: t.score,
         text: t.tweet.text.substring(0, 50) + (t.tweet.text.length > 50 ? '...' : '')
@@ -441,33 +449,33 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     
     // First take high-quality tech tweets
     const highQualityTweets = scoredTweets
-      .filter(t => t.score >= TECH_SCORE_THRESHOLD)
-      .map(t => t.tweet);
+      .filter((t: ScoredTweet) => t.score >= TECH_SCORE_THRESHOLD)
+      .map((t: ScoredTweet) => t.tweet);
     
     // If we need more to meet our daily limit, add lower quality tweets sorted by score
     let selectedNewTweets = highQualityTweets;
     if (highQualityTweets.length < DAILY_TWEET_FETCH_LIMIT) {
       const lowerQualityNeeded = DAILY_TWEET_FETCH_LIMIT - highQualityTweets.length;
       const lowerQualityTweets = scoredTweets
-        .filter(t => t.score < TECH_SCORE_THRESHOLD)
-        .sort((a, b) => b.score - a.score) // Higher score first
+        .filter((t: ScoredTweet) => t.score < TECH_SCORE_THRESHOLD)
+        .sort((a: ScoredTweet, b: ScoredTweet) => b.score - a.score) // Higher score first
         .slice(0, lowerQualityNeeded)
-        .map(t => t.tweet);
+        .map((t: ScoredTweet) => t.tweet);
       
       selectedNewTweets = [...highQualityTweets, ...lowerQualityTweets];
     } else if (highQualityTweets.length > DAILY_TWEET_FETCH_LIMIT) {
       // If we have more quality tweets than our limit, take the highest scoring ones
       selectedNewTweets = scoredTweets
-        .sort((a, b) => b.score - a.score)
+        .sort((a: ScoredTweet, b: ScoredTweet) => b.score - a.score)
         .slice(0, DAILY_TWEET_FETCH_LIMIT)
-        .map(t => t.tweet);
+        .map((t: ScoredTweet) => t.tweet);
     }
     
     logger.info('Selected tweets to cache', {
       highQualityCount: highQualityTweets.length,
       selectedCount: selectedNewTweets.length,
       dailyLimit: DAILY_TWEET_FETCH_LIMIT,
-      ids: selectedNewTweets.map(t => t.id),
+      ids: selectedNewTweets.map((t: TweetV2) => t.id),
       step: 'tweet-selection'
     });
 
@@ -477,7 +485,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       : selectedNewTweets;
 
     // Cache the tweets
-    await cacheTweets(tweetsToCache, 'current', response.includes);
+    await cacheTweets(tweetsToCache, 'current', response.data.includes);
     
     // Select tweets for display
     await selectTweetsForDisplay([...tweetsToCache]);

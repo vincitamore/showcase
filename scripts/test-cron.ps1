@@ -281,4 +281,50 @@ if (
         
         Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
     }
+}
+# If we received a successful response, display a success message
+elseif (
+    ($DevResponse -and $DevResponse.status -eq "success") -or
+    ($DirectResponse -and $DirectResponse.status -eq "success")
+) {
+    Write-Host "`n----------------------------------------`n"
+    Write-Host "TWITTER API REQUEST SUCCESSFUL!" -ForegroundColor Green -BackgroundColor Black
+    
+    # Show details from the successful response
+    if ($DevResponse -and $DevResponse.status -eq "success") {
+        $tweetCount = $DevResponse.cronResponse.tweetCount
+        $source = $DevResponse.cronResponse.source
+        
+        Write-Host "`nDev endpoint response:" -ForegroundColor Green
+        Write-Host "Tweet count: $tweetCount" -ForegroundColor White
+        Write-Host "Source: $source" -ForegroundColor White
+        
+        if ($DevResponse.cronResponse.newTweets -ne $null) {
+            Write-Host "New tweets: $($DevResponse.cronResponse.newTweets)" -ForegroundColor White
+        }
+        
+        if ($DevResponse.cronResponse.filteredCount -ne $null) {
+            Write-Host "Filtered count: $($DevResponse.cronResponse.filteredCount)" -ForegroundColor White
+        }
+    }
+    
+    if ($DirectResponse -and $DirectResponse.status -eq "success") {
+        $tweetCount = $DirectResponse.tweetCount
+        $source = $DirectResponse.source
+        
+        Write-Host "`nDirect endpoint response:" -ForegroundColor Green
+        Write-Host "Tweet count: $tweetCount" -ForegroundColor White
+        Write-Host "Source: $source" -ForegroundColor White
+        
+        if ($DirectResponse.newTweets -ne $null) {
+            Write-Host "New tweets: $($DirectResponse.newTweets)" -ForegroundColor White
+        }
+        
+        if ($DirectResponse.filteredCount -ne $null) {
+            Write-Host "Filtered count: $($DirectResponse.filteredCount)" -ForegroundColor White
+        }
+    }
+    
+    Write-Host "`nThe Twitter API request completed successfully." -ForegroundColor Green
+    Write-Host "Your cron job is working properly!" -ForegroundColor Green
 } 
