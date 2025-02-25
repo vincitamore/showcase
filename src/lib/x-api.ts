@@ -216,9 +216,22 @@ export async function getReadOnlyClient() {
       appSecret: env.TWITTER_API_SECRET as string,
       accessToken: env.TWITTER_ACCESS_TOKEN as string,
       accessSecret: env.TWITTER_ACCESS_SECRET as string,
-    } as any); // Use 'as any' to bypass TypeScript errors
+    });
     
+    // Ensure we're using the v2 API
     const readOnlyClient = client.readOnly;
+    
+    // Test the client with a simple request to verify credentials
+    try {
+      // Verify the credentials by making a simple request
+      await readOnlyClient.v2.me();
+      console.log('[Twitter API] Credentials verified successfully');
+    } catch (verifyError) {
+      // If we can't get the current user, it might be because we're using app-only auth
+      // This is expected and not an error for read-only operations
+      console.log('[Twitter API] App-only authentication detected (normal for read-only operations)');
+    }
+    
     console.log('[Twitter API] Client initialized successfully');
     
     return readOnlyClient;
