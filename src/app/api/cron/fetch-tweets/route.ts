@@ -430,7 +430,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments',
       'user.fields': 'profile_image_url,username',
       'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
-      'expansions': 'author_id,attachments.media_keys,attachments.poll_ids,entities.mentions.username,referenced_tweets.id,referenced_tweets.id.author_id'
+      // Use camelCase for expansions parameter as expected by the Twitter API v2 client
+      expansions: 'author_id,attachments.media_keys,attachments.poll_ids,entities.mentions.username,referenced_tweets.id,referenced_tweets.id.author_id'
     };
 
     // If we have cached tweets, only fetch newer ones
@@ -464,6 +465,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         'tweet.fields': searchParams['tweet.fields'],
         'user.fields': searchParams['user.fields'],
         'media.fields': searchParams['media.fields'],
+        // Use camelCase for expansions parameter as expected by the Twitter API v2 client
         expansions: searchParams.expansions,
         ...(searchParams.since_id ? { since_id: searchParams.since_id } : {})
       });
