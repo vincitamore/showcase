@@ -331,7 +331,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // Modified query format to ensure compatibility with Twitter API v2
     // Use proper spacing and formatting according to Twitter API docs
     // Ensure the username is properly formatted and the query is valid
-    const query = `from:${username.trim()}`;
+    // Add quotes around the username to ensure it's treated as a single entity
+    const query = `from:"${username.trim()}"`;
     
     logger.info('Using Twitter query', {
       step: 'query-preparation',
