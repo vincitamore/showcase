@@ -21,9 +21,12 @@ Shows additional debug information about the requests
 .PARAMETER FetchLogs
 When set, attempts to fetch recent Vercel logs for the project (requires Vercel CLI to be installed)
 
+.PARAMETER Method
+The test method to use: "dev" for development endpoint, "direct" for direct endpoint, or "both" for both (default)
+
 .EXAMPLE
 .\test-cron.ps1
-Tests the default fetch-tweets cron job
+Tests the default fetch-tweets cron job using both methods
 
 .EXAMPLE
 .\test-cron.ps1 -Path "/api/cron/rotate-logs" -DevSecret "mysecret123"
@@ -32,6 +35,10 @@ Tests the rotate-logs cron job with a specific secret
 .EXAMPLE
 .\test-cron.ps1 -Verbose -FetchLogs
 Tests the default cron job with detailed logging and fetches recent Vercel logs
+
+.EXAMPLE
+.\test-cron.ps1 -Method "dev"
+Tests only using the development endpoint, avoiding duplicate calls
 #>
 
 param(
@@ -39,7 +46,9 @@ param(
     [string]$DevSecret = $env:DEV_SECRET,
     [string]$BaseUrl = $env:NEXT_PUBLIC_URL,
     [switch]$Verbose,
-    [switch]$FetchLogs
+    [switch]$FetchLogs,
+    [ValidateSet("dev", "direct", "both")]
+    [string]$Method = "both"
 )
 
 # Set defaults if not provided
@@ -55,107 +64,130 @@ if (-not $DevSecret) {
     }
 }
 
+# Variables to store responses
+$DevResponse = $null
+$DirectResponse = $null
+
 # Method 1: Test using the dev test endpoint
-$DevTestUrl = "${BaseUrl}/api/dev/test-cron?path=${Path}"
-Write-Host "Testing via development endpoint: $DevTestUrl"
+if ($Method -eq "dev" -or $Method -eq "both") {
+    $DevTestUrl = "${BaseUrl}/api/dev/test-cron?path=${Path}"
+    Write-Host "Testing via development endpoint: $DevTestUrl"
 
-if ($Verbose) {
-    Write-Host "`nRequest details:" -ForegroundColor Cyan
-    Write-Host "Authorization: Bearer $($DevSecret.Substring(0, 3))..." -ForegroundColor Cyan
-    Write-Host "URL: $DevTestUrl" -ForegroundColor Cyan
-}
-
-try {
-    $DevResponse = Invoke-RestMethod -Uri $DevTestUrl -Headers @{
-        "Authorization" = "Bearer $DevSecret"
-        "Content-Type" = "application/json"
-    } -Method Get -ErrorAction Stop
-
-    Write-Host "Development endpoint test successful:" -ForegroundColor Green
-    
     if ($Verbose) {
-        Write-Host "`nFull response:" -ForegroundColor Cyan
-        $DevResponse | ConvertTo-Json -Depth 10
-    } else {
-        $DevResponse | ConvertTo-Json -Depth 5
+        Write-Host "`nRequest details:" -ForegroundColor Cyan
+        Write-Host "Authorization: Bearer $($DevSecret.Substring(0, 3))..." -ForegroundColor Cyan
+        Write-Host "URL: $DevTestUrl" -ForegroundColor Cyan
     }
-    
-    # Check if the underlying cron job had an error
-    if ($DevResponse.cronResponse.error -or $DevResponse.responseStatus -ge 400) {
-        Write-Host "`nWarning: The development endpoint succeeded, but the cron job itself failed:" -ForegroundColor Yellow
+
+    try {
+        $DevResponse = Invoke-RestMethod -Uri $DevTestUrl -Headers @{
+            "Authorization" = "Bearer $DevSecret"
+            "Content-Type" = "application/json"
+        } -Method Get -ErrorAction Stop
+
+        Write-Host "Development endpoint test successful:" -ForegroundColor Green
         
-        if ($DevResponse.cronResponse.error) {
-            Write-Host "Error details:" -ForegroundColor Yellow
-            $DevResponse.cronResponse.error | ConvertTo-Json -Depth 3
+        if ($Verbose) {
+            Write-Host "`nFull response:" -ForegroundColor Cyan
+            $DevResponse | ConvertTo-Json -Depth 10
+        } else {
+            $DevResponse | ConvertTo-Json -Depth 5
         }
         
-        if ($DevResponse.responseStatus -ge 400) {
-            Write-Host "Response status: $($DevResponse.responseStatus) $($DevResponse.responseInfo.statusText)" -ForegroundColor Yellow
+        # Check if the underlying cron job had an error
+        if ($DevResponse.cronResponse.error -or $DevResponse.responseStatus -ge 400) {
+            Write-Host "`nWarning: The development endpoint succeeded, but the cron job itself failed:" -ForegroundColor Yellow
+            
+            if ($DevResponse.cronResponse.error) {
+                Write-Host "Error details:" -ForegroundColor Yellow
+                $DevResponse.cronResponse.error | ConvertTo-Json -Depth 3
+            }
+            
+            if ($DevResponse.responseStatus -ge 400) {
+                Write-Host "Response status: $($DevResponse.responseStatus) $($DevResponse.responseInfo.statusText)" -ForegroundColor Yellow
+            }
+            
+            Write-Host "`nTry running with the -Verbose parameter to see more details" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "Development endpoint test failed:" -ForegroundColor Red
+        Write-Host $_.Exception.Message
+        Write-Host "Status code: $($_.Exception.Response.StatusCode.value__)"
+        
+        if ($Verbose) {
+            Write-Host "`nDetailed error information:" -ForegroundColor Red
+            Write-Host "Exception type: $($_.Exception.GetType().FullName)"
+            Write-Host "Status description: $($_.Exception.Response.StatusDescription)"
         }
         
-        Write-Host "`nTry running with the -Verbose parameter to see more details" -ForegroundColor Yellow
+        if ($_.ErrorDetails.Message) {
+            try {
+                $errorContent = $_.ErrorDetails.Message | ConvertFrom-Json
+                
+                if ($Verbose) {
+                    Write-Host "`nResponse content:" -ForegroundColor Red
+                    $errorContent | ConvertTo-Json -Depth 10
+                } else {
+                    $errorContent | ConvertTo-Json -Depth 5
+                }
+            } catch {
+                Write-Host $_.ErrorDetails.Message
+            }
+        }
     }
-} catch {
-    Write-Host "Development endpoint test failed:" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    Write-Host "Status code: $($_.Exception.Response.StatusCode.value__)"
-    
-    if ($_.ErrorDetails.Message) {
-        try {
-            $errorContent = $_.ErrorDetails.Message | ConvertFrom-Json
-            $errorContent | ConvertTo-Json -Depth 5
-        } catch {
-            Write-Host $_.ErrorDetails.Message
-        }
+
+    if ($Method -eq "both") {
+        Write-Host "`n----------------------------------------`n"
     }
 }
-
-Write-Host "`n----------------------------------------`n"
 
 # Method 2: Test the endpoint directly with the dev_key parameter
-$DirectTestUrl = "${BaseUrl}${Path}?dev_key=${DevSecret}&test=true"
-Write-Host "Testing by calling endpoint directly: $DirectTestUrl"
+if ($Method -eq "direct" -or $Method -eq "both") {
+    $DirectTestUrl = "${BaseUrl}${Path}?dev_key=${DevSecret}&test=true"
+    Write-Host "Testing by calling endpoint directly: $DirectTestUrl"
 
-if ($Verbose) {
-    Write-Host "`nDirect request details:" -ForegroundColor Cyan
-    Write-Host "URL: $DirectTestUrl" -ForegroundColor Cyan
-    Write-Host "No Authorization header (using dev_key in query)" -ForegroundColor Cyan
-}
-
-try {
-    $DirectResponse = Invoke-RestMethod -Uri $DirectTestUrl -Method Get -ErrorAction Stop
-
-    Write-Host "Direct endpoint test successful:" -ForegroundColor Green
-    
     if ($Verbose) {
-        Write-Host "`nFull response:" -ForegroundColor Cyan
-        $DirectResponse | ConvertTo-Json -Depth 10
-    } else {
-        $DirectResponse | ConvertTo-Json -Depth 5
+        Write-Host "`nDirect request details:" -ForegroundColor Cyan
+        Write-Host "URL: $DirectTestUrl" -ForegroundColor Cyan
+        Write-Host "No Authorization header (using dev_key in query)" -ForegroundColor Cyan
     }
-} catch {
-    Write-Host "Direct endpoint test failed:" -ForegroundColor Red
-    Write-Host $_.Exception.Message
-    Write-Host "Status code: $($_.Exception.Response.StatusCode.value__)"
-    
-    if ($Verbose) {
-        Write-Host "`nDetailed error information:" -ForegroundColor Red
-        Write-Host "Exception type: $($_.Exception.GetType().FullName)"
-        Write-Host "Status description: $($_.Exception.Response.StatusDescription)"
-    }
-    
-    if ($_.ErrorDetails.Message) {
-        try {
-            $errorContent = $_.ErrorDetails.Message | ConvertFrom-Json
-            
-            if ($Verbose) {
-                Write-Host "`nResponse content:" -ForegroundColor Red
-                $errorContent | ConvertTo-Json -Depth 10
-            } else {
-                $errorContent | ConvertTo-Json -Depth 5
+
+    try {
+        $DirectResponse = Invoke-RestMethod -Uri $DirectTestUrl -Method Get -ErrorAction Stop
+
+        Write-Host "Direct endpoint test successful:" -ForegroundColor Green
+        
+        if ($Verbose) {
+            Write-Host "`nFull response:" -ForegroundColor Cyan
+            $DirectResponse | ConvertTo-Json -Depth 10
+        } else {
+            $DirectResponse | ConvertTo-Json -Depth 5
+        }
+    } catch {
+        Write-Host "Direct endpoint test failed:" -ForegroundColor Red
+        Write-Host $_.Exception.Message
+        Write-Host "Status code: $($_.Exception.Response.StatusCode.value__)"
+        
+        if ($Verbose) {
+            Write-Host "`nDetailed error information:" -ForegroundColor Red
+            Write-Host "Exception type: $($_.Exception.GetType().FullName)"
+            Write-Host "Status description: $($_.Exception.Response.StatusDescription)"
+        }
+        
+        if ($_.ErrorDetails.Message) {
+            try {
+                $errorContent = $_.ErrorDetails.Message | ConvertFrom-Json
+                $DirectResponse = $errorContent  # Store the error response for analysis
+                
+                if ($Verbose) {
+                    Write-Host "`nResponse content:" -ForegroundColor Red
+                    $errorContent | ConvertTo-Json -Depth 10
+                } else {
+                    $errorContent | ConvertTo-Json -Depth 5
+                }
+            } catch {
+                Write-Host $_.ErrorDetails.Message
             }
-        } catch {
-            Write-Host $_.ErrorDetails.Message
         }
     }
 }
@@ -215,43 +247,44 @@ if ($FetchLogs) {
     }
 }
 
-# If we received a rate limit error or invalid request, display helpful recovery info
-if (
-    ($DevResponse.cronResponse.error -ne $null) -or
-    ($DirectResponse.error -ne $null) -or
-    # Check for common error patterns in responses
-    ($DevResponse.cronResponse.error.details.message -match "429" -or 
-    $DirectResponse.error.details.message -match "429" -or
-    $DevResponse.cronResponse.error.details.message -match "400" -or
-    $DirectResponse.error.details.message -match "400" -or
-    ($DevResponse.cronResponse.error.details.message -match "Request failed" -or 
-     $DirectResponse.error.details.message -match "Request failed") -or
-    ($DevResponse.cronResponse.error.details.message -match "Invalid Request" -or 
-     $DirectResponse.error.details.message -match "Invalid Request"))
-) {
-    Write-Host "`n----------------------------------------`n"
+Write-Host "`n----------------------------------------`n"
+
+# Analyze the responses to determine what happened
+# First, check if we have any responses to analyze
+if (($Method -eq "dev" -or $Method -eq "both") -and $DevResponse -ne $null) {
+    $responseToAnalyze = $DevResponse.cronResponse
+    $errorSource = "Development endpoint"
     
-    # Determine the type of error
-    $isRateLimit = $DevResponse.cronResponse.error.details.message -match "429" -or $DirectResponse.error.details.message -match "429"
-    $isInvalidRequest = $DevResponse.cronResponse.error.details.message -match "400" -or $DirectResponse.error.details.message -match "400" -or
-                        $DevResponse.cronResponse.error.details.message -match "Invalid Request" -or $DirectResponse.error.details.message -match "Invalid Request"
-    $isNetworkError = $DevResponse.cronResponse.error.details.message -match "Request failed" -or $DirectResponse.error.details.message -match "Request failed"
+    # For dev endpoint, the error might be nested in cronResponse
+    if ($responseToAnalyze.error) {
+        $errorDetails = $responseToAnalyze.error
+    } else {
+        $errorDetails = $responseToAnalyze
+    }
+} elseif (($Method -eq "direct" -or $Method -eq "both") -and $DirectResponse -ne $null) {
+    $responseToAnalyze = $DirectResponse
+    $errorSource = "Direct endpoint"
     
-    if ($isRateLimit) {
+    # For direct endpoint, the error might be at the top level
+    if ($responseToAnalyze.error) {
+        $errorDetails = $responseToAnalyze.error
+    } else {
+        $errorDetails = $responseToAnalyze
+    }
+} else {
+    Write-Host "No response data available for analysis." -ForegroundColor Yellow
+    exit
+}
+
+# Check for specific error types
+if ($errorDetails) {
+    # Check for rate limit errors (429)
+    if ($errorDetails.code -eq "TWITTER_RATE_LIMIT" -or 
+        $errorDetails.code -eq "RATE_LIMIT_EXCEEDED" -or
+        $errorDetails.message -match "429" -or
+        $errorDetails.message -match "rate limit") {
+        
         Write-Host "TWITTER RATE LIMIT DETECTED" -ForegroundColor Red -BackgroundColor Black
-        
-        # Parse stack trace to see if we can extract rate limit info
-        $stackTrace = if ($DevResponse.cronResponse.error.details.stack) { 
-            $DevResponse.cronResponse.error.details.stack 
-        } elseif ($DirectResponse.error.details.stack) { 
-            $DirectResponse.error.details.stack 
-        } else { $null }
-        
-        # Look for Twitter API URL in the error to help identify which endpoint is rate limited
-        if ($stackTrace -match "twitter.com/([^/]+)/([^/]+)") {
-            $endpoint = $Matches[1] + "/" + $Matches[2]
-            Write-Host "Rate limited endpoint: $endpoint" -ForegroundColor Yellow
-        }
         
         Write-Host "`nTwitter API rate limits typically reset after 15 minutes." -ForegroundColor Yellow
         Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
@@ -260,24 +293,17 @@ if (
         Write-Host "3. Reduce the frequency of your API calls" -ForegroundColor White
         Write-Host "4. If available, use cached tweets from the database" -ForegroundColor White
         
-        Write-Host "`nTo check the actual reset time, run the script with the direct endpoint and examine the error response." -ForegroundColor Cyan
-    }
-    
-    if ($isInvalidRequest) {
-        Write-Host "TWITTER API INVALID REQUEST DETECTED" -ForegroundColor Red -BackgroundColor Black
-        
-        # Extract error details
-        $errorMessage = if ($DevResponse.cronResponse.error.details.message) {
-            $DevResponse.cronResponse.error.details.message
-        } elseif ($DirectResponse.error.details.message) {
-            $DirectResponse.error.details.message
-        } else { "Unknown error" }
-        
-        # Look for API problem URL to help identify the issue
-        if ($errorMessage -match "https://api.twitter.com/2/problems/([^)]+)") {
-            $problemType = $Matches[1]
-            Write-Host "Problem type: $problemType" -ForegroundColor Yellow
+        if ($errorDetails.resetAt) {
+            Write-Host "`nRate limit will reset at: $($errorDetails.resetAt)" -ForegroundColor Yellow
         }
+    }
+    # Check for invalid request errors (400)
+    elseif ($errorDetails.code -eq "INVALID_REQUEST" -or
+            $errorDetails.message -match "400" -or
+            $errorDetails.message -match "Invalid Request" -or
+            $errorDetails.message -match "invalid parameters") {
+        
+        Write-Host "TWITTER API INVALID REQUEST DETECTED" -ForegroundColor Red -BackgroundColor Black
         
         Write-Host "`nThe Twitter API rejected the request due to invalid parameters." -ForegroundColor Yellow
         Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
@@ -286,24 +312,15 @@ if (
         Write-Host "3. Review the Twitter API documentation: https://developer.twitter.com/en/docs/twitter-api" -ForegroundColor White
         Write-Host "4. Check that you have sufficient permissions for this request" -ForegroundColor White
         
-        Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
+        Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
     }
-    
-    if ($isNetworkError) {
+    # Check for network errors
+    elseif ($errorDetails.code -eq "TWITTER_NETWORK_ERROR" -or
+            $errorDetails.message -match "timeout" -or
+            $errorDetails.message -match "network" -or
+            $errorDetails.message -match "Request failed") {
+        
         Write-Host "TWITTER API NETWORK ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
-        
-        # Extract error details
-        $errorMessage = if ($DevResponse.cronResponse.error.details.message) {
-            $DevResponse.cronResponse.error.details.message
-        } elseif ($DirectResponse.error.details.message) {
-            $DirectResponse.error.details.message
-        } else { "Unknown error" }
-        
-        $stackTrace = if ($DevResponse.cronResponse.error.details.stack) { 
-            $DevResponse.cronResponse.error.details.stack 
-        } elseif ($DirectResponse.error.details.stack) { 
-            $DirectResponse.error.details.stack 
-        } else { $null }
         
         Write-Host "`nThere was a network error while connecting to the Twitter API." -ForegroundColor Yellow
         Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
@@ -311,33 +328,78 @@ if (
         Write-Host "2. Verify that X/Twitter services are online" -ForegroundColor White
         Write-Host "3. Check if your API credentials have been revoked or expired" -ForegroundColor White
         Write-Host "4. Examine if there are any IP restrictions on your Twitter developer account" -ForegroundColor White
+        Write-Host "5. Verify that your Twitter API endpoint URL is correct" -ForegroundColor White
         
-        Write-Host "`nError message: $errorMessage" -ForegroundColor Yellow
+        Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
         
-        if ($Verbose -and $stackTrace) {
+        if ($Verbose -and $errorDetails.details -and $errorDetails.details.stack) {
             Write-Host "`nStack trace:" -ForegroundColor Yellow
-            Write-Host $stackTrace -ForegroundColor Gray
+            Write-Host $errorDetails.details.stack -ForegroundColor Gray
+        }
+    }
+    # Check for authentication errors
+    elseif ($errorDetails.code -eq "UNAUTHORIZED" -or
+            $errorDetails.message -match "401" -or
+            $errorDetails.message -match "auth" -or
+            $errorDetails.message -match "credentials") {
+        
+        Write-Host "TWITTER API AUTHENTICATION ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        Write-Host "`nThe Twitter API rejected your authentication credentials." -ForegroundColor Yellow
+        Write-Host "Options to resolve this issue:" -ForegroundColor Cyan
+        Write-Host "1. Verify that your Twitter API credentials are correct" -ForegroundColor White
+        Write-Host "2. Check if your API keys have been revoked or expired" -ForegroundColor White
+        Write-Host "3. Ensure that your Twitter developer account is in good standing" -ForegroundColor White
+        
+        Write-Host "`nError message: $($errorDetails.message)" -ForegroundColor Yellow
+    }
+    # Generic error fallback
+    else {
+        Write-Host "TWITTER API ERROR DETECTED" -ForegroundColor Red -BackgroundColor Black
+        
+        Write-Host "`nAn error occurred while communicating with the Twitter API." -ForegroundColor Yellow
+        Write-Host "Error details:" -ForegroundColor Cyan
+        Write-Host "Code: $($errorDetails.code)" -ForegroundColor White
+        Write-Host "Message: $($errorDetails.message)" -ForegroundColor White
+        
+        if ($Verbose -and $errorDetails.details) {
+            Write-Host "`nAdditional details:" -ForegroundColor Yellow
+            $errorDetails.details | ConvertTo-Json -Depth 3
         }
     }
 }
-# If we received a successful response, display a success message
+# Check for successful responses
 elseif (
-    # Make sure the response actually has content and not just empty fields
-    (($DevResponse -and $DevResponse.status -eq "success" -and 
+    # For dev endpoint
+    ($Method -eq "dev" -and $DevResponse -and $DevResponse.status -eq "success" -and 
+     $DevResponse.cronResponse.status -eq "success" -and
      ($DevResponse.cronResponse.tweetCount -gt 0 -or 
       ($DevResponse.cronResponse.source -eq "cache" -and $DevResponse.cronResponse.tweetCount -ne $null))) -or
-     
-    ($DirectResponse -and $DirectResponse.status -eq "success" -and 
+    
+    # For direct endpoint
+    ($Method -eq "direct" -and $DirectResponse -and $DirectResponse.status -eq "success" -and
      ($DirectResponse.tweetCount -gt 0 -or 
-      ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null))))
+      ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null))) -or
+    
+    # For both endpoints (either one succeeding)
+    ($Method -eq "both" -and (
+        ($DevResponse -and $DevResponse.status -eq "success" -and 
+         $DevResponse.cronResponse.status -eq "success" -and
+         ($DevResponse.cronResponse.tweetCount -gt 0 -or 
+          ($DevResponse.cronResponse.source -eq "cache" -and $DevResponse.cronResponse.tweetCount -ne $null))) -or
+        ($DirectResponse -and $DirectResponse.status -eq "success" -and
+         ($DirectResponse.tweetCount -gt 0 -or 
+          ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null)))
+    ))
 ) {
-    Write-Host "`n----------------------------------------`n"
     Write-Host "TWITTER API REQUEST SUCCESSFUL!" -ForegroundColor Green -BackgroundColor Black
     
     # Show details from the successful response
-    if ($DevResponse -and $DevResponse.status -eq "success" -and 
+    if ($Method -ne "direct" -and $DevResponse -and $DevResponse.status -eq "success" -and 
+        $DevResponse.cronResponse.status -eq "success" -and
         ($DevResponse.cronResponse.tweetCount -gt 0 -or 
          ($DevResponse.cronResponse.source -eq "cache" -and $DevResponse.cronResponse.tweetCount -ne $null))) {
+        
         $tweetCount = $DevResponse.cronResponse.tweetCount
         $source = $DevResponse.cronResponse.source
         
@@ -354,9 +416,10 @@ elseif (
         }
     }
     
-    if ($DirectResponse -and $DirectResponse.status -eq "success" -and 
+    if ($Method -ne "dev" -and $DirectResponse -and $DirectResponse.status -eq "success" -and
         ($DirectResponse.tweetCount -gt 0 -or 
          ($DirectResponse.source -eq "cache" -and $DirectResponse.tweetCount -ne $null))) {
+        
         $tweetCount = $DirectResponse.tweetCount
         $source = $DirectResponse.source
         
@@ -378,7 +441,6 @@ elseif (
 }
 else {
     # Catch-all for confusing status cases - could be partial success or odd error format
-    Write-Host "`n----------------------------------------`n"
     Write-Host "INCONSISTENT OR EMPTY RESPONSE DETECTED" -ForegroundColor Yellow -BackgroundColor Black
     
     Write-Host "`nYour request received a response, but it doesn't contain the expected data." -ForegroundColor Yellow
@@ -387,11 +449,14 @@ else {
     Write-Host "2. A problem with parsing the Twitter API response" -ForegroundColor White
     Write-Host "3. A successful connection to cache but the cache is empty" -ForegroundColor White
     
-    if ($DevResponse) {
+    if ($Method -ne "direct" -and $DevResponse) {
         Write-Host "`nDev endpoint details:" -ForegroundColor Yellow
         Write-Host "Status: $($DevResponse.status)" -ForegroundColor White
         
         if ($DevResponse.cronResponse) {
+            if ($DevResponse.cronResponse.status) {
+                Write-Host "Cron response status: $($DevResponse.cronResponse.status)" -ForegroundColor White
+            }
             if ($DevResponse.cronResponse.tweetCount -ne $null) {
                 Write-Host "Tweet count: $($DevResponse.cronResponse.tweetCount)" -ForegroundColor White
             }
@@ -401,7 +466,7 @@ else {
         }
     }
     
-    if ($DirectResponse) {
+    if ($Method -ne "dev" -and $DirectResponse) {
         Write-Host "`nDirect endpoint details:" -ForegroundColor Yellow
         Write-Host "Status: $($DirectResponse.status)" -ForegroundColor White
         

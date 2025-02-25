@@ -391,7 +391,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         endpoint: 'tweets/search/recent'
       });
       
-      // Use the proper v2.search method instead of the generic get method
+      // Use the proper search method
       response = await client.v2.search(query, searchParams);
       
       logger.info('Twitter API request successful', { 
