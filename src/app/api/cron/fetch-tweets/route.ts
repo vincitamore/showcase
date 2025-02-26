@@ -1054,7 +1054,7 @@ async function selectTweetsForDisplay(tweets: TweetV2[]) {
   }
 }
 
-// Simplify the processTweetsForCache function to use the username directly
+// Improve the processTweetsForCache function to properly handle JSON data
 async function processTweetsForCache(tweets: TweetV2[], type: string, includes?: any) {
   try {
     logger.info(`Processing ${tweets.length} tweets of type ${type}`);
@@ -1113,12 +1113,13 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
                 url: url.url,
                 expandedUrl: url.expanded_url,
                 mediaKey: url.media_key,
-                metadata: JSON.stringify({
-                  status: url.status,
-                  title: url.title,
-                  description: url.description,
+                // Convert metadata to a Prisma-compatible JSON format
+                metadata: {
+                  status: url.status || null,
+                  title: url.title || null,
+                  description: url.description || null,
                   images: url.images || []
-                })
+                } as any // Use type assertion to satisfy TypeScript
               });
             }
           }
@@ -1129,9 +1130,10 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
               entitiesData.push({
                 type: 'mention',
                 text: mention.username,
-                metadata: JSON.stringify({
-                  id: mention.id
-                })
+                // Convert metadata to a Prisma-compatible JSON format
+                metadata: {
+                  id: mention.id || null
+                } as any // Use type assertion to satisfy TypeScript
               });
             }
           }
@@ -1160,13 +1162,14 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
               text: media.alt_text || '',
               url: media.url || media.preview_image_url,
               mediaKey: media.media_key,
-              metadata: JSON.stringify({
-                type: media.type,
-                width: media.width,
-                height: media.height,
-                preview_image_url: media.preview_image_url,
-                duration_ms: media.duration_ms
-              })
+              // Convert metadata to a Prisma-compatible JSON format
+              metadata: {
+                type: media.type || null,
+                width: media.width || null,
+                height: media.height || null,
+                preview_image_url: media.preview_image_url || null,
+                duration_ms: media.duration_ms || null
+              } as any // Use type assertion to satisfy TypeScript
             });
           }
         }
@@ -1180,23 +1183,25 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
             id: tweet.id,
             text: tweet.text,
             createdAt: createdAt,
-            publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
+            // Convert publicMetrics to a Prisma-compatible JSON format
+            publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
             authorId: username, // Use the username directly as authorId
             editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
             entities: {
-              create: entitiesData
+              create: entitiesData as any // Use type assertion to satisfy TypeScript
             }
           },
           update: {
             id: tweet.id,
             text: tweet.text,
             createdAt: createdAt,
-            publicMetrics: tweet.public_metrics ? JSON.stringify(tweet.public_metrics) : undefined,
+            // Convert publicMetrics to a Prisma-compatible JSON format
+            publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
             authorId: username, // Use the username directly as authorId
             editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
             entities: {
               deleteMany: {},
-              create: entitiesData
+              create: entitiesData as any // Use type assertion to satisfy TypeScript
             }
           }
         });
@@ -1243,6 +1248,180 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
       stack: error instanceof Error ? error.stack : undefined
     });
     throw error;
+  }
+}
+
+// Add a new endpoint for cleaning up or deleting tweets
+export async function DELETE(req: Request): Promise<Response> {
+  try {
+    // Check for authorization
+    const url = new URL(req.url);
+    const devBypass = url.searchParams.get('dev_key') === env.DEV_SECRET;
+    const authHeader = req.headers.get('authorization');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowDevEndpoints = env.ALLOW_DEV_ENDPOINTS || false;
+    
+    // Check authorization
+    const isAuthorized = 
+      authHeader === `Bearer ${env.CRON_SECRET}` || 
+      ((!isProduction || allowDevEndpoints) && devBypass);
+    
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } },
+        { status: 401 }
+      );
+    }
+    
+    // Get action from query params
+    const action = url.searchParams.get('action') || 'report';
+    
+    // Get all tweets
+    const tweets = await prisma.tweet.findMany({
+      include: {
+        entities: true
+      }
+    });
+    
+    logger.info(`Found ${tweets.length} tweets for cleanup`, {
+      step: 'cleanup-start',
+      action
+    });
+    
+    // Report on problematic tweets
+    const problematicTweets = tweets.filter(tweet => {
+      // Check if publicMetrics is a string (malformed)
+      const isPublicMetricsString = typeof tweet.publicMetrics === 'string';
+      
+      // Check if any entities have malformed metadata
+      const hasEntityWithStringMetadata = tweet.entities.some(
+        entity => typeof entity.metadata === 'string'
+      );
+      
+      return isPublicMetricsString || hasEntityWithStringMetadata;
+    });
+    
+    logger.info(`Found ${problematicTweets.length} problematic tweets`, {
+      step: 'cleanup-analysis',
+      problematicCount: problematicTweets.length,
+      totalCount: tweets.length
+    });
+    
+    if (action === 'report') {
+      // Just report the issues
+      return NextResponse.json({
+        status: 'success',
+        message: 'Analysis complete',
+        totalTweets: tweets.length,
+        problematicTweets: problematicTweets.length,
+        sampleIds: problematicTweets.slice(0, 5).map(t => t.id)
+      });
+    } else if (action === 'delete') {
+      // Delete problematic tweets
+      for (const tweet of problematicTweets) {
+        // First delete entities
+        await prisma.tweetEntity.deleteMany({
+          where: {
+            tweetId: tweet.id
+          }
+        });
+        
+        // Then delete the tweet
+        await prisma.tweet.delete({
+          where: {
+            id: tweet.id
+          }
+        });
+      }
+      
+      return NextResponse.json({
+        status: 'success',
+        message: 'Deleted problematic tweets',
+        deletedCount: problematicTweets.length,
+        remainingCount: tweets.length - problematicTweets.length
+      });
+    } else if (action === 'fix') {
+      // Fix problematic tweets
+      let fixedCount = 0;
+      
+      for (const tweet of problematicTweets) {
+        try {
+          // Fix publicMetrics if it's a string
+          let fixedPublicMetrics: any = tweet.publicMetrics;
+          if (typeof tweet.publicMetrics === 'string') {
+            try {
+              fixedPublicMetrics = JSON.parse(tweet.publicMetrics);
+            } catch (e) {
+              // If parsing fails, set to empty object
+              fixedPublicMetrics = {};
+            }
+          }
+          
+          // Update the tweet with fixed publicMetrics
+          await prisma.tweet.update({
+            where: {
+              id: tweet.id
+            },
+            data: {
+              publicMetrics: fixedPublicMetrics
+            }
+          });
+          
+          // Fix entities with string metadata
+          for (const entity of tweet.entities) {
+            if (typeof entity.metadata === 'string') {
+              let fixedMetadata: any = {};
+              try {
+                fixedMetadata = JSON.parse(entity.metadata);
+              } catch (e) {
+                // If parsing fails, leave as empty object
+              }
+              
+              // Update the entity with fixed metadata
+              await prisma.tweetEntity.update({
+                where: {
+                  id: entity.id
+                },
+                data: {
+                  metadata: fixedMetadata
+                }
+              });
+            }
+          }
+          
+          fixedCount++;
+        } catch (error) {
+          logger.error(`Error fixing tweet ${tweet.id}`, {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+      return NextResponse.json({
+        status: 'success',
+        message: 'Fixed problematic tweets',
+        fixedCount,
+        totalProblematic: problematicTweets.length
+      });
+    }
+    
+    return NextResponse.json({
+      status: 'error',
+      message: 'Invalid action specified',
+      validActions: ['report', 'delete', 'fix']
+    }, { status: 400 });
+    
+  } catch (error) {
+    logger.error('Error in tweet cleanup', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    return NextResponse.json({
+      status: 'error',
+      message: 'Failed to clean up tweets',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
 
