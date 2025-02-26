@@ -120,12 +120,51 @@ const BlogSection = () => {
   const [urlEntitiesMap, setUrlEntitiesMap] = useState<Record<string, TweetEntity[]>>({})
 
   // Initialize Twitter embed script
-  const { loadTwitterWidgets } = useTwitterEmbed()
+  const { loadTwitterWidgets, forceWidgetReload } = useTwitterEmbed()
 
   useEffect(() => {
     fetchCachedTweets()
     checkAuth()
+    
+    // Return empty cleanup function
+    return () => {};
   }, [])
+
+  // Add a new useEffect to trigger Twitter widget loading after tweets are rendered
+  useEffect(() => {
+    if (tweets.length > 0) {
+      console.log('[Tweet Rendering] Triggering Twitter widget loading after tweets render');
+      
+      // Give time for the DOM to update
+      const timer = setTimeout(() => {
+        loadTwitterWidgets();
+        
+        // Add a second load after a longer delay to catch any missed embeds
+        // but only do this once, not repeatedly
+        const secondTimer = setTimeout(() => {
+          console.log('[Tweet Rendering] Performing final widget reload check');
+          forceWidgetReload();
+          
+          // After this final reload, hide any remaining loading indicators
+          setTimeout(() => {
+            document.querySelectorAll('.tweet-embed-loading').forEach(el => {
+              el.classList.add('hidden');
+            });
+          }, 2000);
+        }, 5000);
+        
+        return () => {
+          clearTimeout(timer);
+          clearTimeout(secondTimer);
+        };
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Return an empty cleanup function when tweets.length is 0
+    return () => {};
+  }, [tweets, loadTwitterWidgets, forceWidgetReload]);
 
   // Handle URL preview loading states at the component level
   useEffect(() => {
@@ -346,7 +385,10 @@ const BlogSection = () => {
       
       // Trigger Twitter widget loading after tweets are rendered
       setTimeout(() => {
+        console.log('[Tweet Rendering] Initial widget load after fetching tweets');
         loadTwitterWidgets();
+        
+        // No need for additional forced reloads here since the useEffect will handle it
       }, 1000);
     } catch (error) {
       console.error('[Tweet Rendering ERROR] Error fetching tweets:', error);
@@ -804,31 +846,60 @@ const BlogSection = () => {
   }, []);
 
   // Memoize the renderUrlPreviews function to prevent unnecessary re-renders
-  const renderUrlPreviews = React.useCallback((entities: TweetEntity[]) => {
+  const renderUrlPreviews = React.useCallback((entities: TweetEntity[], tweetId?: string) => {
     // Add detailed logging at the start of the function
     console.log('[Tweet Rendering DEBUG] renderUrlPreviews called:', {
       entitiesCount: entities?.length || 0,
       urlEntitiesCount: entities?.filter(e => e.type === 'url').length || 0,
-      urlEntities: entities?.filter(e => e.type === 'url').map(e => ({
-        id: e.id,
-        type: e.type,
-        url: e.url,
-        expandedUrl: e.expandedUrl,
-        displayUrl: e.displayUrl,
-        hasMetadata: !!e.metadata
-      }))
+      tweetId
+    });
+    
+    // Ensure URL entities have the correct structure
+    const enhancedEntities = entities.map(entity => {
+      if (entity.type === 'url' && entity.url && !entity.expandedUrl) {
+        console.log('[Tweet Rendering DEBUG] Enhancing URL entity with missing expandedUrl:', entity.url);
+        return {
+          ...entity,
+          expandedUrl: entity.url,
+          displayUrl: formatDisplayUrl(entity.url)
+        };
+      }
+      return entity;
+    });
+    
+    // Log enhanced entities
+    console.log('[Tweet Rendering DEBUG] Enhanced URL entities:', {
+      originalCount: entities.filter(e => e.type === 'url').length,
+      enhancedCount: enhancedEntities.filter(e => e.type === 'url').length
     });
     
     // Deduplicate URL entities by their expanded URL
-    const uniqueUrlEntities = entities
+    const uniqueUrlEntities = enhancedEntities
       .filter(e => e.type === 'url' && e.expandedUrl) // Only include entities with expanded URLs
-      .reduce((acc: TweetEntity[], entity) => {
+      .filter(e => {
         // Skip URLs that expand to Twitter/X URLs as they will be handled separately
-        if (entity.expandedUrl?.includes('twitter.com') || entity.expandedUrl?.includes('x.com')) {
-          console.log('[Tweet Rendering DEBUG] Skipping Twitter URL:', entity.expandedUrl);
-          return acc;
+        if (e.expandedUrl?.includes('twitter.com') || e.expandedUrl?.includes('x.com')) {
+          console.log('[Tweet Rendering DEBUG] Skipping Twitter URL:', e.expandedUrl);
+          
+          // If this is a self-reference (links to the current tweet), skip it
+          if (tweetId) {
+            try {
+              const match = e.expandedUrl?.match(/\/status\/(\d+)/);
+              const urlTweetId = match ? match[1] : null;
+              if (urlTweetId === tweetId) {
+                console.log('[Tweet Rendering DEBUG] Skipping self-referential URL:', e.expandedUrl);
+                return false;
+              }
+            } catch (err) {
+              // Ignore extraction errors
+            }
+          }
+          
+          return false;
         }
-        
+        return true;
+      })
+      .reduce((acc: TweetEntity[], entity) => {
         const exists = acc.find(e => e.expandedUrl === entity.expandedUrl);
         if (!exists) acc.push(entity);
         return acc;
@@ -915,10 +986,37 @@ const BlogSection = () => {
             metadata = {};
           }
 
-          // Skip if no preview data
+          // If no metadata, create a basic preview with just the URL
           if (!metadata?.title && !metadata?.description && !metadata?.images?.length && !metadata?.image) {
-            console.log('[Tweet Rendering DEBUG] Skipping URL preview due to missing metadata');
-            return null;
+            console.log('[Tweet Rendering DEBUG] No metadata, creating basic preview for URL:', entity.expandedUrl || entity.url);
+            
+            // Get the domain from the expanded URL
+            const domain = (() => {
+              try {
+                return new URL(entity.expandedUrl || entity.url || '').hostname;
+              } catch (e) {
+                return entity.displayUrl || '';
+              }
+            })();
+            
+            return (
+              <div
+                key={entity.expandedUrl || entity.url || index}
+                className="rounded-lg border overflow-hidden hover:bg-accent/5 transition-colors cursor-pointer p-3"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(entity.expandedUrl || entity.url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium truncate">
+                    {entity.displayUrl || domain || entity.expandedUrl || entity.url}
+                  </span>
+                </div>
+              </div>
+            );
           }
 
           // Get the domain from the expanded URL
@@ -1015,19 +1113,21 @@ const BlogSection = () => {
     });
     
     try {
-      // Get unique Twitter URLs for embedding
-      console.log('[Tweet Rendering DEBUG] Checking for Twitter URLs in entities:', {
-        urlEntitiesCount: entities.filter(e => e.type === 'url').length,
-        urlEntities: entities.filter(e => e.type === 'url').map(e => ({
-          id: e.id,
-          url: e.url,
-          expandedUrl: e.expandedUrl,
-          isTwitterUrl: e.expandedUrl?.includes('twitter.com') || e.expandedUrl?.includes('x.com'),
-          isStatusUrl: e.expandedUrl?.includes('/status/')
-        }))
+      // Log detailed entity information
+      entities.forEach((entity, index) => {
+        if (entity.type === 'url') {
+          console.log('[Tweet Rendering DEBUG] URL entity details:', {
+            index,
+            url: entity.url,
+            expandedUrl: entity.expandedUrl,
+            displayUrl: entity.displayUrl,
+            metadata: entity.metadata ? 'present' : 'missing',
+            type: entity.type
+          });
+        }
       });
       
-      // Enhanced Twitter URL detection
+      // Enhanced Twitter URL detection with self-reference filtering
       const twitterUrls = entities
         .filter(e => {
           // Check if it's a URL entity
@@ -1044,15 +1144,31 @@ const BlogSection = () => {
           // Check if it's a status URL (tweet)
           const isStatusUrl = e.expandedUrl.includes('/status/');
           
+          // Extract the tweet ID from the URL to check if it's self-referential
+          let urlTweetId = null;
+          try {
+            const match = e.expandedUrl.match(/\/status\/(\d+)/);
+            urlTweetId = match ? match[1] : null;
+          } catch (err) {
+            // Ignore extraction errors
+          }
+          
+          // Skip if this URL points to the current tweet (self-reference)
+          const isSelfReference = urlTweetId === tweet.id;
+          
           console.log('[Tweet Rendering DEBUG] Twitter URL check:', {
             url: e.url,
             expandedUrl: e.expandedUrl,
             isTwitterDomain,
             isStatusUrl,
-            result: isTwitterDomain && isStatusUrl
+            urlTweetId,
+            currentTweetId: tweet.id,
+            isSelfReference,
+            result: isTwitterDomain && isStatusUrl && !isSelfReference
           });
           
-          return isTwitterDomain && isStatusUrl;
+          // Only include Twitter URLs that aren't self-references
+          return isTwitterDomain && isStatusUrl && !isSelfReference;
         })
         .reduce((acc: string[], entity) => {
           const url = entity.expandedUrl;
@@ -1077,6 +1193,44 @@ const BlogSection = () => {
               url: twitterUrl
             });
             
+            // Extract tweet ID from URL for direct embedding
+            const tweetId = (() => {
+              try {
+                // Extract the tweet ID from the URL
+                const match = twitterUrl.match(/\/status\/(\d+)/);
+                return match ? match[1] : null;
+              } catch (e) {
+                return null;
+              }
+            })();
+            
+            console.log('[Tweet Rendering DEBUG] Extracted tweet ID:', tweetId);
+            
+            // For Twitter embeds, use the tweet ID directly if available
+            if (tweetId) {
+              return (
+                <div 
+                  key={`${tweet.id}-embed-${embedIndex}`}
+                  className="rounded-lg border border-border/50 overflow-hidden relative"
+                >
+                  {/* Loading state indicator */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 tweet-embed-loading">
+                    <div className="h-5 w-5 border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <blockquote 
+                    className="twitter-tweet" 
+                    data-conversation="none"
+                    data-theme="dark"
+                    data-align="center"
+                    data-dnt="true"
+                  >
+                    <a href={`https://twitter.com/i/status/${tweetId}`}></a>
+                  </blockquote>
+                </div>
+              );
+            }
+            
+            // Fallback to using the full URL if tweet ID extraction failed
             return (
               <div 
                 key={`${tweet.id}-embed-${embedIndex}`}
@@ -1091,11 +1245,7 @@ const BlogSection = () => {
                   data-conversation="none"
                   data-theme="dark"
                   data-align="center"
-                  onLoad={() => {
-                    // Hide loading indicator when tweet is loaded
-                    const loadingEl = document.querySelector('.tweet-embed-loading');
-                    if (loadingEl) loadingEl.classList.add('hidden');
-                  }}
+                  data-dnt="true"
                 >
                   <a href={twitterUrl}></a>
                 </blockquote>
@@ -1128,8 +1278,8 @@ const BlogSection = () => {
       // Render media content if available
       const mediaContent = renderMedia(entities);
       
-      // Render URL previews if available - but don't use hooks inside this render function
-      const urlPreviewsContent = renderUrlPreviews(entities);
+      // Render URL previews if available - pass the tweet ID to filter out self-references
+      const urlPreviewsContent = renderUrlPreviews(entities, tweet.id);
 
       const result = (
         <div className="flex h-full flex-col justify-between gap-4">
@@ -1172,30 +1322,10 @@ const BlogSection = () => {
 
       return result;
     } catch (error) {
-      console.error('Error rendering tweet:', error);
-      
-      // Provide a fallback UI when there's an error
+      console.error('[Tweet Rendering ERROR] Error rendering tweet:', error);
       return (
-        <div className="flex h-full flex-col justify-between gap-4">
-          <div className="space-y-4">
-            <div className="text-sm">
-              <div className="whitespace-pre-wrap break-words">
-                {tweet.text || "This tweet couldn't be rendered properly."}
-              </div>
-              <div className="mt-2 text-xs text-red-500">
-                There was an error rendering this tweet. Please refresh the page or try again later.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div>{formatDate(tweet.created_at)}</div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <Heart className="h-4 w-4" />
-                <span>{formatNumber(tweet.public_metrics?.like_count)}</span>
-              </div>
-            </div>
-          </div>
+        <div className="text-red-500 text-sm">
+          Error rendering tweet. Please try refreshing the page.
         </div>
       );
     }
@@ -1259,11 +1389,16 @@ const BlogSection = () => {
             setApi={(api) => {
               // Set up a listener for slide changes to reload Twitter widgets
               if (api) {
+                let debounceTimer: NodeJS.Timeout;
                 api.on('select', () => {
-                  // Reload Twitter widgets when carousel slide changes
-                  setTimeout(() => {
+                  // Debounce the reload to prevent multiple rapid calls
+                  clearTimeout(debounceTimer);
+                  debounceTimer = setTimeout(() => {
+                    console.log('[Tweet Rendering] Carousel slide changed, loading Twitter widgets');
                     loadTwitterWidgets();
-                  }, 300);
+                    
+                    // Don't force reload on every slide change, it's too aggressive
+                  }, 500);
                 });
               }
             }}

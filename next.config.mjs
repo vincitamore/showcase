@@ -14,6 +14,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'amore.build',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   experimental: {
