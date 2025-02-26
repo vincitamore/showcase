@@ -99,6 +99,7 @@ const BlogSection = () => {
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [expandedTweets, setExpandedTweets] = useState<{[key: string]: boolean}>({})
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
 
@@ -295,6 +296,14 @@ const BlogSection = () => {
   const handleCardClick = (tweetId: string) => {
     window.open(`https://x.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
+
+  const toggleTweetExpansion = (tweetId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTweets(prev => ({
+      ...prev,
+      [tweetId]: !prev[tweetId]
+    }));
+  };
 
   const renderTweetText = (text: string, entities: any[]) => {
     if (!text) return null;
@@ -645,11 +654,28 @@ const BlogSection = () => {
       // Only render one Twitter embed per tweet
       const primaryTwitterUrl = twitterUrls[0];
 
+      // Check if tweet is long (> 280 characters)
+      const isLongTweet = tweet.text.length > 280;
+      const isExpanded = expandedTweets[tweet.id] || false;
+      const displayText = isLongTweet && !isExpanded 
+        ? tweet.text.substring(0, 280) + '...' 
+        : tweet.text;
+
       const result = (
         <div className="flex h-full flex-col justify-between gap-4">
           <div className="space-y-4">
             <div className="text-sm">
-              {renderTweetText(tweet.text, entities)}
+              <div className="whitespace-pre-wrap break-words">
+                {renderTweetText(displayText, entities)}
+              </div>
+              {isLongTweet && (
+                <button 
+                  onClick={(e) => toggleTweetExpansion(tweet.id, e)}
+                  className="text-xs text-primary mt-1 hover:underline"
+                >
+                  {isExpanded ? 'Show less' : 'Show more'}
+                </button>
+              )}
               {renderMedia(entities)}
               {renderUrlPreviews(entities)}
               {primaryTwitterUrl && (

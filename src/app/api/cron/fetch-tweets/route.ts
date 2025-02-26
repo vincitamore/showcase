@@ -63,6 +63,21 @@ function validateTwitterQuery(query: string): { isValid: boolean; reason?: strin
   return { isValid: true };
 }
 
+// Helper function to validate tweet text and check for truncation
+function validateTweetText(tweet: TweetV2): boolean {
+  // Log warning if tweet appears to be truncated
+  if (tweet.text.endsWith('…') && !tweet.text.endsWith('…https://')) {
+    logger.warn('Tweet text appears to be truncated', {
+      id: tweet.id,
+      textLength: tweet.text.length,
+      textEnd: tweet.text.substring(tweet.text.length - 20),
+      step: 'tweet-text-validation'
+    });
+    return false;
+  }
+  return true;
+}
+
 type TweetWithEntities = {
   id: string;
   text: string;
@@ -445,7 +460,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // to optimize our monthly post quota usage
     const searchParams: any = {
       max_results: DAILY_TWEET_FETCH_LIMIT, // Only request exactly what we'll store
-      'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments',
+      'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text',
       'user.fields': 'profile_image_url,username',
       'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
       'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
@@ -488,7 +503,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
         max_results: 10, // Keep the reduced number for testing
-        'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments', // Restore full fields
+        'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text', // Explicitly request full text
         'user.fields': 'profile_image_url,username',
         'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
         'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
@@ -561,6 +576,31 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         source: tweetsFromTweets.length > 0 ? 'paginator.tweets' : 
                 tweetsFromData.length > 0 ? 'paginator.data' :
                 tweetsFromRealData.length > 0 ? 'paginator._realData.data' : 'none'
+      });
+      
+      // Analyze tweet text lengths
+      let totalTextLength = 0;
+      let tweetCount = 0;
+      let longTweetCount = 0;
+      
+      for (const tweet of extractedTweets) {
+        totalTextLength += tweet.text.length;
+        tweetCount++;
+        if (tweet.text.length > 280) {
+          longTweetCount++;
+          logger.info('Processing long tweet', {
+            id: tweet.id,
+            length: tweet.text.length,
+            step: 'long-tweet-processing'
+          });
+        }
+      }
+      
+      logger.info('Tweet length statistics', {
+        totalTweets: tweetCount,
+        longTweets: longTweetCount,
+        averageLength: tweetCount ? Math.round(totalTextLength / tweetCount) : 0,
+        step: 'tweet-length-stats'
       });
       
       // Add detailed response logging
@@ -1092,6 +1132,17 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
     
     for (const tweet of tweets) {
       try {
+        // Validate tweet text and log info about it
+        validateTweetText(tweet);
+        
+        // Log info about the tweet text
+        logger.info('Tweet text info', {
+          id: tweet.id,
+          textLength: tweet.text.length,
+          textSnippet: tweet.text.substring(0, 50) + (tweet.text.length > 50 ? '...' : ''),
+          step: 'text-processing'
+        });
+        
         // Convert Twitter API date format to Date object
         const createdAt = tweet.created_at ? new Date(tweet.created_at) : new Date();
         

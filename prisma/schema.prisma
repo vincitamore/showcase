@@ -15,9 +15,9 @@ datasource db {
 }
 
 model ChatSession {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   messages  Message[]
   ipAddress String?
   userAgent String?
@@ -27,11 +27,11 @@ model Message {
   id            String      @id @default(cuid())
   createdAt     DateTime    @default(now())
   content       String
-  role          String      // 'user' | 'assistant'
+  role          String // 'user' | 'assistant'
   chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
   chatSessionId String
   tokens        Int         @default(0)
-  skillTags     String[]    // Array of skill tags referenced in the response
+  skillTags     String[] // Array of skill tags referenced in the response
 
   @@index([chatSessionId])
 }
@@ -43,7 +43,7 @@ model SystemPrompt {
   content   String
   version   String   @unique
   isActive  Boolean  @default(false)
-  metadata  Json?    // Store any additional prompt configuration
+  metadata  Json? // Store any additional prompt configuration
 }
 
 model RateLimit {
@@ -59,43 +59,43 @@ model RateLimit {
 
 // New models for Twitter integration
 model Tweet {
-  id                    String        @id
-  text                  String
-  createdAt            DateTime
-  updatedAt            DateTime      @updatedAt
-  publicMetrics        Json?         // Likes, retweets, etc.
-  entities             TweetEntity[]
-  editHistoryTweetIds  String[]
-  authorId             String
-  cacheEntries         TweetCache[]  @relation("CachedTweets")
-  
+  id                  String        @id
+  text                String        @db.Text // Use Text type to support extended tweets
+  createdAt           DateTime
+  updatedAt           DateTime      @updatedAt
+  publicMetrics       Json? // Likes, retweets, etc.
+  entities            TweetEntity[]
+  editHistoryTweetIds String[]
+  authorId            String
+  cacheEntries        TweetCache[]  @relation("CachedTweets")
+
   @@index([createdAt])
   @@index([authorId])
 }
 
 model TweetEntity {
-  id          String   @id @default(cuid())
-  type        String   // url, mention, hashtag, cashtag, annotation
+  id          String  @id @default(cuid())
+  type        String // url, mention, hashtag, cashtag, annotation
   text        String
   url         String?
   expandedUrl String?
   mediaKey    String?
-  tweet       Tweet    @relation(fields: [tweetId], references: [id], onDelete: Cascade)
+  tweet       Tweet   @relation(fields: [tweetId], references: [id], onDelete: Cascade)
   tweetId     String
-  metadata    Json?    // Additional entity-specific data
+  metadata    Json? // Additional entity-specific data
 
   @@index([tweetId])
   @@index([type])
 }
 
 model TweetCache {
-  id          String    @id @default(cuid())
-  type        String    // 'current' | 'previous' | 'selected'
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tweets      Tweet[]   @relation("CachedTweets")
-  expiresAt   DateTime?
-  isActive    Boolean   @default(true)
+  id        String    @id @default(cuid())
+  type      String // 'current' | 'previous' | 'selected'
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tweets    Tweet[]   @relation("CachedTweets")
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
 
   @@index([type])
   @@index([isActive])
@@ -114,8 +114,8 @@ model TwitterRateLimit {
 
 model TempImage {
   id        String   @id @default(cuid())
-  data      String   // Base64 encoded image data
-  mimeType  String   // Always "image/jpeg"
+  data      String // Base64 encoded image data
+  mimeType  String // Always "image/jpeg"
   expiresAt DateTime // TTL for the image
   createdAt DateTime @default(now())
 
