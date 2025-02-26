@@ -12,7 +12,7 @@ import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
 import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 import { performance } from '@/lib/performance'
-import { detectMentions, detectHashtags, detectUrls } from '@/lib/tweet-utils'
+import { detectMentions, detectHashtags, detectUrls, isShortUrl } from '@/lib/tweet-utils'
 
 interface UrlEntity {
   url: string
@@ -98,9 +98,10 @@ const DEFAULT_PROFILE_IMAGE = "https://abs.twimg.com/sticky/default_profile_imag
 const BlogSection = () => {
   const [tweets, setTweets] = useState<Tweet[]>([])
   const [message, setMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isPosting, setIsPosting] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [expandedTweets, setExpandedTweets] = useState<{[key: string]: boolean}>({})
+  const [expandedTweets, setExpandedTweets] = useState<Record<string, boolean>>({})
+  const [isLoadingUrlPreviews, setIsLoadingUrlPreviews] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
 
@@ -249,7 +250,7 @@ const BlogSection = () => {
 
   const handlePost = async () => {
     if (!message.trim()) return
-    setIsLoading(true)
+    setIsPosting(true)
     console.log('Attempting to post tweet:', { message });
 
     try {
@@ -290,7 +291,7 @@ const BlogSection = () => {
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setIsPosting(false)
     }
   }
 
@@ -438,7 +439,17 @@ const BlogSection = () => {
         case 'url':
           // For URLs, we'll render them inline if they're not Twitter URLs
           // Twitter URLs will be rendered as embeds separately
-          if (entity.expandedUrl && !entity.expandedUrl.includes('x.com')) {
+          if (entity.expandedUrl) {
+            // Check if it's a shortened URL (t.co, bit.ly, etc.)
+            const isShortened = isShortUrl(entity.url || '');
+            
+            // Hide shortened URLs completely in the rendered text
+            if (isShortened) {
+              // Skip rendering the URL text completely
+              break;
+            }
+            
+            // For regular URLs, show them as clickable links
             segments.push(
               <span
                 key={`entity-${index}`}
@@ -608,15 +619,61 @@ const BlogSection = () => {
     );
   }
 
+  const UrlPreviewShimmer = () => (
+    <div className="mt-3 rounded-lg border overflow-hidden animate-pulse">
+      <div className="flex flex-col sm:flex-row">
+        <div className="sm:w-1/3 h-[120px] bg-accent/10"></div>
+        <div className="p-3 sm:p-4 flex-1 space-y-3">
+          <div className="h-4 bg-accent/10 rounded w-3/4"></div>
+          <div className="space-y-2">
+            <div className="h-3 bg-accent/10 rounded w-full"></div>
+            <div className="h-3 bg-accent/10 rounded w-5/6"></div>
+          </div>
+          <div className="h-3 bg-accent/10 rounded w-1/4"></div>
+        </div>
+      </div>
+    </div>
+  );
+
   function renderUrlPreviews(entities: TweetEntity[]) {
     // Deduplicate URL entities by their expanded URL
     const uniqueUrlEntities = entities
-      .filter(e => e.type === 'url')
+      .filter(e => e.type === 'url' && e.expandedUrl) // Only include entities with expanded URLs
       .reduce((acc: TweetEntity[], entity) => {
+        // Skip URLs that expand to Twitter/X URLs as they will be handled separately
+        if (entity.expandedUrl?.includes('twitter.com') || entity.expandedUrl?.includes('x.com')) {
+          return acc;
+        }
+        
         const exists = acc.find(e => e.expandedUrl === entity.expandedUrl);
         if (!exists) acc.push(entity);
         return acc;
       }, []);
+
+    // Set loading state for URL previews
+    useEffect(() => {
+      if (uniqueUrlEntities.length > 0) {
+        const urlKeys = uniqueUrlEntities.map(entity => entity.expandedUrl || entity.url || entity.id);
+        
+        // Initialize loading state for each URL
+        const loadingStates = urlKeys.reduce((acc, key) => {
+          acc[key] = true;
+          return acc;
+        }, {} as Record<string, boolean>);
+        
+        setIsLoadingUrlPreviews(loadingStates);
+        
+        // Simulate loading completion (in a real app, this would be based on actual loading events)
+        const timer = setTimeout(() => {
+          setIsLoadingUrlPreviews({});
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
+      
+      // Return a no-op cleanup function for the case where there are no URL entities
+      return () => {};
+    }, [uniqueUrlEntities]);
 
     if (!uniqueUrlEntities?.length) return null;
 
@@ -631,22 +688,35 @@ const BlogSection = () => {
     });
 
     return (
-      <div className="mt-2 space-y-2">
+      <div className="mt-3 space-y-3">
         {uniqueUrlEntities.map((entity, index) => {
+          const entityKey = entity.expandedUrl || entity.url || entity.id;
+          const isLoading = isLoadingUrlPreviews[entityKey];
+          
+          if (isLoading) {
+            return <UrlPreviewShimmer key={`shimmer-${entityKey}`} />;
+          }
+          
           const metadata = typeof entity.metadata === 'string'
             ? JSON.parse(entity.metadata)
             : entity.metadata;
 
-          // Skip if no preview data or if it's a Twitter/X URL (will be embedded)
-          if (
-            (!metadata?.title && !metadata?.description && !metadata?.images?.length) ||
-            (entity.expandedUrl && (
-              entity.expandedUrl.includes('twitter.com') || 
-              entity.expandedUrl.includes('x.com')
-            ))
-          ) {
+          // Skip if no preview data
+          if (!metadata?.title && !metadata?.description && !metadata?.images?.length) {
             return null;
           }
+
+          // Get the domain from the expanded URL
+          const domain = (() => {
+            try {
+              return new URL(entity.expandedUrl || '').hostname;
+            } catch (e) {
+              return entity.displayUrl || '';
+            }
+          })();
+
+          // Check if this is a shortened URL that's been expanded
+          const isExpandedShortUrl = isShortUrl(entity.url || '');
 
           return (
             <div
@@ -658,31 +728,42 @@ const BlogSection = () => {
                 window.open(entity.expandedUrl || entity.url, '_blank', 'noopener,noreferrer');
               }}
             >
-              {metadata.images?.[0]?.url && (
-                <div className="relative w-full h-[160px] bg-accent/5">
-                  <Image
-                    src={metadata.images[0].url}
-                    alt={metadata.title || 'Link preview'}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 400px) 100vw, 400px"
-                  />
-                </div>
-              )}
-              <div className="p-3">
-                {metadata.title && (
-                  <h4 className="font-medium text-sm mb-2 line-clamp-1">
-                    {metadata.title}
-                  </h4>
+              <div className="flex flex-col sm:flex-row">
+                {metadata.images?.[0]?.url && (
+                  <div className="relative sm:w-1/3 h-[120px] sm:h-auto bg-accent/5">
+                    <Image
+                      src={metadata.images[0].url}
+                      alt={metadata.title || 'Link preview'}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 400px) 100vw, 400px"
+                    />
+                  </div>
                 )}
-                {metadata.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                    {metadata.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
-                  <ExternalLink className="h-3 w-3" />
-                  {new URL(entity.expandedUrl || entity.url || '').hostname}
+                <div className="p-3 sm:p-4 flex-1">
+                  {/* Visual indicator for expanded short URLs */}
+                  {isExpandedShortUrl && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                      <span className="text-primary font-medium">{entity.url}</span>
+                      <span>→</span>
+                      <span>{domain}</span>
+                    </div>
+                  )}
+                  
+                  {metadata.title && (
+                    <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                      {metadata.title}
+                    </h4>
+                  )}
+                  {metadata.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                      {metadata.description}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                    <ExternalLink className="h-3 w-3" />
+                    {domain}
+                  </div>
                 </div>
               </div>
             </div>
@@ -698,9 +779,10 @@ const BlogSection = () => {
     try {
       // Get unique Twitter URLs for embedding
       const twitterUrls = entities
-        .filter(e => e.type === 'url' && (
-          e.expandedUrl?.includes('twitter.com/') || 
-          e.expandedUrl?.includes('x.com/')
+        .filter(e => e.type === 'url' && e.expandedUrl && (
+          (e.expandedUrl.includes('twitter.com/') || e.expandedUrl.includes('x.com/')) &&
+          // Ensure it's a tweet URL (has /status/ in the path)
+          e.expandedUrl.includes('/status/')
         ))
         .reduce((acc: string[], entity) => {
           const url = entity.expandedUrl;
@@ -708,8 +790,35 @@ const BlogSection = () => {
           return acc;
         }, []);
 
-      // Only render one Twitter embed per tweet
-      const primaryTwitterUrl = twitterUrls[0];
+      // Only render Twitter embeds if there are any
+      const twitterEmbedsSection = twitterUrls.length > 0 ? (
+        <div className="mt-3 space-y-3">
+          {twitterUrls.map((twitterUrl, embedIndex) => (
+            <div 
+              key={`${tweet.id}-embed-${embedIndex}`}
+              className="rounded-lg border border-border/50 overflow-hidden relative"
+            >
+              {/* Loading state indicator */}
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 tweet-embed-loading">
+                <div className="h-5 w-5 border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+              </div>
+              <blockquote 
+                className="twitter-tweet" 
+                data-conversation="none"
+                data-theme="dark"
+                data-align="center"
+                onLoad={() => {
+                  // Hide loading indicator when tweet is loaded
+                  const loadingEl = document.querySelector('.tweet-embed-loading');
+                  if (loadingEl) loadingEl.classList.add('hidden');
+                }}
+              >
+                <a href={twitterUrl}></a>
+              </blockquote>
+            </div>
+          ))}
+        </div>
+      ) : null;
 
       // Check if tweet is long (> 280 characters)
       const isLongTweet = tweet.text.length > 280;
@@ -735,20 +844,7 @@ const BlogSection = () => {
               )}
               {renderMedia(entities)}
               {renderUrlPreviews(entities)}
-              {primaryTwitterUrl && (
-                <div 
-                  key={`${tweet.id}-embed`}
-                  className="mt-2 rounded-lg border border-border/50 overflow-hidden"
-                >
-                  <blockquote 
-                    className="twitter-tweet" 
-                    data-conversation="none"
-                    data-theme="dark"
-                  >
-                    <a href={primaryTwitterUrl}></a>
-                  </blockquote>
-                </div>
-              )}
+              {twitterEmbedsSection}
             </div>
           </div>
 
@@ -800,14 +896,14 @@ const BlogSection = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 className="min-h-[100px] resize-none"
-                disabled={isLoading}
+                disabled={isPosting}
               />
               <div className="flex justify-end">
                 <Button 
                   onClick={handlePost} 
-                  disabled={!message.trim() || isLoading}
+                  disabled={!message.trim() || isPosting}
                 >
-                  {isLoading ? "Posting..." : "Post to X & Blog"}
+                  {isPosting ? "Posting..." : "Post to X & Blog"}
                 </Button>
               </div>
             </>

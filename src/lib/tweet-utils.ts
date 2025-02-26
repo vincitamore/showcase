@@ -358,33 +358,83 @@ async function expandUrl(shortUrl: string | null | undefined): Promise<string> {
       return shortUrl || '';
     }
     
-    // Set a timeout since some redirects might hang
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    // Perform a HEAD request and follow redirects
-    const response = await fetch(shortUrl, {
-      method: 'HEAD',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; TweetEntityResolver/1.0)'
-      }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    // Get the final URL after all redirects
-    let finalUrl = response.url;
-    
-    // Handle Twitter/X domain consistency
-    // Replace twitter.com with x.com to ensure consistency with Twitter API responses
-    // and for future-proofing as the platform has rebranded
-    if (finalUrl.includes('twitter.com')) {
-      finalUrl = finalUrl.replace('twitter.com', 'x.com');
+    // Skip expansion if it's not a shortened URL
+    if (!isShortUrl(shortUrl)) {
+      return shortUrl;
     }
     
-    return finalUrl;
+    // Set a timeout since some redirects might hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000); // Extended timeout
+    
+    try {
+      // Perform a HEAD request and follow redirects
+      const response = await fetch(shortUrl, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; TweetEntityResolver/1.0)'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Get the final URL after all redirects
+      let finalUrl = response.url;
+      
+      // Handle Twitter/X domain consistency
+      // Replace twitter.com with x.com to ensure consistency with Twitter API responses
+      // and for future-proofing as the platform has rebranded
+      if (finalUrl.includes('twitter.com')) {
+        finalUrl = finalUrl.replace('twitter.com', 'x.com');
+      }
+      
+      // Clean up the URL by removing unnecessary query parameters
+      try {
+        const url = new URL(finalUrl);
+        
+        // Remove tracking parameters
+        const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'];
+        trackingParams.forEach(param => {
+          url.searchParams.delete(param);
+        });
+        
+        // Rebuild the URL without tracking parameters
+        finalUrl = url.toString();
+      } catch (error) {
+        // If URL parsing fails, keep the original expanded URL
+        console.error(`Error cleaning URL ${finalUrl}:`, error);
+      }
+      
+      return finalUrl;
+    } catch (fetchError) {
+      // If the HEAD request fails, try with a GET request as a fallback
+      clearTimeout(timeoutId);
+      
+      console.warn(`HEAD request failed for ${shortUrl}, trying GET fallback:`, fetchError);
+      
+      const newController = new AbortController();
+      const newTimeoutId = setTimeout(() => newController.abort(), 7000);
+      
+      try {
+        const response = await fetch(shortUrl, {
+          method: 'GET',
+          redirect: 'follow',
+          signal: newController.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; TweetEntityResolver/1.0)'
+          }
+        });
+        
+        clearTimeout(newTimeoutId);
+        return response.url;
+      } catch (getError) {
+        clearTimeout(newTimeoutId);
+        console.error(`Both HEAD and GET requests failed for ${shortUrl}:`, getError);
+        return shortUrl;
+      }
+    }
   } catch (error) {
     console.error(`Error expanding URL ${shortUrl}:`, error);
     // Return original if expansion fails
@@ -421,29 +471,45 @@ export async function expandShortUrls(options: {
   try {
     const { prisma } = await import('@/lib/db');
     
-    // Find URL entities that need expansion
-    // - where url and expandedUrl are identical (t.co URLs)
-    // - or where expandedUrl is null
+    // Find URL entities that need expansion:
+    // 1. Where expandedUrl is null
+    // 2. Where url is a known shortener domain and expandedUrl points to the same domain
+    // 3. Where the url has patterns typical of short URLs
     const urlEntities = await prisma.tweetEntity.findMany({
       where: {
         type: 'url',
         OR: [
           { expandedUrl: null },
+          // Known URL shorteners
           {
             url: { startsWith: 'https://t.co/' },
             expandedUrl: { startsWith: 'https://t.co/' }
+          },
+          {
+            url: { startsWith: 'https://bit.ly/' },
+            expandedUrl: { startsWith: 'https://bit.ly/' }
+          },
+          {
+            url: { startsWith: 'https://buff.ly/' },
+            expandedUrl: { startsWith: 'https://buff.ly/' }
+          },
+          {
+            url: { startsWith: 'https://tinyurl.com/' },
+            expandedUrl: { startsWith: 'https://tinyurl.com/' }
+          },
+          {
+            url: { startsWith: 'https://ow.ly/' },
+            expandedUrl: { startsWith: 'https://ow.ly/' }
+          },
+          {
+            url: { startsWith: 'https://goo.gl/' },
+            expandedUrl: { startsWith: 'https://goo.gl/' }
           }
+          // Note: Removed the regex pattern match since Prisma doesn't support it directly
         ]
       },
       take: limit,
-      include: {
-        tweet: {
-          select: {
-            id: true,
-            text: true
-          }
-        }
-      }
+      orderBy: { id: 'asc' } // Ensure consistent ordering
     });
     
     results.totalUrlEntities = await prisma.tweetEntity.count({
@@ -463,8 +529,7 @@ export async function expandShortUrls(options: {
         id: entity.id,
         url: originalUrl,
         originalExpandedUrl: entity.expandedUrl,
-        tweetId: entity.tweetId,
-        tweetTextPreview: entity.tweet?.text?.substring(0, 50) + '...'
+        tweetId: entity.tweetId
       };
       
       try {
@@ -560,4 +625,21 @@ export async function expandShortUrls(options: {
     console.error('Error in expandShortUrls:', error);
     throw error;
   }
+}
+
+/**
+ * Determines if a URL is a shortened URL (t.co, bit.ly, etc.)
+ * @param url The URL to check
+ * @returns True if the URL is a shortened URL
+ */
+export function isShortUrl(url: string): boolean {
+  if (!url) return false;
+  
+  return url.includes('t.co/') || 
+         url.includes('bit.ly/') || 
+         url.includes('buff.ly/') ||
+         url.includes('tinyurl.com/') ||
+         url.includes('ow.ly/') ||
+         url.includes('goo.gl/') ||
+         url.match(/https?:\/\/\w+\.\w+\/\w{5,10}$/i) !== null;
 } 
