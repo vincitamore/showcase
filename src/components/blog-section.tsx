@@ -12,6 +12,7 @@ import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
 import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 import { performance } from '@/lib/performance'
+import { detectMentions, detectHashtags, detectUrls } from '@/lib/tweet-utils'
 
 interface UrlEntity {
   url: string
@@ -317,12 +318,63 @@ const BlogSection = () => {
       }))
     });
 
+    // Check if we need to generate fallback entities
+    const hasMentions = entities.some(e => e.type === 'mention');
+    const hasHashtags = entities.some(e => e.type === 'hashtag');
+    const hasUrls = entities.some(e => e.type === 'url');
+    
+    // Create fallback entities for missing types if needed
+    let enhancedEntities = [...entities];
+    let hasAddedFallbackEntities = false;
+    
+    if (!hasMentions) {
+      console.log('[Tweet Rendering] No mention entities found, detecting from text');
+      const detectedMentions = detectMentions(text);
+      if (detectedMentions.length > 0) {
+        enhancedEntities = [...enhancedEntities, ...detectedMentions];
+        hasAddedFallbackEntities = true;
+      }
+    }
+    
+    if (!hasHashtags) {
+      console.log('[Tweet Rendering] No hashtag entities found, detecting from text');
+      const detectedHashtags = detectHashtags(text);
+      if (detectedHashtags.length > 0) {
+        enhancedEntities = [...enhancedEntities, ...detectedHashtags];
+        hasAddedFallbackEntities = true;
+      }
+    }
+    
+    if (!hasUrls) {
+      console.log('[Tweet Rendering] No URL entities found, detecting from text');
+      const detectedUrls = detectUrls(text);
+      if (detectedUrls.length > 0) {
+        enhancedEntities = [...enhancedEntities, ...detectedUrls];
+        hasAddedFallbackEntities = true;
+      }
+    }
+    
+    // Log if we added fallback entities
+    if (hasAddedFallbackEntities) {
+      console.log('[Tweet Rendering] Added fallback entities:', {
+        originalCount: entities.length,
+        enhancedCount: enhancedEntities.length,
+        added: enhancedEntities.length - entities.length
+      });
+    }
+
     // Sort entities by their position in the text
-    const sortedEntities = entities
+    const sortedEntities = enhancedEntities
       .filter(e => e.metadata?.indices)
       .sort((a, b) => {
-        const aIndices = JSON.parse(typeof a.metadata === 'string' ? a.metadata : JSON.stringify(a.metadata)).indices;
-        const bIndices = JSON.parse(typeof b.metadata === 'string' ? b.metadata : JSON.stringify(b.metadata)).indices;
+        const aIndices = Array.isArray(a.metadata.indices) 
+          ? a.metadata.indices 
+          : JSON.parse(typeof a.metadata === 'string' ? a.metadata : JSON.stringify(a.metadata)).indices;
+        
+        const bIndices = Array.isArray(b.metadata.indices)
+          ? b.metadata.indices
+          : JSON.parse(typeof b.metadata === 'string' ? b.metadata : JSON.stringify(b.metadata)).indices;
+        
         return aIndices[0] - bIndices[0];
       });
 
@@ -331,11 +383,16 @@ const BlogSection = () => {
     let lastIndex = 0;
 
     sortedEntities.forEach((entity, index) => {
+      // Get indices safely, handling different possible formats
       const metadata = typeof entity.metadata === 'string'
         ? JSON.parse(entity.metadata)
         : entity.metadata;
-
-      const [start, end] = metadata.indices;
+      
+      const indices = Array.isArray(metadata.indices) 
+        ? metadata.indices 
+        : (metadata.indices ? JSON.parse(JSON.stringify(metadata.indices)) : [0, 0]);
+      
+      const [start, end] = indices;
 
       // Add text before entity
       if (start > lastIndex) {
