@@ -103,7 +103,7 @@ const BlogSection = () => {
   const [error, setError] = useState<string | null>(null)
 
   // Initialize Twitter embed script
-  useTwitterEmbed()
+  const { loadTwitterWidgets } = useTwitterEmbed()
 
   useEffect(() => {
     fetchCachedTweets()
@@ -151,6 +151,15 @@ const BlogSection = () => {
         setError('No tweets available');
         return;
       }
+
+      // Log the raw tweet dates for debugging
+      console.log('[Tweet Rendering] Raw tweet dates:', 
+        data.tweets.map((t: any) => ({
+          id: t.id,
+          createdAt: t.createdAt,
+          parsedDate: t.createdAt ? new Date(t.createdAt).toISOString() : null
+        }))
+      );
 
       // Process tweets
       const processedTweets = await Promise.all(data.tweets.map(async (dbTweet: any) => {
@@ -221,6 +230,11 @@ const BlogSection = () => {
         valid_count: validTweets.length 
       });
       setTweets(validTweets);
+      
+      // Trigger Twitter widget loading after tweets are rendered
+      setTimeout(() => {
+        loadTwitterWidgets();
+      }, 1000);
     } catch (error) {
       performance.end('tweet_processing', { error: 1 });
       toast({
@@ -279,7 +293,7 @@ const BlogSection = () => {
   }
 
   const handleCardClick = (tweetId: string) => {
-    window.open(`https://twitter.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
+    window.open(`https://x.com/${profileConfig.username}/status/${tweetId}`, '_blank', 'noopener,noreferrer')
   }
 
   const renderTweetText = (text: string, entities: any[]) => {
@@ -333,7 +347,7 @@ const BlogSection = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.open(`https://twitter.com/${entity.text}`, '_blank', 'noopener,noreferrer');
+                window.open(`https://x.com/${entity.text}`, '_blank', 'noopener,noreferrer');
               }}
             >
               @{entity.text}
@@ -348,7 +362,7 @@ const BlogSection = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.open(`https://twitter.com/hashtag/${entity.text}`, '_blank', 'noopener,noreferrer');
+                window.open(`https://x.com/hashtag/${entity.text}`, '_blank', 'noopener,noreferrer');
               }}
             >
               #{entity.text}
@@ -356,7 +370,25 @@ const BlogSection = () => {
           );
           break;
         case 'url':
-          // Skip URLs as they'll be rendered as previews
+          // For URLs, we'll render them inline if they're not Twitter URLs
+          // Twitter URLs will be rendered as embeds separately
+          if (entity.expandedUrl && !entity.expandedUrl.includes('x.com')) {
+            segments.push(
+              <span
+                key={`entity-${index}`}
+                className="text-primary hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(entity.expandedUrl, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {entity.displayUrl || entity.text}
+              </span>
+            );
+          } else {
+            // Skip Twitter URLs as they'll be rendered as embeds
+          }
           break;
       }
 
@@ -381,7 +413,49 @@ const BlogSection = () => {
 
   function formatDate(date: string | undefined) {
     if (!date) return 'Just now';
-    return new Date(date).toLocaleDateString();
+    
+    try {
+      // Try to parse the date
+      const tweetDate = new Date(date);
+      const now = new Date();
+      
+      // Check if the date is valid
+      if (isNaN(tweetDate.getTime())) {
+        console.warn('[Tweet Rendering] Invalid date format:', date);
+        return 'Unknown date';
+      }
+      
+      // Check if the date is in the future (which would be an error)
+      if (tweetDate > now) {
+        console.warn('[Tweet Rendering] Future date detected:', date);
+        return 'Just now';
+      }
+      
+      // Calculate time difference in milliseconds
+      const diffMs = now.getTime() - tweetDate.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      
+      // Format based on how old the tweet is
+      if (diffMinutes < 60) {
+        return diffMinutes <= 1 ? 'Just now' : `${diffMinutes}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else if (diffDays < 7) {
+        return `${diffDays}d ago`;
+      } else {
+        // For older tweets, show the actual date in a more readable format
+        return tweetDate.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      }
+    } catch (error) {
+      console.error('[Tweet Rendering] Error formatting date:', error);
+      return 'Unknown date';
+    }
   }
 
   function formatNumber(num: number | undefined) {
@@ -497,10 +571,13 @@ const BlogSection = () => {
             ? JSON.parse(entity.metadata)
             : entity.metadata;
 
-          // Skip if no preview data or if it's a Twitter URL (will be embedded)
+          // Skip if no preview data or if it's a Twitter/X URL (will be embedded)
           if (
             (!metadata?.title && !metadata?.description && !metadata?.images?.length) ||
-            (entity.expandedUrl && entity.expandedUrl.includes('twitter.com'))
+            (entity.expandedUrl && (
+              entity.expandedUrl.includes('twitter.com') || 
+              entity.expandedUrl.includes('x.com')
+            ))
           ) {
             return null;
           }
@@ -555,7 +632,10 @@ const BlogSection = () => {
     try {
       // Get unique Twitter URLs for embedding
       const twitterUrls = entities
-        .filter(e => e.type === 'url' && e.expandedUrl?.includes('twitter.com/'))
+        .filter(e => e.type === 'url' && (
+          e.expandedUrl?.includes('twitter.com/') || 
+          e.expandedUrl?.includes('x.com/')
+        ))
         .reduce((acc: string[], entity) => {
           const url = entity.expandedUrl;
           if (url && !acc.includes(url)) acc.push(url);
@@ -671,6 +751,17 @@ const BlogSection = () => {
               containScroll: "trimSnaps",
               dragFree: false
             }}
+            setApi={(api) => {
+              // Set up a listener for slide changes to reload Twitter widgets
+              if (api) {
+                api.on('select', () => {
+                  // Reload Twitter widgets when carousel slide changes
+                  setTimeout(() => {
+                    loadTwitterWidgets();
+                  }, 300);
+                });
+              }
+            }}
           >
             {(() => {
               performance.start('tweet_rendering', { 
@@ -735,7 +826,7 @@ const BlogSection = () => {
                             data-conversation="none"
                             data-theme="dark"
                           >
-                            <a href={`https://twitter.com/x/status/${ref.id}`}></a>
+                            <a href={`https://x.com/i/status/${ref.id}`}></a>
                           </blockquote>
                         </div>
                       ))}
@@ -754,7 +845,7 @@ const BlogSection = () => {
                       </span>
                       <time className="ml-auto text-[10px]">
                         {tweet.created_at 
-                          ? new Date(tweet.created_at).toLocaleDateString()
+                          ? formatDate(tweet.created_at)
                           : 'Just now'
                         }
                       </time>

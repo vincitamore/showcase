@@ -1059,9 +1059,6 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
   try {
     logger.info(`Processing ${tweets.length} tweets of type ${type}`);
     
-    // Start entity cleanup
-    logger.info('Starting entity cleanup', { timestamp: new Date().toISOString(), step: 'start' });
-    
     // Get existing tweets to avoid duplicates
     const existingTweets = await prisma.tweet.findMany({
       where: {
@@ -1074,14 +1071,12 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
       }
     });
     
-    logger.info('Found tweets to clean', {
-      tweetCount: existingTweets.length,
+    logger.info('Found existing tweets', {
+      existingCount: existingTweets.length,
+      newCount: tweets.length,
       timestamp: new Date().toISOString(),
       step: 'tweets-found'
     });
-    
-    // Track duplicates removed
-    let duplicatesRemoved = 0;
     
     // Process each tweet
     const tweetRecords = [];
@@ -1099,6 +1094,14 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
       try {
         // Convert Twitter API date format to Date object
         const createdAt = tweet.created_at ? new Date(tweet.created_at) : new Date();
+        
+        // Log the date for debugging
+        logger.info('Tweet date info', {
+          id: tweet.id,
+          created_at: tweet.created_at,
+          parsedDate: createdAt.toISOString(),
+          step: 'date-parsing'
+        });
         
         // Process entities if present
         const entitiesData = [];
@@ -1174,39 +1177,62 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
           }
         }
         
-        // Create or update the tweet - use the username directly as authorId
-        const tweetData = await prisma.tweet.upsert({
-          where: {
-            id: tweet.id
-          },
-          create: {
-            id: tweet.id,
-            text: tweet.text,
-            createdAt: createdAt,
-            // Convert publicMetrics to a Prisma-compatible JSON format
-            publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
-            authorId: username, // Use the username directly as authorId
-            editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
-            entities: {
-              create: entitiesData as any // Use type assertion to satisfy TypeScript
-            }
-          },
-          update: {
-            id: tweet.id,
-            text: tweet.text,
-            createdAt: createdAt,
-            // Convert publicMetrics to a Prisma-compatible JSON format
-            publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
-            authorId: username, // Use the username directly as authorId
-            editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
-            entities: {
-              deleteMany: {},
-              create: entitiesData as any // Use type assertion to satisfy TypeScript
-            }
-          }
-        });
+        // Check if tweet already exists
+        const existingTweet = existingTweets.find(t => t.id === tweet.id);
         
-        tweetRecords.push(tweetData);
+        if (existingTweet) {
+          logger.info(`Tweet ${tweet.id} already exists with ${existingTweet.entities.length} entities`);
+          
+          // Keep the original createdAt date if it exists and is valid
+          const finalCreatedAt = existingTweet.createdAt && !isNaN(new Date(existingTweet.createdAt).getTime())
+            ? existingTweet.createdAt
+            : createdAt;
+          
+          // Filter out entities that already exist
+          const newEntities = entitiesData.filter(newEntity => 
+            !existingTweet.entities.some((existingEntity: any) => 
+              existingEntity.type === newEntity.type && 
+              existingEntity.text === newEntity.text
+            )
+          );
+          
+          logger.info(`Adding ${newEntities.length} new entities to tweet ${tweet.id}`);
+          
+          // Update the tweet but preserve entities
+          const updatedTweet = await prisma.tweet.update({
+            where: { id: tweet.id },
+            data: {
+              text: tweet.text,
+              createdAt: finalCreatedAt, // Preserve original date
+              publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
+              authorId: username,
+              editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
+              // Only add new entities, don't delete existing ones
+              entities: {
+                create: newEntities as any
+              }
+            }
+          });
+          
+          tweetRecords.push(updatedTweet);
+        } else {
+          // Create a new tweet with all entities
+          const newTweet = await prisma.tweet.create({
+            data: {
+              id: tweet.id,
+              text: tweet.text,
+              createdAt: createdAt,
+              publicMetrics: tweet.public_metrics ? { ...tweet.public_metrics } as any : undefined,
+              authorId: username,
+              editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
+              entities: {
+                create: entitiesData as any
+              }
+            }
+          });
+          
+          tweetRecords.push(newTweet);
+        }
       } catch (error) {
         logger.error('Error processing tweet', {
           id: tweet.id,
@@ -1215,13 +1241,6 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
         });
       }
     }
-    
-    logger.info('Entity cleanup complete', {
-      totalTweets: existingTweets.length,
-      totalDuplicatesRemoved: duplicatesRemoved,
-      timestamp: new Date().toISOString(),
-      step: 'complete'
-    });
     
     // Create a new cache entry with the tweets
     if (tweetRecords.length > 0) {
@@ -1298,7 +1317,10 @@ export async function DELETE(req: Request): Promise<Response> {
         entity => typeof entity.metadata === 'string'
       );
       
-      return isPublicMetricsString || hasEntityWithStringMetadata;
+      // Check for future dates
+      const hasFutureDate = tweet.createdAt > new Date();
+      
+      return isPublicMetricsString || hasEntityWithStringMetadata || hasFutureDate;
     });
     
     logger.info(`Found ${problematicTweets.length} problematic tweets`, {
@@ -1314,31 +1336,40 @@ export async function DELETE(req: Request): Promise<Response> {
         message: 'Analysis complete',
         totalTweets: tweets.length,
         problematicTweets: problematicTweets.length,
-        sampleIds: problematicTweets.slice(0, 5).map(t => t.id)
+        sampleIds: problematicTweets.slice(0, 5).map(t => t.id),
+        issues: problematicTweets.slice(0, 5).map(t => ({
+          id: t.id,
+          hasFutureDate: t.createdAt > new Date(),
+          createdAt: t.createdAt.toISOString(),
+          isPublicMetricsString: typeof t.publicMetrics === 'string',
+          hasEntityWithStringMetadata: t.entities.some(e => typeof e.metadata === 'string'),
+          entityCount: t.entities.length
+        }))
       });
-    } else if (action === 'delete') {
-      // Delete problematic tweets
-      for (const tweet of problematicTweets) {
-        // First delete entities
-        await prisma.tweetEntity.deleteMany({
-          where: {
-            tweetId: tweet.id
-          }
-        });
-        
-        // Then delete the tweet
-        await prisma.tweet.delete({
-          where: {
-            id: tweet.id
+    } else if (action === 'fix-dates') {
+      // Fix tweets with future dates
+      const futureDateTweets = tweets.filter(tweet => tweet.createdAt > new Date());
+      
+      logger.info(`Found ${futureDateTweets.length} tweets with future dates`, {
+        step: 'fix-dates',
+        count: futureDateTweets.length
+      });
+      
+      // Update each tweet with a future date to use the current date
+      for (const tweet of futureDateTweets) {
+        await prisma.tweet.update({
+          where: { id: tweet.id },
+          data: {
+            createdAt: new Date()
           }
         });
       }
       
       return NextResponse.json({
         status: 'success',
-        message: 'Deleted problematic tweets',
-        deletedCount: problematicTweets.length,
-        remainingCount: tweets.length - problematicTweets.length
+        message: 'Fixed tweets with future dates',
+        fixedCount: futureDateTweets.length,
+        totalTweets: tweets.length
       });
     } else if (action === 'fix') {
       // Fix problematic tweets
@@ -1357,13 +1388,17 @@ export async function DELETE(req: Request): Promise<Response> {
             }
           }
           
-          // Update the tweet with fixed publicMetrics
+          // Fix future dates
+          const fixedDate = tweet.createdAt > new Date() ? new Date() : tweet.createdAt;
+          
+          // Update the tweet with fixed data
           await prisma.tweet.update({
             where: {
               id: tweet.id
             },
             data: {
-              publicMetrics: fixedPublicMetrics
+              publicMetrics: fixedPublicMetrics,
+              createdAt: fixedDate
             }
           });
           
@@ -1408,7 +1443,7 @@ export async function DELETE(req: Request): Promise<Response> {
     return NextResponse.json({
       status: 'error',
       message: 'Invalid action specified',
-      validActions: ['report', 'delete', 'fix']
+      validActions: ['report', 'fix', 'fix-dates']
     }, { status: 400 });
     
   } catch (error) {

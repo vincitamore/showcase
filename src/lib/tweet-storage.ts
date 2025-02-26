@@ -50,17 +50,125 @@ function toPrismaJson<T>(data: T) {
 
 // Helper function to validate and format dates
 function toValidDate(date: Date | string | number | null | undefined): Date {
-  if (!date) return new Date();
+  if (!date) {
+    console.warn('[Twitter Storage] No date provided, using current date as fallback');
+    return new Date();
+  }
   
   try {
-    const parsed = new Date(date);
-    if (isNaN(parsed.getTime())) {
-      console.warn('[Twitter Storage] Invalid date:', date);
-      return new Date();
+    // If it's already a Date object, just validate it
+    if (date instanceof Date) {
+      if (isNaN(date.getTime())) {
+        console.warn('[Twitter Storage] Invalid Date object:', date);
+        return new Date();
+      }
+      
+      // Check if date is in the future (which would be an error)
+      const now = new Date();
+      if (date > now) {
+        console.warn('[Twitter Storage] Future date detected, using current date instead:', date);
+        return now;
+      }
+      
+      return date;
     }
-    return parsed;
+    
+    // If it's a number, treat it as a timestamp
+    if (typeof date === 'number') {
+      const parsed = new Date(date);
+      if (isNaN(parsed.getTime())) {
+        console.warn('[Twitter Storage] Invalid timestamp:', date);
+        return new Date();
+      }
+      
+      // Check if date is in the future
+      const now = new Date();
+      if (parsed > now) {
+        console.warn('[Twitter Storage] Future date from timestamp detected, using current date instead:', date);
+        return now;
+      }
+      
+      return parsed;
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof date === 'string') {
+      console.log('[Twitter Storage] Parsing date string:', date);
+      
+      // Check if it's an ISO string format
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(date)) {
+        const parsed = new Date(date);
+        if (isNaN(parsed.getTime())) {
+          console.warn('[Twitter Storage] Invalid ISO date string:', date);
+          return new Date();
+        }
+        
+        // Check if date is in the future
+        const now = new Date();
+        if (parsed > now) {
+          console.warn('[Twitter Storage] Future date from ISO string detected, using current date instead:', date);
+          return now;
+        }
+        
+        return parsed;
+      }
+      
+      // Check if it's a timestamp string
+      if (/^\d+$/.test(date)) {
+        const timestamp = parseInt(date, 10);
+        const parsed = new Date(timestamp);
+        if (isNaN(parsed.getTime())) {
+          console.warn('[Twitter Storage] Invalid timestamp string:', date);
+          return new Date();
+        }
+        
+        // Check if date is in the future
+        const now = new Date();
+        if (parsed > now) {
+          console.warn('[Twitter Storage] Future date from timestamp string detected, using current date instead:', date);
+          return now;
+        }
+        
+        return parsed;
+      }
+      
+      // Try Twitter's date format (e.g., "Wed Oct 10 20:19:24 +0000 2018")
+      if (date.includes('+0000') || date.match(/\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2}/)) {
+        const parsed = new Date(date);
+        if (!isNaN(parsed.getTime())) {
+          // Check if date is in the future
+          const now = new Date();
+          if (parsed > now) {
+            console.warn('[Twitter Storage] Future date from Twitter format detected, using current date instead:', date);
+            return now;
+          }
+          
+          return parsed;
+        }
+      }
+      
+      // Try standard date parsing
+      const parsed = new Date(date);
+      if (isNaN(parsed.getTime())) {
+        console.warn('[Twitter Storage] Invalid date string:', date);
+        return new Date();
+      }
+      
+      // Check if date is in the future
+      const now = new Date();
+      if (parsed > now) {
+        console.warn('[Twitter Storage] Future date from standard parsing detected, using current date instead:', date);
+        return now;
+      }
+      
+      return parsed;
+    }
+    
+    // Fallback for unknown types
+    console.warn('[Twitter Storage] Unhandled date type:', typeof date, date);
+    return new Date();
   } catch (error) {
-    console.warn('[Twitter Storage] Error parsing date:', date, error);
+    console.error('[Twitter Storage] Error parsing date:', date, error);
     return new Date();
   }
 }
@@ -247,98 +355,6 @@ interface PrismaTweet {
   }>;
 }
 
-// Helper function to clean up duplicate entities
-async function cleanupDuplicateEntities() {
-  console.log('[Twitter Storage] Starting entity cleanup:', {
-    timestamp: new Date().toISOString(),
-    step: 'start'
-  });
-
-  // Get all tweets with their entities
-  const tweets = await prisma.tweet.findMany({
-    include: {
-      entities: true
-    }
-  }) as PrismaTweet[];
-
-  console.log('[Twitter Storage] Found tweets to clean:', {
-    tweetCount: tweets.length,
-    timestamp: new Date().toISOString(),
-    step: 'tweets-found'
-  });
-
-  let totalDuplicatesRemoved = 0;
-
-  for (const tweet of tweets) {
-    try {
-      // Group entities by their type and text to find duplicates
-      const entityGroups = tweet.entities.reduce<Record<string, Array<{ id: string }>>>((acc, entity) => {
-        const key = `${entity.type}-${entity.text}`;
-        if (!acc[key]) {
-          acc[key] = [];
-        }
-        acc[key].push({ id: entity.id });
-        return acc;
-      }, {} as Record<string, Array<{ id: string }>>);
-
-      // For each group of duplicate entities, keep one and delete the rest
-      for (const [key, entities] of Object.entries(entityGroups)) {
-        if (entities.length > 1) {
-          // Keep the first entity and delete the rest
-          const [_keep, ...duplicates] = entities;
-          if (duplicates.length > 0) {
-            const duplicateIds = duplicates.map(d => d.id);
-
-            console.log('[Twitter Storage] Removing duplicates for tweet:', {
-              tweetId: tweet.id,
-              entityKey: key,
-              duplicateCount: duplicateIds.length,
-              duplicateIds,
-              timestamp: new Date().toISOString(),
-              step: 'pre-delete'
-            });
-
-            await prisma.tweetEntity.deleteMany({
-              where: {
-                id: {
-                  in: duplicateIds
-                }
-              }
-            });
-
-            totalDuplicatesRemoved += duplicateIds.length;
-
-            console.log('[Twitter Storage] Removed duplicates for tweet:', {
-              tweetId: tweet.id,
-              entityKey: key,
-              duplicatesRemoved: duplicateIds.length,
-              timestamp: new Date().toISOString(),
-              step: 'duplicates-removed'
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[Twitter Storage] Error cleaning duplicates for tweet:', {
-        tweetId: tweet.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString(),
-        step: 'error'
-      });
-      // Continue with next tweet even if this one fails
-      continue;
-    }
-  }
-
-  console.log('[Twitter Storage] Entity cleanup complete:', {
-    totalTweets: tweets.length,
-    totalDuplicatesRemoved,
-    timestamp: new Date().toISOString(),
-    step: 'complete'
-  });
-}
-
 // Added function to score tweets based on tech relevance
 export function scoreTweetRelevance(tweet: TweetV2): number {
   if (!tweet.text) return 0;
@@ -375,9 +391,6 @@ export function scoreTweetRelevance(tweet: TweetV2): number {
 export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYPES.CURRENT, includes?: ApiV2Includes) {
   console.log(`[Twitter Storage] Caching ${tweets.length} tweets of type ${type}`);
 
-  // Clean up duplicate entities first
-  await cleanupDuplicateEntities();
-
   // Deactivate previous caches of the same type
   await (prisma as any).tweetCache.updateMany({
     where: {
@@ -406,38 +419,71 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
 
   for (const tweet of sortedTweets) {
     try {
-      // First, delete any existing entities for this tweet to prevent duplicates
-      await (prisma as any).tweetEntity.deleteMany({
-        where: { tweetId: tweet.id }
-      });
-
-      const tweetData = await convertTweetForStorage(tweet, includes);
-      const createdTweet = await (prisma as any).tweet.upsert({
+      // Check if the tweet already exists
+      const existingTweet = await (prisma as any).tweet.findUnique({
         where: { id: tweet.id },
-        create: {
-          ...tweetData,
-          entities: {
-            create: tweetData.entities.create
-          }
-        },
-        update: {
-          ...tweetData,
-          entities: {
-            deleteMany: {},
-            create: tweetData.entities.create
-          }
-        }
+        include: { entities: true }
       });
 
-      await (prisma as any).tweetCache.update({
-        where: { id: cache.id },
-        data: {
-          tweets: {
-            connect: { id: createdTweet.id }
+      if (existingTweet) {
+        console.log(`[Twitter Storage] Tweet ${tweet.id} already exists with ${existingTweet.entities.length} entities`);
+        
+        // Only update the tweet if needed, preserve the original createdAt date
+        const tweetData = await convertTweetForStorage(tweet, includes);
+        
+        // Keep the original createdAt date if it exists and is valid
+        const createdAt = existingTweet.createdAt && !isNaN(new Date(existingTweet.createdAt).getTime())
+          ? existingTweet.createdAt
+          : tweetData.createdAt;
+        
+        // Update the tweet but preserve entities
+        const updatedTweet = await (prisma as any).tweet.update({
+          where: { id: tweet.id },
+          data: {
+            text: tweetData.text,
+            createdAt: createdAt, // Preserve original date
+            publicMetrics: tweetData.publicMetrics,
+            // Only add new entities, don't delete existing ones
+            entities: {
+              create: tweetData.entities.create.filter(newEntity => 
+                !existingTweet.entities.some((existingEntity: { type: string; text: string }) => 
+                  existingEntity.type === newEntity.type && 
+                  existingEntity.text === newEntity.text
+                )
+              )
+            }
           }
-        }
-      });
+        });
 
+        await (prisma as any).tweetCache.update({
+          where: { id: cache.id },
+          data: {
+            tweets: {
+              connect: { id: updatedTweet.id }
+            }
+          }
+        });
+      } else {
+        // Create new tweet with entities
+        const tweetData = await convertTweetForStorage(tweet, includes);
+        const createdTweet = await (prisma as any).tweet.create({
+          data: {
+            ...tweetData,
+            entities: {
+              create: tweetData.entities.create
+            }
+          }
+        });
+
+        await (prisma as any).tweetCache.update({
+          where: { id: cache.id },
+          data: {
+            tweets: {
+              connect: { id: createdTweet.id }
+            }
+          }
+        });
+      }
     } catch (error) {
       console.error('[Twitter Storage] Error caching tweet:', {
         id: tweet.id,
