@@ -107,6 +107,15 @@ This plan outlines the steps to improve how shortened URLs are rendered in tweet
    - Added loading state management
    - Smooth transition from loading to loaded state
 
+### 6. Fix Server/Client Code Separation Issue ⚠️
+
+**Issue:** Our implementation caused Prisma Client (server-only) to be bundled into client-side code, resulting in runtime errors.
+
+**Solution:**
+1. Move the `isShortUrl` function from tweet-utils.ts (which imports Prisma) to a new client-safe utility file
+2. Update imports in client components to use only client-safe utilities
+3. Ensure proper separation between server and client code according to Next.js App Router best practices
+
 ## Testing
 
 All components have been tested and are working as expected. The following improvements are now in place:

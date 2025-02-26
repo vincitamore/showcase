@@ -632,7 +632,7 @@ export async function expandShortUrls(options: {
  * @param url The URL to check
  * @returns True if the URL is a shortened URL
  */
-export function isShortUrl(url: string): boolean {
+function isShortUrl(url: string): boolean {
   if (!url) return false;
   
   return url.includes('t.co/') || 

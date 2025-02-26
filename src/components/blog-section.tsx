@@ -12,7 +12,8 @@ import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
 import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 import { performance } from '@/lib/performance'
-import { detectMentions, detectHashtags, detectUrls, isShortUrl } from '@/lib/tweet-utils'
+import { detectMentions, detectHashtags, detectUrls } from '@/lib/tweet-utils'
+import { isShortUrl, formatDisplayUrl } from '@/lib/url-utils'
 
 interface UrlEntity {
   url: string
