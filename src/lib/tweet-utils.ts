@@ -344,4 +344,211 @@ export function enhanceTweetTextWithEntities(text: string) {
     text,
     entities: detectedEntities
   };
+}
+
+/**
+ * Expands a shortened URL to its full destination by following redirects
+ * @param shortUrl The shortened URL to expand
+ * @returns The expanded destination URL or the original if expansion fails
+ */
+async function expandUrl(shortUrl: string | null | undefined): Promise<string> {
+  try {
+    // Skip if not a URL or already expanded
+    if (!shortUrl || !shortUrl.startsWith('http')) {
+      return shortUrl || '';
+    }
+    
+    // Set a timeout since some redirects might hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    // Perform a HEAD request and follow redirects
+    const response = await fetch(shortUrl, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; TweetEntityResolver/1.0)'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    // Return the final URL after all redirects
+    return response.url;
+  } catch (error) {
+    console.error(`Error expanding URL ${shortUrl}:`, error);
+    // Return original if expansion fails
+    return shortUrl || '';
+  }
+}
+
+/**
+ * Finds and updates URL entities that have missing or incorrect expanded URLs
+ * @param options Configuration options for the process
+ * @returns Statistics about the process
+ */
+export async function expandShortUrls(options: {
+  limit?: number;
+  dryRun?: boolean;
+  logLevel?: 'none' | 'summary' | 'verbose';
+} = {}) {
+  const { 
+    limit = 100,
+    dryRun = true,
+    logLevel = 'summary' 
+  } = options;
+  
+  const startTime = Date.now();
+  const results = {
+    totalUrlEntities: 0,
+    urlsNeedingExpansion: 0,
+    successfullyExpanded: 0,
+    failedExpansions: 0,
+    skippedExpansions: 0,
+    processedEntities: [] as any[]
+  };
+  
+  try {
+    const { prisma } = await import('@/lib/db');
+    
+    // Find URL entities that need expansion
+    // - where url and expandedUrl are identical (t.co URLs)
+    // - or where expandedUrl is null
+    const urlEntities = await prisma.tweetEntity.findMany({
+      where: {
+        type: 'url',
+        OR: [
+          { expandedUrl: null },
+          {
+            url: { startsWith: 'https://t.co/' },
+            expandedUrl: { startsWith: 'https://t.co/' }
+          }
+        ]
+      },
+      take: limit,
+      include: {
+        tweet: {
+          select: {
+            id: true,
+            text: true
+          }
+        }
+      }
+    });
+    
+    results.totalUrlEntities = await prisma.tweetEntity.count({
+      where: { type: 'url' }
+    });
+    
+    results.urlsNeedingExpansion = urlEntities.length;
+    
+    if (logLevel !== 'none') {
+      console.log(`Found ${urlEntities.length} URL entities that need expansion`);
+    }
+    
+    // Process each URL entity
+    for (const entity of urlEntities) {
+      const originalUrl = entity.url || '';
+      const entityInfo = {
+        id: entity.id,
+        url: originalUrl,
+        originalExpandedUrl: entity.expandedUrl,
+        tweetId: entity.tweetId,
+        tweetTextPreview: entity.tweet?.text?.substring(0, 50) + '...'
+      };
+      
+      try {
+        // Skip if we're in dry run mode
+        if (dryRun) {
+          if (logLevel === 'verbose') {
+            console.log(`[DRY RUN] Would expand URL: ${originalUrl}`);
+          }
+          results.skippedExpansions++;
+          results.processedEntities.push({
+            ...entityInfo,
+            expandedUrl: null,
+            status: 'skipped',
+            reason: 'dry_run'
+          });
+          continue;
+        }
+        
+        // Skip if no URL
+        if (!originalUrl) {
+          results.skippedExpansions++;
+          results.processedEntities.push({
+            ...entityInfo,
+            expandedUrl: null,
+            status: 'skipped',
+            reason: 'no_url'
+          });
+          continue;
+        }
+        
+        // Expand the URL
+        const expandedUrl = await expandUrl(originalUrl);
+        
+        // Skip if expansion didn't change anything
+        if (expandedUrl === originalUrl || expandedUrl === entity.expandedUrl) {
+          if (logLevel === 'verbose') {
+            console.log(`Skipping URL that didn't change: ${originalUrl}`);
+          }
+          results.skippedExpansions++;
+          results.processedEntities.push({
+            ...entityInfo,
+            expandedUrl,
+            status: 'skipped',
+            reason: 'no_change'
+          });
+          continue;
+        }
+        
+        // Update the entity in the database
+        await prisma.tweetEntity.update({
+          where: { id: entity.id },
+          data: { expandedUrl }
+        });
+        
+        results.successfullyExpanded++;
+        results.processedEntities.push({
+          ...entityInfo,
+          expandedUrl,
+          status: 'success'
+        });
+        
+        if (logLevel === 'verbose') {
+          console.log(`Expanded URL: ${originalUrl} → ${expandedUrl}`);
+        }
+      } catch (error) {
+        results.failedExpansions++;
+        results.processedEntities.push({
+          ...entityInfo,
+          status: 'error',
+          reason: error instanceof Error ? error.message : 'Unknown error'
+        });
+        
+        if (logLevel !== 'none') {
+          console.error(`Error processing URL entity ${entity.id}:`, error);
+        }
+      }
+    }
+    
+    const processingTime = Date.now() - startTime;
+    
+    if (logLevel !== 'none') {
+      console.log(`URL expansion processing completed in ${processingTime}ms`);
+      console.log(`- Successfully expanded: ${results.successfullyExpanded}`);
+      console.log(`- Failed expansions: ${results.failedExpansions}`);
+      console.log(`- Skipped expansions: ${results.skippedExpansions}`);
+    }
+    
+    return {
+      ...results,
+      processingTime: `${processingTime}ms`
+    };
+  } catch (error) {
+    console.error('Error in expandShortUrls:', error);
+    throw error;
+  }
 } 
