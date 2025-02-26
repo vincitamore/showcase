@@ -107,14 +107,28 @@ This plan outlines the steps to improve how shortened URLs are rendered in tweet
    - Added loading state management
    - Smooth transition from loading to loaded state
 
-### 6. Fix Server/Client Code Separation Issue ⚠️
+### 6. Fix Server/Client Code Separation Issue ✅
 
 **Issue:** Our implementation caused Prisma Client (server-only) to be bundled into client-side code, resulting in runtime errors.
 
 **Solution:**
-1. Move the `isShortUrl` function from tweet-utils.ts (which imports Prisma) to a new client-safe utility file
-2. Update imports in client components to use only client-safe utilities
-3. Ensure proper separation between server and client code according to Next.js App Router best practices
+1. Move the `isShortUrl` function from tweet-utils.ts (which imports Prisma) to a new client-safe utility file ✅
+2. Update imports in client components to use only client-safe utilities ✅
+3. Move `detectMentions`, `detectHashtags`, and `detectUrls` functions to the client-safe utility file ✅
+4. Ensure proper separation between server and client code according to Next.js App Router best practices ✅
+
+### 7. Fix Blank Tweet Rendering Issue ✅
+
+**Issue:** After implementing the client/server code separation, tweets were rendering as blank cards with no content visible.
+
+**Root Cause:** Type incompatibility between `DetectedEntity` and `TweetEntity` interfaces.
+
+**Solution:**
+1. Created a unified `EntityType` type in `blog-section.tsx` to handle both interfaces ✅
+2. Updated the `DetectedEntity` interface in `url-utils.ts` to include optional properties that match `TweetEntity` ✅
+3. Enhanced the entity detection functions to set properties that match the expected structure ✅
+4. Added robust error handling and fallbacks throughout the rendering pipeline ✅
+5. Implemented multiple safety checks to ensure text is always displayed even when entity processing fails ✅
 
 ## Testing
 
@@ -125,6 +139,70 @@ All components have been tested and are working as expected. The following impro
 3. Twitter/X links are properly embedded with loading indicators
 4. URL expansion is more robust with better handling of redirects
 5. Visual design is improved with responsive layouts and loading states
+6. Tweet text is always displayed, even when entity processing encounters issues
+7. Client-side code is properly separated from server-side dependencies
+8. URL previews and Twitter embeds are properly rendered with appropriate metadata
+
+### Troubleshooting and Fixes
+
+During implementation, we encountered and fixed several issues:
+
+1. **React Hooks Error**: Fixed an issue where hooks were being called conditionally inside render functions, causing the "Rendered more hooks than during the previous render" error. This was resolved by:
+   - Moving the `useEffect` hook from the `renderUrlPreviews` function to the component level
+   - Creating a centralized state management approach for URL preview loading states
+   - Ensuring consistent hook execution across renders
+   - Adding better error handling and fallback UI for failed tweet rendering
+
+2. **Type Compatibility**: Ensured compatibility between `DetectedEntity` and `TweetEntity` interfaces by:
+   - Creating a unified `EntityType` type
+   - Adding optional properties to match expected structures
+   - Implementing robust error handling throughout the rendering pipeline
+
+3. **URL Preview Rendering Issues**: Fixed problems with URL previews not displaying by:
+   - Enhancing metadata parsing to handle different formats and structures
+   - Adding support for nested metadata objects
+   - Implementing fallbacks for title, description, and image fields
+   - Adding comprehensive logging to track the preview rendering process
+   - Fixing image URL handling to support different metadata structures
+
+4. **Twitter Embed Issues**: Resolved problems with Twitter/X embeds not displaying by:
+   - Improving the Twitter URL detection logic with more robust checks
+   - Adding detailed logging for Twitter URL detection and processing
+   - Enhancing the filtering logic to properly identify status URLs
+   - Ensuring proper handling of both twitter.com and x.com domains
+
+5. **Multiple Rendering Passes**: Addressed issues with components being rendered multiple times by:
+   - Implementing memoization for expensive rendering operations
+   - Adding key-based rendering to prevent unnecessary re-renders
+   - Ensuring consistent component structure across rendering passes
+
+## Performance Optimizations
+
+### Memoization to Prevent Unnecessary Re-renders
+
+To improve performance and prevent unnecessary re-renders of tweet components, we've implemented React's `useCallback` for key rendering functions:
+
+1. **Memoized `renderTweetText`**: 
+   - The function that renders tweet text with entities is now memoized using `React.useCallback`
+   - This prevents the function from being recreated on each render
+   - The complex entity processing logic now only runs when the dependencies change
+
+2. **Memoized `renderMedia`**:
+   - Media rendering is now optimized with memoization
+   - Prevents unnecessary processing of media entities on re-renders
+
+3. **Memoized `renderUrlPreviews`**:
+   - URL preview rendering is now memoized with a dependency on the loading state
+   - Only re-renders when the loading state of URL previews changes
+
+These optimizations help reduce the computational overhead of processing tweets, especially when dealing with complex entity structures and multiple rendering passes. The memoization ensures that the expensive rendering functions are only recalculated when their inputs change, not on every component render.
+
+### Benefits
+
+- Reduced CPU usage during rendering
+- Smoother UI experience with fewer jank/stutters
+- Better handling of complex tweet structures with many entities
+- Improved performance when rendering multiple tweets simultaneously
 
 ## Future Improvements
 

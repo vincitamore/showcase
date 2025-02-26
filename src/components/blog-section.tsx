@@ -12,7 +12,15 @@ import Image from "next/image"
 import { profileConfig } from "@/lib/profile-config"
 import { useTwitterEmbed } from "@/hooks/use-twitter-embed"
 import { performance } from '@/lib/performance'
-import { isShortUrl, formatDisplayUrl, detectMentions, detectHashtags, detectUrls } from '@/lib/url-utils'
+import { 
+  isShortUrl, 
+  formatDisplayUrl,
+  detectMentions,
+  detectHashtags,
+  detectUrls,
+  DetectedEntity
+} from '@/lib/url-utils'
+import React from 'react'
 
 interface UrlEntity {
   url: string
@@ -63,14 +71,19 @@ interface TweetMetrics {
 
 interface TweetEntity {
   id: string;
-  type: string;
+  tweetId: string;
+  type: 'url' | 'mention' | 'hashtag' | 'media';
   text: string;
   url?: string;
   expandedUrl?: string;
   displayUrl?: string;
   mediaKey?: string;
-  metadata: any;
+  metadata?: any;
+  indices?: [number, number];
 }
+
+// Combined type for entities that can be either TweetEntity or DetectedEntity
+type EntityType = TweetEntity | DetectedEntity;
 
 interface Tweet {
   id: string;
@@ -104,6 +117,7 @@ const BlogSection = () => {
   const [isLoadingUrlPreviews, setIsLoadingUrlPreviews] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
+  const [urlEntitiesMap, setUrlEntitiesMap] = useState<Record<string, TweetEntity[]>>({})
 
   // Initialize Twitter embed script
   const { loadTwitterWidgets } = useTwitterEmbed()
@@ -112,6 +126,53 @@ const BlogSection = () => {
     fetchCachedTweets()
     checkAuth()
   }, [])
+
+  // Handle URL preview loading states at the component level
+  useEffect(() => {
+    // Create a map of all unique URL entities across all tweets
+    const allUrlEntities: Record<string, TweetEntity[]> = {};
+    
+    tweets.forEach(tweet => {
+      const entities = tweet.entities || [];
+      // Get unique URL entities for this tweet
+      const uniqueUrlEntities = entities
+        .filter(e => e.type === 'url' && e.expandedUrl) 
+        .filter(e => !(e.expandedUrl?.includes('twitter.com') || e.expandedUrl?.includes('x.com')))
+        .reduce((acc: TweetEntity[], entity) => {
+          const exists = acc.find(e => e.expandedUrl === entity.expandedUrl);
+          if (!exists) acc.push(entity);
+          return acc;
+        }, []);
+      
+      if (uniqueUrlEntities.length > 0) {
+        allUrlEntities[tweet.id] = uniqueUrlEntities;
+      }
+    });
+    
+    setUrlEntitiesMap(allUrlEntities);
+    
+    // Set loading states for all URL entities
+    const loadingStates: Record<string, boolean> = {};
+    
+    Object.values(allUrlEntities).flat().forEach(entity => {
+      const key = entity.expandedUrl || entity.url || entity.id;
+      if (key) loadingStates[key] = true;
+    });
+    
+    if (Object.keys(loadingStates).length > 0) {
+      setIsLoadingUrlPreviews(loadingStates);
+      
+      // Simulate loading completion
+      const timer = setTimeout(() => {
+        setIsLoadingUrlPreviews({});
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Return empty cleanup function if no loading states
+    return () => {};
+  }, [tweets]);
 
   const checkAuth = async () => {
     try {
@@ -155,12 +216,42 @@ const BlogSection = () => {
         return;
       }
 
+      console.log('[Tweet Rendering DEBUG] Raw tweets from API:', {
+        count: data.tweets.length,
+        firstTweet: data.tweets[0] ? {
+          id: data.tweets[0].id,
+          text: data.tweets[0].text ? data.tweets[0].text.substring(0, 50) + '...' : 'No text',
+          entitiesCount: data.tweets[0].entities?.length || 0
+        } : 'No tweets'
+      });
+
       // Log the raw tweet dates for debugging
       console.log('[Tweet Rendering] Raw tweet dates:', 
         data.tweets.map((t: any) => ({
           id: t.id,
           createdAt: t.createdAt,
           parsedDate: t.createdAt ? new Date(t.createdAt).toISOString() : null
+        }))
+      );
+
+      // Log detailed entity information for debugging
+      console.log('[Tweet Rendering DEBUG] Detailed entity information:', 
+        data.tweets.map((t: any) => ({
+          id: t.id,
+          entitiesCount: t.entities?.length || 0,
+          entities: t.entities?.map((e: any) => ({
+            id: e.id,
+            type: e.type,
+            text: e.text,
+            url: e.url,
+            expandedUrl: e.expandedUrl,
+            displayUrl: e.displayUrl,
+            mediaKey: e.mediaKey,
+            metadataType: typeof e.metadata,
+            metadataPreview: typeof e.metadata === 'string' 
+              ? e.metadata.substring(0, 100) + '...' 
+              : JSON.stringify(e.metadata).substring(0, 100) + '...'
+          }))
         }))
       );
 
@@ -205,7 +296,7 @@ const BlogSection = () => {
             }
           }).filter(Boolean);
 
-          return {
+          const processedTweet = {
             id: dbTweet.id,
             text: dbTweet.text,
             created_at: dbTweet.createdAt,
@@ -217,7 +308,16 @@ const BlogSection = () => {
             },
             entities
           };
+
+          console.log('[Tweet Rendering DEBUG] Processed tweet:', {
+            id: processedTweet.id,
+            textLength: processedTweet.text?.length || 0,
+            entitiesCount: processedTweet.entities?.length || 0
+          });
+
+          return processedTweet;
         } catch (tweetError) {
+          console.error('[Tweet Rendering ERROR] Error processing tweet:', tweetError);
           performance.end('tweet_processing', { 
             error: 'tweet_processing_error',
             tweetId: dbTweet.id 
@@ -228,6 +328,16 @@ const BlogSection = () => {
 
       // Filter out null values and set tweets
       const validTweets = processedTweets.filter(Boolean);
+      
+      console.log('[Tweet Rendering DEBUG] Final processed tweets:', {
+        count: validTweets.length,
+        firstTweet: validTweets[0] ? {
+          id: validTweets[0].id,
+          textLength: validTweets[0].text?.length || 0,
+          entitiesCount: validTweets[0].entities?.length || 0
+        } : 'No valid tweets'
+      });
+      
       performance.end('tweet_processing', { 
         processed_count: processedTweets.length,
         valid_count: validTweets.length 
@@ -239,6 +349,7 @@ const BlogSection = () => {
         loadTwitterWidgets();
       }, 1000);
     } catch (error) {
+      console.error('[Tweet Rendering ERROR] Error fetching tweets:', error);
       performance.end('tweet_processing', { error: 1 });
       toast({
         title: "Error",
@@ -307,149 +418,144 @@ const BlogSection = () => {
     }));
   };
 
-  const renderTweetText = (text: string, entities: any[]) => {
-    if (!text) return null;
+  // Memoize the renderTweetText function to prevent unnecessary re-renders
+  const renderTweetText = React.useCallback((text: string, entities: TweetEntity[]) => {
+    console.log('[Tweet Rendering DEBUG] renderTweetText called:', {
+      textLength: text?.length || 0,
+      textPreview: text ? (text.substring(0, 50) + (text.length > 50 ? '...' : '')) : 'No text',
+      entitiesCount: entities?.length || 0,
+      entitiesTypes: entities?.map(e => e.type) || []
+    });
 
-    console.log('[Tweet Rendering] Processing tweet text:', {
-      textLength: text.length,
-      entities: entities.map(e => ({
+    if (!text) {
+      console.error('[Tweet Rendering ERROR] No text provided to renderTweetText');
+      return <div className="text-red-500">Error: No tweet text available</div>;
+    }
+
+    // If no entities are provided or the array is empty, just return the plain text
+    if (!entities || entities.length === 0) {
+      console.log('[Tweet Rendering DEBUG] No entities provided, returning plain text');
+      return <div className="whitespace-pre-wrap break-words">{text}</div>;
+    }
+
+    // Create fallback entities if none are provided
+    let enhancedEntities: EntityType[] = [...(entities || [])];
+    
+    // Check if we have mention entities, if not, detect them
+    if (!enhancedEntities.some(e => e.type === 'mention')) {
+      console.log('[Tweet Rendering DEBUG] No mention entities found, detecting mentions');
+      const detectedMentions = detectMentions(text);
+      console.log('[Tweet Rendering DEBUG] Detected mentions:', {
+        count: detectedMentions.length,
+        mentions: detectedMentions.map(m => m.text)
+      });
+      enhancedEntities = [...enhancedEntities, ...detectedMentions];
+    }
+    
+    // Check if we have hashtag entities, if not, detect them
+    if (!enhancedEntities.some(e => e.type === 'hashtag')) {
+      console.log('[Tweet Rendering DEBUG] No hashtag entities found, detecting hashtags');
+      const detectedHashtags = detectHashtags(text);
+      console.log('[Tweet Rendering DEBUG] Detected hashtags:', {
+        count: detectedHashtags.length,
+        hashtags: detectedHashtags.map(h => h.text)
+      });
+      enhancedEntities = [...enhancedEntities, ...detectedHashtags];
+    }
+    
+    // Check if we have URL entities, if not, detect them
+    if (!enhancedEntities.some(e => e.type === 'url')) {
+      console.log('[Tweet Rendering DEBUG] No URL entities found, detecting URLs');
+      const detectedUrls = detectUrls(text);
+      console.log('[Tweet Rendering DEBUG] Detected URLs:', {
+        count: detectedUrls.length,
+        urls: detectedUrls.map(u => ({
+          text: u.text,
+          expandedUrl: u.expandedUrl,
+          displayUrl: u.displayUrl
+        }))
+      });
+      enhancedEntities = [...enhancedEntities, ...detectedUrls];
+    }
+
+    console.log('[Tweet Rendering DEBUG] Enhanced entities:', {
+      originalCount: entities?.length || 0,
+      enhancedCount: enhancedEntities.length,
+      types: enhancedEntities.map(e => e.type)
+    });
+
+    // Sort entities by their position in the text
+    const sortedEntities = enhancedEntities
+      .filter(e => e.metadata?.indices)
+      .sort((a, b) => {
+        try {
+          const aIndices = Array.isArray(a.metadata.indices) 
+            ? a.metadata.indices 
+            : JSON.parse(typeof a.metadata === 'string' ? a.metadata : JSON.stringify(a.metadata)).indices;
+          
+          const bIndices = Array.isArray(b.metadata.indices)
+            ? b.metadata.indices
+            : JSON.parse(typeof b.metadata === 'string' ? b.metadata : JSON.stringify(b.metadata)).indices;
+          
+          return aIndices[0] - bIndices[0];
+        } catch (error) {
+          console.error('[Tweet Rendering ERROR] Error sorting entities:', error);
+          return 0; // Default to no change in order if there's an error
+        }
+      });
+
+    console.log('[Tweet Rendering DEBUG] Sorted entities:', {
+      sortedCount: sortedEntities.length,
+      sortedEntities: sortedEntities.map(e => ({
         type: e.type,
         text: e.text,
         indices: e.metadata?.indices
       }))
     });
 
-    // Check if we need to generate fallback entities
-    const hasMentions = entities.some(e => e.type === 'mention');
-    const hasHashtags = entities.some(e => e.type === 'hashtag');
-    const hasUrls = entities.some(e => e.type === 'url');
-    
-    // Create fallback entities for missing types if needed
-    let enhancedEntities = [...entities];
-    let hasAddedFallbackEntities = false;
-    
-    if (!hasMentions) {
-      console.log('[Tweet Rendering] No mention entities found, detecting from text');
-      const detectedMentions = detectMentions(text);
-      if (detectedMentions.length > 0) {
-        enhancedEntities = [...enhancedEntities, ...detectedMentions];
-        hasAddedFallbackEntities = true;
-      }
-    }
-    
-    if (!hasHashtags) {
-      console.log('[Tweet Rendering] No hashtag entities found, detecting from text');
-      const detectedHashtags = detectHashtags(text);
-      if (detectedHashtags.length > 0) {
-        enhancedEntities = [...enhancedEntities, ...detectedHashtags];
-        hasAddedFallbackEntities = true;
-      }
-    }
-    
-    if (!hasUrls) {
-      console.log('[Tweet Rendering] No URL entities found, detecting from text');
-      const detectedUrls = detectUrls(text);
-      if (detectedUrls.length > 0) {
-        enhancedEntities = [...enhancedEntities, ...detectedUrls];
-        hasAddedFallbackEntities = true;
-      }
-    }
-    
-    // Log if we added fallback entities
-    if (hasAddedFallbackEntities) {
-      console.log('[Tweet Rendering] Added fallback entities:', {
-        originalCount: entities.length,
-        enhancedCount: enhancedEntities.length,
-        added: enhancedEntities.length - entities.length
-      });
-    }
-
-    // Sort entities by their position in the text
-    const sortedEntities = enhancedEntities
-      .filter(e => e.metadata?.indices)
-      .sort((a, b) => {
-        const aIndices = Array.isArray(a.metadata.indices) 
-          ? a.metadata.indices 
-          : JSON.parse(typeof a.metadata === 'string' ? a.metadata : JSON.stringify(a.metadata)).indices;
-        
-        const bIndices = Array.isArray(b.metadata.indices)
-          ? b.metadata.indices
-          : JSON.parse(typeof b.metadata === 'string' ? b.metadata : JSON.stringify(b.metadata)).indices;
-        
-        return aIndices[0] - bIndices[0];
-      });
-
     // Create segments of text and entities
     const segments: JSX.Element[] = [];
     let lastIndex = 0;
 
+    // If we have no entities after sorting, just return the plain text
+    if (sortedEntities.length === 0) {
+      console.log('[Tweet Rendering DEBUG] No sorted entities, returning plain text');
+      return <div className="whitespace-pre-wrap break-words">{text}</div>;
+    }
+
     sortedEntities.forEach((entity, index) => {
-      // Get indices safely, handling different possible formats
-      const metadata = typeof entity.metadata === 'string'
-        ? JSON.parse(entity.metadata)
-        : entity.metadata;
-      
-      const indices = Array.isArray(metadata.indices) 
-        ? metadata.indices 
-        : (metadata.indices ? JSON.parse(JSON.stringify(metadata.indices)) : [0, 0]);
-      
-      const [start, end] = indices;
+      try {
+        // Get indices safely, handling different possible formats
+        const metadata = typeof entity.metadata === 'string'
+          ? JSON.parse(entity.metadata)
+          : entity.metadata;
+        
+        const indices = Array.isArray(metadata.indices) 
+          ? metadata.indices 
+          : (metadata.indices ? JSON.parse(JSON.stringify(metadata.indices)) : [0, 0]);
+        
+        const [start, end] = indices;
 
-      // Add text before entity
-      if (start > lastIndex) {
-        segments.push(
-          <span key={`text-${index}`}>
-            {text.slice(lastIndex, start)}
-          </span>
-        );
-      }
+        console.log(`[Tweet Rendering DEBUG] Processing entity ${index}:`, {
+          type: entity.type,
+          text: entity.text,
+          start,
+          end,
+          lastIndex
+        });
 
-      // Add entity
-      switch (entity.type) {
-        case 'mention':
+        // Add text before entity
+        if (start > lastIndex) {
           segments.push(
-            <span
-              key={`entity-${index}`}
-              className="text-primary hover:underline cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(`https://x.com/${entity.text}`, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              @{entity.text}
+            <span key={`text-${index}`}>
+              {text.slice(lastIndex, start)}
             </span>
           );
-          break;
-        case 'hashtag':
-          segments.push(
-            <span
-              key={`entity-${index}`}
-              className="text-primary hover:underline cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.open(`https://x.com/hashtag/${entity.text}`, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              #{entity.text}
-            </span>
-          );
-          break;
-        case 'url':
-          // For URLs, we'll render them inline if they're not Twitter URLs
-          // Twitter URLs will be rendered as embeds separately
-          if (entity.expandedUrl) {
-            // Check if it's a shortened URL (t.co, bit.ly, etc.)
-            const isShortened = isShortUrl(entity.url || '');
-            
-            // Hide shortened URLs completely in the rendered text
-            if (isShortened) {
-              // Skip rendering the URL text completely
-              break;
-            }
-            
-            // For regular URLs, show them as clickable links
+        }
+
+        // Add entity
+        switch (entity.type) {
+          case 'mention':
             segments.push(
               <span
                 key={`entity-${index}`}
@@ -457,19 +563,86 @@ const BlogSection = () => {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  window.open(entity.expandedUrl, '_blank', 'noopener,noreferrer');
+                  window.open(`https://x.com/${entity.text}`, '_blank', 'noopener,noreferrer');
                 }}
               >
-                {entity.displayUrl || entity.text}
+                @{entity.text}
               </span>
             );
-          } else {
-            // Skip Twitter URLs as they'll be rendered as embeds
-          }
-          break;
-      }
+            break;
+          case 'hashtag':
+            segments.push(
+              <span
+                key={`entity-${index}`}
+                className="text-primary hover:underline cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(`https://x.com/hashtag/${entity.text}`, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                #{entity.text}
+              </span>
+            );
+            break;
+          case 'url':
+            // For URLs, we'll render them inline if they're not Twitter URLs
+            // Twitter URLs will be rendered as embeds separately
+            if (entity.expandedUrl) {
+              // Check if it's a shortened URL (t.co, bit.ly, etc.)
+              const isShortened = isShortUrl(entity.text || '');
+              
+              // Hide shortened URLs completely in the rendered text
+              if (isShortened) {
+                // Skip rendering the URL text completely
+                break;
+              }
+              
+              // For regular URLs, show them as clickable links
+              segments.push(
+                <span
+                  key={`entity-${index}`}
+                  className="text-primary hover:underline cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(entity.expandedUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                >
+                  {entity.displayUrl || entity.text}
+                </span>
+              );
+            } else {
+              // If no expanded URL, use the original text as a fallback
+              segments.push(
+                <span
+                  key={`entity-${index}`}
+                  className="text-primary hover:underline cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(entity.text, '_blank', 'noopener,noreferrer');
+                  }}
+                >
+                  {formatDisplayUrl(entity.text)}
+                </span>
+              );
+            }
+            break;
+          default:
+            // For unknown entity types, just render the text
+            segments.push(
+              <span key={`entity-${index}`}>
+                {entity.text}
+              </span>
+            );
+        }
 
-      lastIndex = end;
+        lastIndex = end;
+      } catch (error) {
+        console.error(`[Tweet Rendering ERROR] Error processing entity ${index}:`, error);
+        // Skip this entity and continue with the next one
+      }
     });
 
     // Add remaining text
@@ -481,12 +654,22 @@ const BlogSection = () => {
       );
     }
 
+    console.log('[Tweet Rendering DEBUG] Final segments:', {
+      segmentsCount: segments.length
+    });
+
+    // If we somehow ended up with no segments, return the plain text as a fallback
+    if (segments.length === 0) {
+      console.warn('[Tweet Rendering WARN] No segments created, falling back to plain text');
+      return <div className="whitespace-pre-wrap break-words">{text}</div>;
+    }
+
     return (
       <div className="whitespace-pre-wrap break-words">
         {segments}
       </div>
     );
-  }
+  }, []);
 
   function formatDate(date: string | undefined) {
     if (!date) return 'Just now';
@@ -540,7 +723,8 @@ const BlogSection = () => {
     return new Intl.NumberFormat('en-US', { notation: 'compact' }).format(num);
   }
 
-  function renderMedia(entities: TweetEntity[]) {
+  // Memoize the renderMedia function to prevent unnecessary re-renders
+  const renderMedia = React.useCallback((entities: TweetEntity[]) => {
     const mediaEntities = entities.filter(e => e.type === 'media');
     if (!mediaEntities?.length) return null;
 
@@ -617,31 +801,31 @@ const BlogSection = () => {
         })}
       </div>
     );
-  }
+  }, []);
 
-  const UrlPreviewShimmer = () => (
-    <div className="mt-3 rounded-lg border overflow-hidden animate-pulse">
-      <div className="flex flex-col sm:flex-row">
-        <div className="sm:w-1/3 h-[120px] bg-accent/10"></div>
-        <div className="p-3 sm:p-4 flex-1 space-y-3">
-          <div className="h-4 bg-accent/10 rounded w-3/4"></div>
-          <div className="space-y-2">
-            <div className="h-3 bg-accent/10 rounded w-full"></div>
-            <div className="h-3 bg-accent/10 rounded w-5/6"></div>
-          </div>
-          <div className="h-3 bg-accent/10 rounded w-1/4"></div>
-        </div>
-      </div>
-    </div>
-  );
-
-  function renderUrlPreviews(entities: TweetEntity[]) {
+  // Memoize the renderUrlPreviews function to prevent unnecessary re-renders
+  const renderUrlPreviews = React.useCallback((entities: TweetEntity[]) => {
+    // Add detailed logging at the start of the function
+    console.log('[Tweet Rendering DEBUG] renderUrlPreviews called:', {
+      entitiesCount: entities?.length || 0,
+      urlEntitiesCount: entities?.filter(e => e.type === 'url').length || 0,
+      urlEntities: entities?.filter(e => e.type === 'url').map(e => ({
+        id: e.id,
+        type: e.type,
+        url: e.url,
+        expandedUrl: e.expandedUrl,
+        displayUrl: e.displayUrl,
+        hasMetadata: !!e.metadata
+      }))
+    });
+    
     // Deduplicate URL entities by their expanded URL
     const uniqueUrlEntities = entities
       .filter(e => e.type === 'url' && e.expandedUrl) // Only include entities with expanded URLs
       .reduce((acc: TweetEntity[], entity) => {
         // Skip URLs that expand to Twitter/X URLs as they will be handled separately
         if (entity.expandedUrl?.includes('twitter.com') || entity.expandedUrl?.includes('x.com')) {
+          console.log('[Tweet Rendering DEBUG] Skipping Twitter URL:', entity.expandedUrl);
           return acc;
         }
         
@@ -650,32 +834,19 @@ const BlogSection = () => {
         return acc;
       }, []);
 
-    // Set loading state for URL previews
-    useEffect(() => {
-      if (uniqueUrlEntities.length > 0) {
-        const urlKeys = uniqueUrlEntities.map(entity => entity.expandedUrl || entity.url || entity.id);
-        
-        // Initialize loading state for each URL
-        const loadingStates = urlKeys.reduce((acc, key) => {
-          acc[key] = true;
-          return acc;
-        }, {} as Record<string, boolean>);
-        
-        setIsLoadingUrlPreviews(loadingStates);
-        
-        // Simulate loading completion (in a real app, this would be based on actual loading events)
-        const timer = setTimeout(() => {
-          setIsLoadingUrlPreviews({});
-        }, 1000);
-        
-        return () => clearTimeout(timer);
-      }
-      
-      // Return a no-op cleanup function for the case where there are no URL entities
-      return () => {};
-    }, [uniqueUrlEntities]);
+    console.log('[Tweet Rendering DEBUG] Unique URL entities after filtering:', {
+      uniqueCount: uniqueUrlEntities.length,
+      entities: uniqueUrlEntities.map(e => ({
+        id: e.id,
+        url: e.url,
+        expandedUrl: e.expandedUrl
+      }))
+    });
 
-    if (!uniqueUrlEntities?.length) return null;
+    if (!uniqueUrlEntities?.length) {
+      console.log('[Tweet Rendering DEBUG] No unique URL entities to render');
+      return null;
+    }
 
     console.log('[Tweet Rendering] Processing unique URL entities:', {
       originalCount: entities.filter(e => e.type === 'url').length,
@@ -693,16 +864,60 @@ const BlogSection = () => {
           const entityKey = entity.expandedUrl || entity.url || entity.id;
           const isLoading = isLoadingUrlPreviews[entityKey];
           
+          console.log('[Tweet Rendering DEBUG] Rendering URL preview:', {
+            index,
+            entityKey,
+            isLoading,
+            url: entity.url,
+            expandedUrl: entity.expandedUrl
+          });
+          
           if (isLoading) {
             return <UrlPreviewShimmer key={`shimmer-${entityKey}`} />;
           }
           
-          const metadata = typeof entity.metadata === 'string'
-            ? JSON.parse(entity.metadata)
-            : entity.metadata;
+          // Parse metadata safely, handling different formats
+          let metadata: any = {};
+          try {
+            if (typeof entity.metadata === 'string') {
+              metadata = JSON.parse(entity.metadata);
+            } else if (entity.metadata && typeof entity.metadata === 'object') {
+              metadata = entity.metadata;
+            }
+            
+            // Check for nested metadata structures
+            if (metadata.metadata && typeof metadata.metadata === 'object') {
+              metadata = { ...metadata, ...metadata.metadata };
+            }
+            
+            // Check for title/description in different locations
+            if (metadata.title_value && !metadata.title) {
+              metadata.title = metadata.title_value;
+            }
+            
+            if (metadata.description_value && !metadata.description) {
+              metadata.description = metadata.description_value;
+            }
+            
+            // Check for images in different locations
+            if (!metadata.images && metadata.image) {
+              metadata.images = [{ url: metadata.image }];
+            }
+            
+            console.log('[Tweet Rendering DEBUG] Parsed URL preview metadata:', {
+              hasMetadata: true,
+              title: metadata?.title,
+              description: metadata?.description?.substring(0, 50),
+              hasImages: !!(metadata?.images?.length || metadata?.image)
+            });
+          } catch (error) {
+            console.error('[Tweet Rendering ERROR] Error parsing metadata:', error);
+            metadata = {};
+          }
 
           // Skip if no preview data
-          if (!metadata?.title && !metadata?.description && !metadata?.images?.length) {
+          if (!metadata?.title && !metadata?.description && !metadata?.images?.length && !metadata?.image) {
+            console.log('[Tweet Rendering DEBUG] Skipping URL preview due to missing metadata');
             return null;
           }
 
@@ -729,10 +944,10 @@ const BlogSection = () => {
               }}
             >
               <div className="flex flex-col sm:flex-row">
-                {metadata.images?.[0]?.url && (
+                {(metadata.images?.[0]?.url || metadata.image) && (
                   <div className="relative sm:w-1/3 h-[120px] sm:h-auto bg-accent/5">
                     <Image
-                      src={metadata.images[0].url}
+                      src={metadata.images?.[0]?.url || metadata.image}
                       alt={metadata.title || 'Link preview'}
                       fill
                       className="object-cover"
@@ -771,52 +986,122 @@ const BlogSection = () => {
         })}
       </div>
     );
-  }
+  }, [isLoadingUrlPreviews]);
+
+  const UrlPreviewShimmer = () => (
+    <div className="mt-3 rounded-lg border overflow-hidden animate-pulse">
+      <div className="flex flex-col sm:flex-row">
+        <div className="sm:w-1/3 h-[120px] bg-accent/10"></div>
+        <div className="p-3 sm:p-4 flex-1 space-y-3">
+          <div className="h-4 bg-accent/10 rounded w-3/4"></div>
+          <div className="space-y-2">
+            <div className="h-3 bg-accent/10 rounded w-full"></div>
+            <div className="h-3 bg-accent/10 rounded w-5/6"></div>
+          </div>
+          <div className="h-3 bg-accent/10 rounded w-1/4"></div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderTweet = (tweet: Tweet) => {
     const entities = tweet.entities || [];
     
+    console.log('[Tweet Rendering DEBUG] renderTweet called:', {
+      tweetId: tweet.id,
+      textLength: tweet.text?.length || 0,
+      textPreview: tweet.text ? (tweet.text.substring(0, 50) + (tweet.text.length > 50 ? '...' : '')) : 'No text',
+      entitiesCount: entities.length
+    });
+    
     try {
       // Get unique Twitter URLs for embedding
+      console.log('[Tweet Rendering DEBUG] Checking for Twitter URLs in entities:', {
+        urlEntitiesCount: entities.filter(e => e.type === 'url').length,
+        urlEntities: entities.filter(e => e.type === 'url').map(e => ({
+          id: e.id,
+          url: e.url,
+          expandedUrl: e.expandedUrl,
+          isTwitterUrl: e.expandedUrl?.includes('twitter.com') || e.expandedUrl?.includes('x.com'),
+          isStatusUrl: e.expandedUrl?.includes('/status/')
+        }))
+      });
+      
+      // Enhanced Twitter URL detection
       const twitterUrls = entities
-        .filter(e => e.type === 'url' && e.expandedUrl && (
-          (e.expandedUrl.includes('twitter.com/') || e.expandedUrl.includes('x.com/')) &&
-          // Ensure it's a tweet URL (has /status/ in the path)
-          e.expandedUrl.includes('/status/')
-        ))
+        .filter(e => {
+          // Check if it's a URL entity
+          if (e.type !== 'url') return false;
+          
+          // Check if it has an expanded URL
+          if (!e.expandedUrl) return false;
+          
+          // Check if it's a Twitter/X URL
+          const isTwitterDomain = 
+            e.expandedUrl.includes('twitter.com/') || 
+            e.expandedUrl.includes('x.com/');
+          
+          // Check if it's a status URL (tweet)
+          const isStatusUrl = e.expandedUrl.includes('/status/');
+          
+          console.log('[Tweet Rendering DEBUG] Twitter URL check:', {
+            url: e.url,
+            expandedUrl: e.expandedUrl,
+            isTwitterDomain,
+            isStatusUrl,
+            result: isTwitterDomain && isStatusUrl
+          });
+          
+          return isTwitterDomain && isStatusUrl;
+        })
         .reduce((acc: string[], entity) => {
           const url = entity.expandedUrl;
-          if (url && !acc.includes(url)) acc.push(url);
+          if (url && !acc.includes(url)) {
+            console.log('[Tweet Rendering DEBUG] Adding Twitter URL for embedding:', url);
+            acc.push(url);
+          }
           return acc;
         }, []);
+
+      console.log('[Tweet Rendering DEBUG] Twitter URLs for embedding:', {
+        count: twitterUrls.length,
+        urls: twitterUrls
+      });
 
       // Only render Twitter embeds if there are any
       const twitterEmbedsSection = twitterUrls.length > 0 ? (
         <div className="mt-3 space-y-3">
-          {twitterUrls.map((twitterUrl, embedIndex) => (
-            <div 
-              key={`${tweet.id}-embed-${embedIndex}`}
-              className="rounded-lg border border-border/50 overflow-hidden relative"
-            >
-              {/* Loading state indicator */}
-              <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 tweet-embed-loading">
-                <div className="h-5 w-5 border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-              </div>
-              <blockquote 
-                className="twitter-tweet" 
-                data-conversation="none"
-                data-theme="dark"
-                data-align="center"
-                onLoad={() => {
-                  // Hide loading indicator when tweet is loaded
-                  const loadingEl = document.querySelector('.tweet-embed-loading');
-                  if (loadingEl) loadingEl.classList.add('hidden');
-                }}
+          {twitterUrls.map((twitterUrl, embedIndex) => {
+            console.log('[Tweet Rendering DEBUG] Creating Twitter embed for URL:', {
+              index: embedIndex,
+              url: twitterUrl
+            });
+            
+            return (
+              <div 
+                key={`${tweet.id}-embed-${embedIndex}`}
+                className="rounded-lg border border-border/50 overflow-hidden relative"
               >
-                <a href={twitterUrl}></a>
-              </blockquote>
-            </div>
-          ))}
+                {/* Loading state indicator */}
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 tweet-embed-loading">
+                  <div className="h-5 w-5 border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                </div>
+                <blockquote 
+                  className="twitter-tweet" 
+                  data-conversation="none"
+                  data-theme="dark"
+                  data-align="center"
+                  onLoad={() => {
+                    // Hide loading indicator when tweet is loaded
+                    const loadingEl = document.querySelector('.tweet-embed-loading');
+                    if (loadingEl) loadingEl.classList.add('hidden');
+                  }}
+                >
+                  <a href={twitterUrl}></a>
+                </blockquote>
+              </div>
+            );
+          })}
         </div>
       ) : null;
 
@@ -827,13 +1112,30 @@ const BlogSection = () => {
         ? tweet.text.substring(0, 280) + '...' 
         : tweet.text;
 
+      console.log('[Tweet Rendering DEBUG] About to render tweet text:', {
+        displayTextLength: displayText?.length || 0,
+        isLongTweet,
+        isExpanded
+      });
+
+      // Render the tweet content
+      const tweetContent = (
+        <div className="whitespace-pre-wrap break-words">
+          {renderTweetText(displayText, entities)}
+        </div>
+      );
+
+      // Render media content if available
+      const mediaContent = renderMedia(entities);
+      
+      // Render URL previews if available - but don't use hooks inside this render function
+      const urlPreviewsContent = renderUrlPreviews(entities);
+
       const result = (
         <div className="flex h-full flex-col justify-between gap-4">
           <div className="space-y-4">
             <div className="text-sm">
-              <div className="whitespace-pre-wrap break-words">
-                {renderTweetText(displayText, entities)}
-              </div>
+              {tweetContent}
               {isLongTweet && (
                 <button 
                   onClick={(e) => toggleTweetExpansion(tweet.id, e)}
@@ -842,8 +1144,8 @@ const BlogSection = () => {
                   {isExpanded ? 'Show less' : 'Show more'}
                 </button>
               )}
-              {renderMedia(entities)}
-              {renderUrlPreviews(entities)}
+              {mediaContent}
+              {urlPreviewsContent}
               {twitterEmbedsSection}
             </div>
           </div>
@@ -871,7 +1173,31 @@ const BlogSection = () => {
       return result;
     } catch (error) {
       console.error('Error rendering tweet:', error);
-      return null;
+      
+      // Provide a fallback UI when there's an error
+      return (
+        <div className="flex h-full flex-col justify-between gap-4">
+          <div className="space-y-4">
+            <div className="text-sm">
+              <div className="whitespace-pre-wrap break-words">
+                {tweet.text || "This tweet couldn't be rendered properly."}
+              </div>
+              <div className="mt-2 text-xs text-red-500">
+                There was an error rendering this tweet. Please refresh the page or try again later.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>{formatDate(tweet.created_at)}</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                <span>{formatNumber(tweet.public_metrics?.like_count)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
     }
   };
 

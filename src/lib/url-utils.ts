@@ -13,6 +13,10 @@ export interface DetectedEntity {
   expandedUrl?: string;
   displayUrl?: string;
   mediaKey?: string;
+  // Add optional id and tweetId for compatibility with TweetEntity
+  id?: string;
+  tweetId?: string;
+  url?: string;
   metadata?: Record<string, any>;
 }
 
@@ -73,6 +77,7 @@ export function detectMentions(text: string): DetectedEntity[] {
     mentions.push({
       type: 'mention',
       text: match[1] || '', // Ensure we have a string, even if capture group is undefined
+      url: `https://x.com/${match[1] || ''}`, // Add URL for compatibility
       indices: [match.index, match.index + match[0].length],
       metadata: {
         indices: [match.index, match.index + match[0].length]
@@ -100,6 +105,7 @@ export function detectHashtags(text: string): DetectedEntity[] {
     hashtags.push({
       type: 'hashtag',
       text: match[1] || '', // Ensure we have a string, even if capture group is undefined
+      url: `https://x.com/hashtag/${match[1] || ''}`, // Add URL for compatibility
       indices: [match.index, match.index + match[0].length],
       metadata: {
         indices: [match.index, match.index + match[0].length]
@@ -144,6 +150,7 @@ export function detectUrls(text: string): DetectedEntity[] {
     urls.push({
       type: 'url',
       text: fullUrl,
+      url: fullUrl, // Set url property to match TweetEntity structure
       expandedUrl: fullUrl,
       displayUrl,
       indices: [match.index, match.index + fullUrl.length],
