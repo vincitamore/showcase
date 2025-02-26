@@ -1371,6 +1371,44 @@ export async function DELETE(req: Request): Promise<Response> {
         fixedCount: futureDateTweets.length,
         totalTweets: tweets.length
       });
+    } else if (action === 'check-duplicates') {
+      // Check for duplicate tweets by text content
+      const tweetTexts = new Map<string, { count: number, ids: string[] }>();
+      
+      // Count occurrences of each tweet text
+      for (const tweet of tweets) {
+        const normalizedText = tweet.text.trim();
+        if (!tweetTexts.has(normalizedText)) {
+          tweetTexts.set(normalizedText, { count: 1, ids: [tweet.id] });
+        } else {
+          const entry = tweetTexts.get(normalizedText)!;
+          entry.count++;
+          entry.ids.push(tweet.id);
+        }
+      }
+      
+      // Filter to only duplicates
+      const duplicates = Array.from(tweetTexts.entries())
+        .filter(([_, data]) => data.count > 1)
+        .map(([text, data]) => ({
+          text: text.length > 50 ? `${text.substring(0, 50)}...` : text,
+          count: data.count,
+          ids: data.ids
+        }));
+      
+      logger.info(`Found ${duplicates.length} duplicate tweet texts`, {
+        step: 'check-duplicates',
+        duplicateCount: duplicates.length,
+        totalTweets: tweets.length
+      });
+      
+      return NextResponse.json({
+        status: 'success',
+        message: 'Checked for duplicate tweets',
+        duplicateCount: duplicates.length,
+        totalTweets: tweets.length,
+        duplicates: duplicates.slice(0, 10) // Limit to 10 examples
+      });
     } else if (action === 'fix') {
       // Fix problematic tweets
       let fixedCount = 0;
@@ -1443,7 +1481,7 @@ export async function DELETE(req: Request): Promise<Response> {
     return NextResponse.json({
       status: 'error',
       message: 'Invalid action specified',
-      validActions: ['report', 'fix', 'fix-dates']
+      validActions: ['report', 'fix', 'fix-dates', 'check-duplicates']
     }, { status: 400 });
     
   } catch (error) {

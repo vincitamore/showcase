@@ -218,6 +218,13 @@ function hasTweetEntities(tweet: TweetV2): boolean {
 async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) {
   const publicMetrics = toPrismaJson(tweet.public_metrics);
   
+  // Log the tweet creation date for debugging
+  console.log('[Twitter Storage] Processing tweet for storage:', {
+    id: tweet.id,
+    created_at: tweet.created_at,
+    parsedDate: tweet.created_at ? new Date(tweet.created_at).toISOString() : 'undefined'
+  });
+  
   // Define the entity create input type
   type EntityCreateInput = {
     type: string;
@@ -296,10 +303,19 @@ async function convertTweetForStorage(tweet: TweetV2, includes?: ApiV2Includes) 
 
   const entities = await Promise.all(entityPromises);
 
+  // Ensure we're using a valid date and log it
+  const validDate = toValidDate(tweet.created_at);
+  console.log('[Twitter Storage] Final date for tweet storage:', {
+    id: tweet.id,
+    original: tweet.created_at,
+    validated: validDate.toISOString(),
+    isFuture: validDate > new Date()
+  });
+
   return {
     id: tweet.id,
     text: tweet.text,
-    createdAt: toValidDate(tweet.created_at),
+    createdAt: validDate,
     publicMetrics,
     entities: {
       create: entities
