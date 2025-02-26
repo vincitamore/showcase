@@ -374,8 +374,17 @@ async function expandUrl(shortUrl: string | null | undefined): Promise<string> {
     
     clearTimeout(timeoutId);
     
-    // Return the final URL after all redirects
-    return response.url;
+    // Get the final URL after all redirects
+    let finalUrl = response.url;
+    
+    // Handle Twitter/X domain consistency
+    // Replace twitter.com with x.com to ensure consistency with Twitter API responses
+    // and for future-proofing as the platform has rebranded
+    if (finalUrl.includes('twitter.com')) {
+      finalUrl = finalUrl.replace('twitter.com', 'x.com');
+    }
+    
+    return finalUrl;
   } catch (error) {
     console.error(`Error expanding URL ${shortUrl}:`, error);
     // Return original if expansion fails
