@@ -1471,25 +1471,6 @@ const BlogSection = () => {
                         </div>
                       ))}
                     </div>
-
-                    {/* Footer section with fixed height */}
-                    <div className="h-8 mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Heart className="h-3.5 w-3.5" /> {tweet.public_metrics?.like_count ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <MessageCircle className="h-3.5 w-3.5" /> {tweet.public_metrics?.reply_count ?? 0}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Repeat2 className="h-3.5 w-3.5" /> {tweet.public_metrics?.retweet_count ?? 0}
-                      </span>
-                      <time className="ml-auto text-[10px]">
-                        {tweet.created_at 
-                          ? formatDate(tweet.created_at)
-                          : 'Just now'
-                        }
-                      </time>
-                    </div>
                   </div>
                 </Card3D>
               ));
