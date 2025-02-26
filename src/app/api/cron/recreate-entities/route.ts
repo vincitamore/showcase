@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { recreateMissingEntities } from '@/lib/tweet-utils';
+import { env } from '@/env';
 
 /**
  * API route for recreating tweet entities
@@ -22,9 +23,20 @@ export async function GET(request: NextRequest) {
   const logLevel = searchParams.get('logLevel') as 'none' | 'summary' | 'verbose' || 'summary';
   const tweetIdsParam = searchParams.get('tweetIds');
   
-  // Verify authentication
-  const expectedKey = process.env.CRON_SECRET || process.env.DEV_SECRET;
-  if (!expectedKey || devKey !== expectedKey) {
+  // Verify authentication (similar to fetch-tweets endpoint)
+  const authHeader = request.headers.get('authorization');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const allowDevEndpoints = env.ALLOW_DEV_ENDPOINTS || false;
+  
+  // Check authorization:
+  // 1. Always accept proper CRON_SECRET Bearer token
+  // 2. Allow dev_key bypass if in development OR ALLOW_DEV_ENDPOINTS is true
+  const devBypass = devKey === env.DEV_SECRET;
+  const isAuthorized = 
+    authHeader === `Bearer ${env.CRON_SECRET}` || 
+    ((!isProduction || allowDevEndpoints) && devBypass);
+    
+  if (!isAuthorized) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -94,13 +106,20 @@ export async function POST(request: NextRequest) {
     }
     
     const token = authHeader.split(' ')[1];
-    const expectedToken = process.env.CRON_SECRET || process.env.DEV_SECRET;
+    const expectedToken = env.CRON_SECRET;
     
     if (!expectedToken || token !== expectedToken) {
-      return NextResponse.json(
-        { error: 'Invalid token' },
-        { status: 401 }
-      );
+      // Also allow DEV_SECRET in non-production or if dev endpoints allowed
+      const isProduction = process.env.NODE_ENV === 'production';
+      const allowDevEndpoints = env.ALLOW_DEV_ENDPOINTS || false;
+      const isDevTokenValid = env.DEV_SECRET && token === env.DEV_SECRET;
+      
+      if (isProduction && !allowDevEndpoints || !isDevTokenValid) {
+        return NextResponse.json(
+          { error: 'Invalid token' },
+          { status: 401 }
+        );
+      }
     }
     
     // Parse request body
