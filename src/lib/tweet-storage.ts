@@ -56,6 +56,12 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
   }
   
   try {
+    // Add a 5-minute buffer to prevent false positives for "future" dates
+    // due to slight clock differences between systems
+    const now = new Date();
+    const bufferMs = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const futureThreshold = new Date(now.getTime() + bufferMs);
+    
     // If it's already a Date object, just validate it
     if (date instanceof Date) {
       if (isNaN(date.getTime())) {
@@ -63,9 +69,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
         return new Date();
       }
       
-      // Check if date is in the future (which would be an error)
-      const now = new Date();
-      if (date > now) {
+      // Check if date is significantly in the future (beyond our buffer)
+      if (date > futureThreshold) {
         console.warn('[Twitter Storage] Future date detected, using current date instead:', date);
         return now;
       }
@@ -81,9 +86,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
         return new Date();
       }
       
-      // Check if date is in the future
-      const now = new Date();
-      if (parsed > now) {
+      // Check if date is significantly in the future
+      if (parsed > futureThreshold) {
         console.warn('[Twitter Storage] Future date from timestamp detected, using current date instead:', date);
         return now;
       }
@@ -103,9 +107,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
           return new Date();
         }
         
-        // Check if date is in the future
-        const now = new Date();
-        if (parsed > now) {
+        // Check if date is significantly in the future
+        if (parsed > futureThreshold) {
           console.warn('[Twitter Storage] Future date from ISO string detected, using current date instead:', date);
           return now;
         }
@@ -122,9 +125,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
           return new Date();
         }
         
-        // Check if date is in the future
-        const now = new Date();
-        if (parsed > now) {
+        // Check if date is significantly in the future
+        if (parsed > futureThreshold) {
           console.warn('[Twitter Storage] Future date from timestamp string detected, using current date instead:', date);
           return now;
         }
@@ -136,9 +138,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
       if (date.includes('+0000') || date.match(/\w{3} \w{3} \d{1,2} \d{2}:\d{2}:\d{2}/)) {
         const parsed = new Date(date);
         if (!isNaN(parsed.getTime())) {
-          // Check if date is in the future
-          const now = new Date();
-          if (parsed > now) {
+          // Check if date is significantly in the future
+          if (parsed > futureThreshold) {
             console.warn('[Twitter Storage] Future date from Twitter format detected, using current date instead:', date);
             return now;
           }
@@ -154,9 +155,8 @@ function toValidDate(date: Date | string | number | null | undefined): Date {
         return new Date();
       }
       
-      // Check if date is in the future
-      const now = new Date();
-      if (parsed > now) {
+      // Check if date is significantly in the future
+      if (parsed > futureThreshold) {
         console.warn('[Twitter Storage] Future date from standard parsing detected, using current date instead:', date);
         return now;
       }
@@ -452,7 +452,23 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
           ? existingTweet.createdAt
           : tweetData.createdAt;
         
-        // Update the tweet but preserve entities
+        // Log entity counts for debugging
+        console.log(`[Twitter Storage] Entity counts for tweet ${tweet.id}:`, {
+          existingEntities: existingTweet.entities.length,
+          newEntitiesBeforeFilter: tweetData.entities.create.length
+        });
+        
+        // Filter out entities that already exist to avoid duplicates
+        const newEntities = tweetData.entities.create.filter(newEntity => 
+          !existingTweet.entities.some((existingEntity: { type: string; text: string }) => 
+            existingEntity.type === newEntity.type && 
+            existingEntity.text === newEntity.text
+          )
+        );
+        
+        console.log(`[Twitter Storage] Adding ${newEntities.length} new entities to tweet ${tweet.id}`);
+        
+        // Update the tweet but preserve entities - DO NOT use entities: { set: [] } which would delete existing entities
         const updatedTweet = await (prisma as any).tweet.update({
           where: { id: tweet.id },
           data: {
@@ -460,14 +476,9 @@ export async function cacheTweets(tweets: TweetV2[], type: CacheType = CACHE_TYP
             createdAt: createdAt, // Preserve original date
             publicMetrics: tweetData.publicMetrics,
             // Only add new entities, don't delete existing ones
-            entities: {
-              create: tweetData.entities.create.filter(newEntity => 
-                !existingTweet.entities.some((existingEntity: { type: string; text: string }) => 
-                  existingEntity.type === newEntity.type && 
-                  existingEntity.text === newEntity.text
-                )
-              )
-            }
+            entities: newEntities.length > 0 ? {
+              create: newEntities
+            } : undefined // Skip entity update if no new entities to add
           }
         });
 
@@ -692,30 +703,50 @@ export async function updateRateLimit(endpoint: string, resetAt: Date, remaining
     step: 'pre-update'
   });
 
-  const result = await (prisma as any).twitterRateLimit.upsert({
-    where: {
-      endpoint
-    },
-    create: {
+  try {
+    const result = await (prisma as any).twitterRateLimit.upsert({
+      where: {
+        endpoint
+      },
+      create: {
+        endpoint,
+        resetAt: validResetAt,
+        remaining
+      },
+      update: {
+        resetAt: validResetAt,
+        remaining
+      }
+    });
+
+    console.log('[Twitter Storage] Rate limit updated:', {
+      endpoint,
+      resetAt: validResetAt.toISOString(),
+      remaining,
+      durationMs: Date.now() - startTime,
+      step: 'post-update'
+    });
+
+    return result;
+  } catch (error) {
+    console.error('[Twitter Storage] Error updating rate limit:', {
+      endpoint,
+      resetAt: validResetAt.toISOString(),
+      remaining,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      durationMs: Date.now() - startTime,
+      step: 'error'
+    });
+    
+    // Return a fallback object with the data we tried to save
+    // This allows the application to continue functioning even if the database is unavailable
+    return {
       endpoint,
       resetAt: validResetAt,
-      remaining
-    },
-    update: {
-      resetAt: validResetAt,
-      remaining
-    }
-  });
-
-  console.log('[Twitter Storage] Rate limit updated:', {
-    endpoint,
-    resetAt: validResetAt.toISOString(),
-    remaining,
-    durationMs: Date.now() - startTime,
-    step: 'post-update'
-  });
-
-  return result;
+      remaining,
+      lastUpdated: new Date()
+    };
+  }
 }
 
 // Get rate limit info
@@ -728,57 +759,94 @@ export async function getRateLimit(endpoint: string) {
     step: 'pre-fetch'
   });
 
-  const rateLimit = await (prisma as any).twitterRateLimit.findUnique({
-    where: {
-      endpoint
-    }
-  });
-
-  if (rateLimit) {
-    console.log('[Twitter Storage] Retrieved rate limit:', {
-      endpoint,
-      resetAt: toSafeISOString(rateLimit.resetAt),
-      remaining: rateLimit.remaining,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'post-fetch-found'
+  try {
+    const rateLimit = await (prisma as any).twitterRateLimit.findUnique({
+      where: {
+        endpoint
+      }
     });
-  } else {
-    // Create default rate limit if none exists
+
+    if (rateLimit) {
+      console.log('[Twitter Storage] Retrieved rate limit:', {
+        endpoint,
+        resetAt: toSafeISOString(rateLimit.resetAt),
+        remaining: rateLimit.remaining,
+        timestamp: new Date().toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'post-fetch-found'
+      });
+      return rateLimit;
+    } else {
+      // Create default rate limit if none exists
+      const defaultLimit = DEFAULT_RATE_LIMITS[endpoint as keyof typeof DEFAULT_RATE_LIMITS] || DEFAULT_RATE_LIMITS.default;
+      const now = new Date();
+      const resetAt = new Date(now.getTime() + FIFTEEN_MINUTES);
+      
+      console.log('[Twitter Storage] Creating default rate limit:', {
+        endpoint,
+        defaultLimit,
+        resetAt: resetAt.toISOString(),
+        timestamp: now.toISOString(),
+        durationMs: Date.now() - startTime,
+        step: 'creating-default'
+      });
+
+      try {
+        const newLimit = await (prisma as any).twitterRateLimit.create({
+          data: {
+            endpoint,
+            resetAt,
+            remaining: defaultLimit
+          }
+        });
+
+        console.log('[Twitter Storage] Created default rate limit:', {
+          endpoint,
+          resetAt: toSafeISOString(newLimit.resetAt),
+          remaining: newLimit.remaining,
+          timestamp: new Date().toISOString(),
+          durationMs: Date.now() - startTime,
+          step: 'post-fetch-created'
+        });
+
+        return newLimit;
+      } catch (createError) {
+        console.error('[Twitter Storage] Error creating default rate limit:', {
+          endpoint,
+          error: createError instanceof Error ? createError.message : 'Unknown error',
+          durationMs: Date.now() - startTime,
+          step: 'create-error'
+        });
+        
+        // Return a fallback object with default values
+        return {
+          endpoint,
+          resetAt,
+          remaining: defaultLimit,
+          lastUpdated: now
+        };
+      }
+    }
+  } catch (error) {
+    console.error('[Twitter Storage] Error fetching rate limit:', {
+      endpoint,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      durationMs: Date.now() - startTime,
+      step: 'fetch-error'
+    });
+    
+    // Create a fallback rate limit object with default values
     const defaultLimit = DEFAULT_RATE_LIMITS[endpoint as keyof typeof DEFAULT_RATE_LIMITS] || DEFAULT_RATE_LIMITS.default;
     const now = new Date();
     const resetAt = new Date(now.getTime() + FIFTEEN_MINUTES);
     
-    console.log('[Twitter Storage] Creating default rate limit:', {
+    return {
       endpoint,
-      defaultLimit,
-      resetAt: resetAt.toISOString(),
-      timestamp: now.toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'creating-default'
-    });
-
-    const newLimit = await (prisma as any).twitterRateLimit.create({
-      data: {
-        endpoint,
-        resetAt,
-        remaining: defaultLimit
-      }
-    });
-
-    console.log('[Twitter Storage] Created default rate limit:', {
-      endpoint,
-      resetAt: toSafeISOString(newLimit.resetAt),
-      remaining: newLimit.remaining,
-      timestamp: new Date().toISOString(),
-      durationMs: Date.now() - startTime,
-      step: 'post-fetch-created'
-    });
-
-    return newLimit;
+      resetAt,
+      remaining: defaultLimit,
+      lastUpdated: now
+    };
   }
-
-  return rateLimit;
 }
 
 export async function canMakeRequest(endpoint: string): Promise<boolean> {

@@ -1196,9 +1196,14 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
             )
           );
           
-          logger.info(`Adding ${newEntities.length} new entities to tweet ${tweet.id}`);
+          logger.info(`Adding ${newEntities.length} new entities to tweet ${tweet.id}`, {
+            existingEntities: existingTweet.entities.length,
+            newEntitiesBeforeFilter: entitiesData.length,
+            newEntitiesAfterFilter: newEntities.length,
+            step: 'entity-filtering'
+          });
           
-          // Update the tweet but preserve entities
+          // Update the tweet but preserve entities - DO NOT use entities: { set: [] } which would delete existing entities
           const updatedTweet = await prisma.tweet.update({
             where: { id: tweet.id },
             data: {
@@ -1208,9 +1213,9 @@ async function processTweetsForCache(tweets: TweetV2[], type: string, includes?:
               authorId: username,
               editHistoryTweetIds: tweet.edit_history_tweet_ids || [],
               // Only add new entities, don't delete existing ones
-              entities: {
+              entities: newEntities.length > 0 ? {
                 create: newEntities as any
-              }
+              } : undefined // Skip entity update if no new entities to add
             }
           });
           
@@ -1295,17 +1300,27 @@ export async function DELETE(req: Request): Promise<Response> {
     // Get action from query params
     const action = url.searchParams.get('action') || 'report';
     
-    // Get all tweets
-    const tweets = await prisma.tweet.findMany({
-      include: {
-        entities: true
-      }
-    });
-    
-    logger.info(`Found ${tweets.length} tweets for cleanup`, {
-      step: 'cleanup-start',
-      action
-    });
+    // Get all tweets with error handling
+    let tweets = [];
+    try {
+      tweets = await prisma.tweet.findMany({
+        include: {
+          entities: true
+        }
+      });
+      
+      console.log(`Found ${tweets.length} tweets for cleanup`, {
+        step: 'cleanup-start',
+        action
+      });
+    } catch (dbError) {
+      console.error('Database connection error when fetching tweets:', dbError);
+      return NextResponse.json({
+        status: 'error',
+        message: 'Database connection error',
+        error: dbError instanceof Error ? dbError.message : 'Unknown database error'
+      }, { status: 500 });
+    }
     
     // Report on problematic tweets
     const problematicTweets = tweets.filter(tweet => {
@@ -1323,7 +1338,7 @@ export async function DELETE(req: Request): Promise<Response> {
       return isPublicMetricsString || hasEntityWithStringMetadata || hasFutureDate;
     });
     
-    logger.info(`Found ${problematicTweets.length} problematic tweets`, {
+    console.log(`Found ${problematicTweets.length} problematic tweets`, {
       step: 'cleanup-analysis',
       problematicCount: problematicTweets.length,
       totalCount: tweets.length
@@ -1350,7 +1365,7 @@ export async function DELETE(req: Request): Promise<Response> {
       // Fix tweets with future dates
       const futureDateTweets = tweets.filter(tweet => tweet.createdAt > new Date());
       
-      logger.info(`Found ${futureDateTweets.length} tweets with future dates`, {
+      console.log(`Found ${futureDateTweets.length} tweets with future dates`, {
         step: 'fix-dates',
         count: futureDateTweets.length
       });
@@ -1396,7 +1411,7 @@ export async function DELETE(req: Request): Promise<Response> {
           ids: data.ids
         }));
       
-      logger.info(`Found ${duplicates.length} duplicate tweet texts`, {
+      console.log(`Found ${duplicates.length} duplicate tweet texts`, {
         step: 'check-duplicates',
         duplicateCount: duplicates.length,
         totalTweets: tweets.length
@@ -1408,6 +1423,163 @@ export async function DELETE(req: Request): Promise<Response> {
         duplicateCount: duplicates.length,
         totalTweets: tweets.length,
         duplicates: duplicates.slice(0, 10) // Limit to 10 examples
+      });
+    } else if (action === 'fix-entities') {
+      // Check for tweets with missing entities
+      const tweetsWithMissingEntities = tweets.filter(tweet => 
+        tweet.entities && 
+        Object.keys(tweet.entities).some(key => (tweet.entities as any)[key]?.length > 0) && 
+        tweet.entities.length === 0
+      );
+      
+      console.log(`Found ${tweetsWithMissingEntities.length} tweets with potential entity issues`, {
+        step: 'fix-entities',
+        count: tweetsWithMissingEntities.length,
+        totalTweets: tweets.length
+      });
+      
+      // Get the original tweets from the Twitter API to restore entities
+      let fixedCount = 0;
+      let errorCount = 0;
+      
+      if (tweetsWithMissingEntities.length > 0) {
+        try {
+          // Initialize Twitter client
+          const client = await getReadOnlyClient();
+          
+          // Get the username from environment
+          const username = env.TWITTER_USERNAME?.replace('@', '') || 'unknown';
+          
+          for (const tweet of tweetsWithMissingEntities) {
+            try {
+              // Fetch the tweet directly from Twitter API
+              const response = await client.v2.singleTweet(tweet.id, {
+                'tweet.fields': ['created_at', 'entities', 'public_metrics'],
+                'user.fields': ['username'],
+                'media.fields': ['url', 'preview_image_url', 'alt_text'],
+                expansions: ['attachments.media_keys']
+              });
+              
+              if (response.data) {
+                // Process the tweet entities
+                const entitiesData = [];
+                
+                if (response.data.entities) {
+                  // Process URLs
+                  if (response.data.entities.urls?.length) {
+                    for (const url of response.data.entities.urls) {
+                      entitiesData.push({
+                        type: 'url',
+                        text: url.display_url || url.url,
+                        url: url.url,
+                        expandedUrl: url.expanded_url,
+                        mediaKey: url.media_key,
+                        metadata: {
+                          status: url.status || null,
+                          title: url.title || null,
+                          description: url.description || null,
+                          images: url.images || []
+                        }
+                      });
+                    }
+                  }
+                  
+                  // Process mentions
+                  if (response.data.entities.mentions?.length) {
+                    for (const mention of response.data.entities.mentions) {
+                      entitiesData.push({
+                        type: 'mention',
+                        text: mention.username,
+                        metadata: {
+                          id: mention.id || null
+                        }
+                      });
+                    }
+                  }
+                  
+                  // Process hashtags
+                  if (response.data.entities.hashtags?.length) {
+                    for (const hashtag of response.data.entities.hashtags) {
+                      entitiesData.push({
+                        type: 'hashtag',
+                        text: hashtag.tag
+                      });
+                    }
+                  }
+                }
+                
+                // Process media from includes if present
+                const mediaKeys = response.data.attachments?.media_keys || [];
+                if (response.includes?.media && mediaKeys.length > 0) {
+                  const mediaItems = response.includes.media.filter((m: any) => 
+                    mediaKeys.includes(m.media_key)
+                  );
+                  
+                  for (const media of mediaItems) {
+                    entitiesData.push({
+                      type: 'media',
+                      text: media.alt_text || '',
+                      url: media.url || media.preview_image_url,
+                      mediaKey: media.media_key,
+                      metadata: {
+                        type: media.type || null,
+                        width: media.width || null,
+                        height: media.height || null,
+                        preview_image_url: media.preview_image_url || null,
+                        duration_ms: media.duration_ms || null
+                      }
+                    });
+                  }
+                }
+                
+                if (entitiesData.length > 0) {
+                  try {
+                    // Update the tweet with the restored entities
+                    await prisma.tweet.update({
+                      where: { id: tweet.id },
+                      data: {
+                        entities: {
+                          create: entitiesData as any
+                        }
+                      }
+                    });
+                    
+                    fixedCount++;
+                    
+                    console.log(`Fixed entities for tweet ${tweet.id}`, {
+                      step: 'fix-entities-success',
+                      entityCount: entitiesData.length
+                    });
+                  } catch (dbUpdateError) {
+                    errorCount++;
+                    console.error(`Database error when updating entities for tweet ${tweet.id}:`, dbUpdateError);
+                  }
+                }
+              }
+            } catch (tweetError) {
+              errorCount++;
+              console.error(`Error fixing entities for tweet ${tweet.id}:`, {
+                step: 'fix-entities-error',
+                error: tweetError instanceof Error ? tweetError.message : String(tweetError),
+                stack: tweetError instanceof Error ? tweetError.stack : undefined
+              });
+            }
+          }
+        } catch (clientError) {
+          console.error('Error initializing Twitter client for entity fix:', {
+            step: 'fix-entities-client-error',
+            error: clientError instanceof Error ? clientError.message : String(clientError),
+            stack: clientError instanceof Error ? clientError.stack : undefined
+          });
+        }
+      }
+      
+      return NextResponse.json({
+        status: 'success',
+        message: 'Fixed tweets with missing entities',
+        fixedCount,
+        errorCount,
+        totalTweets: tweets.length
       });
     } else if (action === 'fix') {
       // Fix problematic tweets
@@ -1481,11 +1653,11 @@ export async function DELETE(req: Request): Promise<Response> {
     return NextResponse.json({
       status: 'error',
       message: 'Invalid action specified',
-      validActions: ['report', 'fix', 'fix-dates', 'check-duplicates']
+      validActions: ['report', 'fix', 'fix-dates', 'check-duplicates', 'fix-entities']
     }, { status: 400 });
     
   } catch (error) {
-    logger.error('Error in tweet cleanup', {
+    console.error('Error in tweet cleanup:', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
