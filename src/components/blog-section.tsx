@@ -1034,8 +1034,9 @@ const BlogSection = () => {
                     data-theme="dark"
                     data-align="center"
                     data-dnt="true"
+                    data-id={tweetId}
                   >
-                    <a href={`https://x.com/i/status/${tweetId}`}></a>
+                    <a href={`https://twitter.com/i/status/${tweetId}`}></a>
                   </blockquote>
                 </div>
               );
@@ -1202,7 +1203,10 @@ const BlogSection = () => {
                     console.log('[Tweet Rendering] Carousel slide changed, loading Twitter widgets');
                     loadTwitterWidgets();
                     
-                    // Don't force reload on every slide change, it's too aggressive
+                    // Add a forced reload after a short delay to ensure widgets are processed
+                    setTimeout(() => {
+                      forceWidgetReload();
+                    }, 1000);
                   }, 500);
                 });
               }
@@ -1264,14 +1268,19 @@ const BlogSection = () => {
                       {tweet.referenced_tweets?.map((ref) => (
                         <div 
                           key={ref.id}
-                          className="mt-2 rounded-lg border border-border/50 overflow-hidden"
+                          className="mt-2 rounded-lg border border-border/50 overflow-hidden relative"
                         >
+                          {/* Loading state indicator */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 tweet-embed-loading">
+                            <div className="h-5 w-5 border-2 border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                          </div>
                           <blockquote 
                             className="twitter-tweet" 
                             data-conversation="none"
                             data-theme="dark"
+                            data-id={ref.id}
                           >
-                            <a href={`https://x.com/i/status/${ref.id}`}></a>
+                            <a href={`https://twitter.com/i/status/${ref.id}`}></a>
                           </blockquote>
                         </div>
                       ))}
