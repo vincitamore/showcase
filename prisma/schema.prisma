@@ -112,6 +112,18 @@ model TwitterRateLimit {
   @@index([endpoint, resetAt])
 }
 
+// New model for tracking Twitter API quota usage
+model TwitterQuotaUsage {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  used      Int      @default(0)
+  limit     Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
 model TempImage {
   id        String   @id @default(cuid())
   data      String // Base64 encoded image data

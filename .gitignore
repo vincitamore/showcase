@@ -45,3 +45,18 @@ next-env.d.ts
 
 # Bun
 bun.lockb
+
+# Utility scripts (but keep existing tracked files)
+/scripts/check-quota.ts
+/scripts/check-quota.ps1
+/scripts/test-quota-calculation.ts
+/scripts/test-quota-calculation.ps1
+/scripts/reset-daily-limit.ts
+/scripts/reset-daily-limit.ps1
+/scripts/test-cron-compact.ps1
+/scripts/test-cron-filtered.ps1
+/scripts/check-rate-limits.ts
+/scripts/check-rate-limits.ps1
+/scripts/twitter-dashboard.ps1
+/scripts/README.md
+/scripts/init-twitter-quota.ts

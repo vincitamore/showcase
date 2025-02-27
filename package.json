@@ -13,7 +13,8 @@
     "postinstall": "prisma generate",
     "rotate-logs": "ts-node --project scripts/tsconfig.json scripts/rotate-logs.ts",
     "generate-monitoring-hash": "ts-node --project scripts/tsconfig.json scripts/generate-monitoring-hash.ts",
-    "clear-database-metrics": "ts-node --project scripts/tsconfig.json scripts/clear-database-metrics.ts"
+    "clear-database-metrics": "ts-node --project scripts/tsconfig.json scripts/clear-database-metrics.ts",
+    "init-twitter-quota": "ts-node --project scripts/tsconfig.json scripts/init-twitter-quota.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.4",

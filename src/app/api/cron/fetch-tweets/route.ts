@@ -8,7 +8,9 @@ import {
   SELECTED_TWEET_COUNT,
   FIFTEEN_MINUTES,
   DAILY_TWEET_FETCH_LIMIT,
-  TECH_SCORE_THRESHOLD
+  TECH_SCORE_THRESHOLD,
+  getTwitterQuotaUsage,
+  updateTwitterQuotaUsage
 } from '@/lib/tweet-storage';
 import { env } from '@/env';
 import { TweetV2, TweetEntitiesV2, TweetEntityUrlV2, TwitterApiReadOnly, ApiResponseError } from 'twitter-api-v2';
@@ -268,19 +270,30 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       }
     });
     
-    logger.info('Checking daily fetch count', { 
+    // Check both daily fetch limit and monthly quota
+    const dailyQuotaInfo = await getTwitterQuotaUsage();
+    const monthlyQuotaExceeded = dailyQuotaInfo.used >= dailyQuotaInfo.limit;
+    
+    logger.info('Checking quota limits', { 
       fetchCountToday,
       dailyLimit: DAILY_TWEET_FETCH_LIMIT,
-      step: 'daily-limit-check'
+      monthlyQuotaUsed: dailyQuotaInfo.used,
+      monthlyQuotaLimit: dailyQuotaInfo.limit,
+      dailyLimitReached: fetchCountToday >= DAILY_TWEET_FETCH_LIMIT,
+      monthlyQuotaExceeded,
+      step: 'quota-limit-check'
     });
     
-    // If we've already hit our daily limit, just use cached tweets
-    if (fetchCountToday >= DAILY_TWEET_FETCH_LIMIT) {
-      logger.info('Daily fetch limit reached, using cache', {
+    // If we've already hit our daily limit or monthly quota, just use cached tweets
+    if (fetchCountToday >= DAILY_TWEET_FETCH_LIMIT || monthlyQuotaExceeded) {
+      logger.info('Quota limit reached, using cache', {
         fetchCountToday,
         dailyLimit: DAILY_TWEET_FETCH_LIMIT,
+        monthlyQuotaUsed: dailyQuotaInfo.used,
+        monthlyQuotaLimit: dailyQuotaInfo.limit,
         cachedTweetCount: cachedTweets.length,
-        step: 'daily-limit-reached'
+        reason: monthlyQuotaExceeded ? 'Monthly quota exceeded' : 'Daily limit reached',
+        step: 'quota-limit-reached'
       });
       
       // Still select a fresh set of tweets to display, even if we don't fetch new ones
@@ -290,10 +303,17 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         status: 'success',
         tweetCount: cachedTweets.length,
         source: 'cache',
-        dailyLimit: {
-          reached: true,
-          count: fetchCountToday,
-          limit: DAILY_TWEET_FETCH_LIMIT
+        quotaLimits: {
+          daily: {
+            used: fetchCountToday,
+            limit: DAILY_TWEET_FETCH_LIMIT,
+            exceeded: fetchCountToday >= DAILY_TWEET_FETCH_LIMIT
+          },
+          monthly: {
+            used: dailyQuotaInfo.used,
+            limit: dailyQuotaInfo.limit,
+            exceeded: monthlyQuotaExceeded
+          }
         }
       });
     }
@@ -419,30 +439,34 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
 
         // Return cached tweets if available
         if (cachedTweets.length > 0) {
-          // Still select a fresh set of tweets for display
           await selectTweetsForDisplay(cachedTweets);
           
+          // Get current quota usage
+          const quotaUsage = await getTwitterQuotaUsage();
+          
           return NextResponse.json({
-            status: 'success',
-            tweetCount: cachedTweets.length,
-            source: 'cache',
-            rateLimit: {
-              resetAt: resetAt.toISOString(),
-              message: 'Using cached tweets due to rate limit'
+            message: 'Rate limit exceeded, returning cached tweets',
+            tweets: cachedTweets,
+            quotaUsage: {
+              used: quotaUsage.used,
+              limit: quotaUsage.limit,
+              remaining: quotaUsage.limit - quotaUsage.used
             }
-          });
+          }, { status: 200 });
         }
 
-        return NextResponse.json(
-          {
-            error: {
-              message: 'Rate limit exceeded',
-              code: 'RATE_LIMIT_EXCEEDED',
-              resetAt: resetAt.toISOString()
-            }
-          },
-          { status: 429 }
-        );
+        // Get current quota usage
+        const quotaUsage = await getTwitterQuotaUsage();
+        
+        return NextResponse.json({
+          message: 'Rate limit exceeded and no cached tweets available',
+          error: 'RATE_LIMIT_EXCEEDED',
+          quotaUsage: {
+            used: quotaUsage.used,
+            limit: quotaUsage.limit,
+            remaining: quotaUsage.limit - quotaUsage.used
+          }
+        }, { status: 429 });
       }
     } catch (rateLimitError) {
       logger.error('Error checking rate limit', {
@@ -459,8 +483,8 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // Prepare search parameters - request exactly what we'll store
     // to optimize our monthly post quota usage
     const searchParams: any = {
-      max_results: DAILY_TWEET_FETCH_LIMIT, // Only request exactly what we'll store
-      'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text',
+      max_results: DAILY_TWEET_FETCH_LIMIT, // Request exactly what we need
+      'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text', // Explicitly request full text
       'user.fields': 'profile_image_url,username',
       'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
       'expansions': 'author_id,attachments.media_keys,entities.mentions.username,referenced_tweets.id'
@@ -502,7 +526,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
-        max_results: 10, // Keep the reduced number for testing
+        max_results: DAILY_TWEET_FETCH_LIMIT, // Request exactly what we need
         'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text', // Explicitly request full text
         'user.fields': 'profile_image_url,username',
         'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
@@ -527,55 +551,32 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         realDataKeys: tweetPaginator._realData ? Object.keys(tweetPaginator._realData) : []
       });
       
-      // Try different ways to access the tweets
-      let tweetsFromData = [];
-      if (tweetPaginator.data) {
-        if (Array.isArray(tweetPaginator.data)) {
-          tweetsFromData = tweetPaginator.data;
-          logger.info('Found tweets in paginator.data array', {
-            step: 'tweets-location',
-            count: tweetsFromData.length
-          });
-        } else if (tweetPaginator.data.data && Array.isArray(tweetPaginator.data.data)) {
-          tweetsFromData = tweetPaginator.data.data;
-          logger.info('Found tweets in paginator.data.data array', {
-            step: 'tweets-location',
-            count: tweetsFromData.length
-          });
-        }
-      }
+      // Simplify tweet extraction logic to be more consistent
+      let extractedTweets: TweetV2[] = [];
       
-      // Check if tweets are directly available
-      let tweetsFromTweets = [];
-      if (tweetPaginator.tweets && Array.isArray(tweetPaginator.tweets)) {
-        tweetsFromTweets = tweetPaginator.tweets;
+      if (tweetPaginator.data && Array.isArray(tweetPaginator.data)) {
+        extractedTweets = tweetPaginator.data;
+        logger.info('Found tweets in paginator.data array', {
+          step: 'tweets-location',
+          count: extractedTweets.length
+        });
+      } else if (tweetPaginator.tweets && Array.isArray(tweetPaginator.tweets)) {
+        extractedTweets = tweetPaginator.tweets;
         logger.info('Found tweets in paginator.tweets array', {
           step: 'tweets-location',
-          count: tweetsFromTweets.length
+          count: extractedTweets.length
         });
-      }
-      
-      // Check for _realData property (sometimes used in twitter-api-v2)
-      let tweetsFromRealData = [];
-      if (tweetPaginator._realData && Array.isArray(tweetPaginator._realData.data)) {
-        tweetsFromRealData = tweetPaginator._realData.data;
+      } else if (tweetPaginator._realData && tweetPaginator._realData.data && Array.isArray(tweetPaginator._realData.data)) {
+        extractedTweets = tweetPaginator._realData.data;
         logger.info('Found tweets in paginator._realData.data array', {
           step: 'tweets-location',
-          count: tweetsFromRealData.length
+          count: extractedTweets.length
         });
       }
       
-      // Use the best source of tweets
-      extractedTweets = tweetsFromTweets.length > 0 ? tweetsFromTweets : 
-                        tweetsFromData.length > 0 ? tweetsFromData :
-                        tweetsFromRealData.length > 0 ? tweetsFromRealData : [];
-      
-      logger.info('Final extracted tweets', {
-        step: 'tweets-extraction',
+      logger.info('Extracted tweets', {
         count: extractedTweets.length,
-        source: tweetsFromTweets.length > 0 ? 'paginator.tweets' : 
-                tweetsFromData.length > 0 ? 'paginator.data' :
-                tweetsFromRealData.length > 0 ? 'paginator._realData.data' : 'none'
+        step: 'tweets-extraction'
       });
       
       // Analyze tweet text lengths
@@ -654,6 +655,29 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
         monthlyQuota: 100, // Total monthly post quota
         quotaUsage: `${extractedTweets.length}/100 posts for this request`
       });
+      
+      // Update quota usage in the database
+      if (extractedTweets.length > 0) {
+        try {
+          const quotaUsage = await updateTwitterQuotaUsage(extractedTweets.length);
+          
+          logger.info('Twitter API quota usage updated in database', {
+            step: 'quota-tracking-db',
+            requestedTweets: DAILY_TWEET_FETCH_LIMIT,
+            receivedTweets: extractedTweets.length,
+            totalUsed: quotaUsage.used,
+            monthlyLimit: quotaUsage.limit,
+            quotaUsage: `${quotaUsage.used}/${quotaUsage.limit} posts this month`,
+            remaining: quotaUsage.limit - quotaUsage.used
+          });
+        } catch (quotaError) {
+          logger.error('Error updating Twitter quota usage', {
+            step: 'quota-tracking-error',
+            error: quotaError instanceof Error ? quotaError.message : String(quotaError),
+            receivedTweets: extractedTweets.length
+          });
+        }
+      }
     } catch (twitterError: unknown) {
       const errorMessage = twitterError instanceof Error 
         ? twitterError.message 
@@ -957,13 +981,21 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // Select tweets for display
     await selectTweetsForDisplay([...tweetsToCache]);
 
+    // Get current quota usage
+    const quotaUsage = await getTwitterQuotaUsage();
+
     return NextResponse.json({
       status: 'success',
       tweetCount: tweetsToCache.length,
       filteredCount: selectedNewTweets.length,
       highQualityCount: highQualityTweets.length,
       totalNewTweets: newTweets.length,
-      source: 'api'
+      source: 'api',
+      quotaUsage: {
+        used: quotaUsage.used,
+        limit: quotaUsage.limit,
+        remaining: quotaUsage.limit - quotaUsage.used
+      }
     });
 
   } catch (error) {

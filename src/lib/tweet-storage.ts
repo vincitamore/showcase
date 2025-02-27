@@ -42,6 +42,87 @@ export const TECH_KEYWORDS = [
 
 type CacheType = (typeof CACHE_TYPES)[keyof typeof CACHE_TYPES]
 
+// New Twitter quota tracking functions
+// Get today's quota usage
+export async function getTwitterQuotaUsage(): Promise<{ used: number; limit: number; date: Date }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  console.log('[Twitter Storage] Getting quota usage for date:', today.toISOString());
+  
+  try {
+    const quotaUsage = await prisma.twitterQuotaUsage.findUnique({
+      where: { date: today }
+    });
+    
+    if (quotaUsage) {
+      console.log('[Twitter Storage] Found existing quota usage:', {
+        date: quotaUsage.date.toISOString(),
+        used: quotaUsage.used,
+        limit: quotaUsage.limit
+      });
+      return quotaUsage;
+    }
+    
+    // Create new quota usage record for today
+    console.log('[Twitter Storage] Creating new quota usage record for today');
+    return prisma.twitterQuotaUsage.create({
+      data: {
+        date: today,
+        used: 55,
+        limit: 100 // Monthly limit of 100 posts
+      }
+    });
+  } catch (error) {
+    console.error('[Twitter Storage] Error getting quota usage:', error);
+    // Return a default object if there's an error
+    return {
+      date: today,
+      used: 0,
+      limit: 100
+    };
+  }
+}
+
+// Update quota usage
+export async function updateTwitterQuotaUsage(tweetsCount: number): Promise<{ used: number; limit: number }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  console.log('[Twitter Storage] Updating quota usage:', {
+    date: today.toISOString(),
+    incrementBy: tweetsCount
+  });
+  
+  try {
+    const quotaUsage = await prisma.twitterQuotaUsage.upsert({
+      where: { date: today },
+      update: {
+        used: { increment: tweetsCount },
+        updatedAt: new Date()
+      },
+      create: {
+        date: today,
+        used: tweetsCount,
+        limit: 100
+      }
+    });
+    
+    console.log('[Twitter Storage] Updated quota usage:', {
+      date: quotaUsage.date.toISOString(),
+      used: quotaUsage.used,
+      limit: quotaUsage.limit,
+      remaining: quotaUsage.limit - quotaUsage.used
+    });
+    
+    return { used: quotaUsage.used, limit: quotaUsage.limit };
+  } catch (error) {
+    console.error('[Twitter Storage] Error updating quota usage:', error);
+    // Return a default object if there's an error
+    return { used: tweetsCount, limit: 100 };
+  }
+}
+
 // Helper function to safely convert to Prisma JSON
 function toPrismaJson<T>(data: T) {
   if (data === null || data === undefined) return null;
