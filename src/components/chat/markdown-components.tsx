@@ -17,6 +17,21 @@ interface CodeBlockProps {
 
 export const markdownComponents: Components = {
   p: ({ node, children, ...props }) => {
+    // Check if children contains image elements
+    const hasImageChild = React.Children.toArray(children).some(child => 
+      React.isValidElement(child) && child.type === 'img'
+    );
+    
+    // If there's an image, we need to render differently to avoid invalid HTML
+    if (hasImageChild) {
+      return (
+        <div className="mb-2 last:mb-0" {...props}>
+          {children}
+        </div>
+      );
+    }
+    
+    // Handle multiline text
     if (typeof children === 'string') {
       const lines = children.split('\n').filter(line => line.trim() !== '');
       
@@ -192,12 +207,14 @@ export const markdownComponents: Components = {
   strong: ({ node, children }) => (
     <strong className="font-semibold">{children}</strong>
   ),
-  img: ({ node, src, alt, ...props }: MarkdownImageProps) => (
-    <div className="relative w-full max-w-[300px] my-4">
+  img: ({ node, src, alt, ...props }: MarkdownImageProps) => {
+    // Render just the img element without a wrapping div
+    // This allows our paragraph component to handle the wrapping
+    return (
       <img 
         src={src} 
         alt={alt || 'Chat image'} 
-        className="rounded-lg w-full h-auto object-contain"
+        className="rounded-lg w-full h-auto object-contain max-w-[300px] my-4"
         loading="lazy"
         onError={(e) => {
           console.error('[Chat Client] Image failed to load:', e)
@@ -205,8 +222,8 @@ export const markdownComponents: Components = {
         }}
         {...props}
       />
-    </div>
-  ),
+    );
+  },
   blockquote: ({ node, children, ...props }) => (
     <blockquote 
       className="pl-4 border-l-2 border-primary/30 italic text-muted-foreground mb-2 last:mb-0 py-1"

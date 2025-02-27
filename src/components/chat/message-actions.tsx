@@ -28,23 +28,24 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
 
   return (
     <div className={cn(
-      "flex flex-col sm:flex-col md:flex-col items-center gap-1.5",
+      "flex items-center gap-2",
       "flex-row md:flex-col",
-      "opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
-      "touch-none select-none"
+      "touch-none select-none",
+      "z-30"
     )}>
       <Button
         variant="ghost"
         size="icon"
         className={cn(
-          "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
-          "bg-background/80 backdrop-blur-sm sm:bg-transparent",
+          "h-8 w-8 sm:h-7 sm:w-7 rounded-full p-0",
+          "bg-background/95",
           "hover:bg-primary/10 hover:text-primary active:scale-95",
-          "transition-all duration-200"
+          "transition-all duration-200",
+          "shadow-sm"
         )}
         onClick={handleCopy}
       >
-        <Copy className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+        <Copy className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
         <span className="sr-only">Copy message</span>
       </Button>
       {!isUser && (
@@ -52,10 +53,11 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
-            "bg-background/80 backdrop-blur-sm sm:bg-transparent",
+            "h-8 w-8 sm:h-7 sm:w-7 rounded-full p-0",
+            "bg-background/95",
             "hover:bg-primary/10 hover:text-primary active:scale-95",
-            "transition-all duration-200"
+            "transition-all duration-200",
+            "shadow-sm"
           )}
           onClick={() => onQuote(Array.isArray(message.content) 
             ? message.content
@@ -64,7 +66,7 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
                 .join('\n')
             : message.content)}
         >
-          <Quote className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+          <Quote className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
           <span className="sr-only">Quote message</span>
         </Button>
       )}

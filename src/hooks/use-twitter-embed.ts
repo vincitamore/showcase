@@ -13,22 +13,18 @@ export function useTwitterEmbed() {
   const loadTwitterWidgets = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).twttr) {
       try {
-        console.log('[Twitter Embed] Manually triggering widget loading');
         (window as any).twttr.widgets.load();
         
         // Also try to find and process any unprocessed tweets
         setTimeout(() => {
           const unprocessedTweets = document.querySelectorAll('.twitter-tweet:not([data-twitter-extracted-i])');
           if (unprocessedTweets.length > 0) {
-            console.log(`[Twitter Embed] Found ${unprocessedTweets.length} unprocessed tweets, forcing reload`);
             (window as any).twttr.widgets.load();
             
             // Hide loading indicators
             document.querySelectorAll('.tweet-embed-loading').forEach(el => {
               el.classList.add('hidden');
             });
-          } else {
-            console.log('[Twitter Embed] No unprocessed tweets found after initial load');
           }
         }, 1000);
       } catch (error) {
@@ -43,7 +39,6 @@ export function useTwitterEmbed() {
   const forceWidgetReload = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).twttr) {
       try {
-        console.log('[Twitter Embed] Forcing widget reload');
         (window as any).twttr.widgets.load();
         
         // Check for unprocessed tweets
@@ -51,7 +46,6 @@ export function useTwitterEmbed() {
           // Use a more specific selector to avoid false positives
           const unprocessed = document.querySelectorAll('.twitter-tweet:not([data-twitter-extracted-i]):not(.twitter-tweet-rendered)');
           if (unprocessed.length > 0) {
-            console.log(`[Twitter Embed] Found ${unprocessed.length} unprocessed tweets after forced reload`);
             // Try one more time
             (window as any).twttr.widgets.load();
           }
@@ -63,12 +57,9 @@ export function useTwitterEmbed() {
   }, []);
 
   useEffect(() => {
-    console.log('[Twitter Embed] Initializing Twitter embed hook');
-    
     // Remove any existing script to prevent duplicates
     const existingScript = document.getElementById('twitter-widget')
     if (existingScript) {
-      console.log('[Twitter Embed] Removing existing Twitter widget script');
       existingScript.remove()
     }
 
@@ -86,7 +77,6 @@ export function useTwitterEmbed() {
       
       // Try loading again with a different approach after a delay
       setTimeout(() => {
-        console.log('[Twitter Embed] Retrying script load with different approach');
         const retryScript = document.createElement('script');
         retryScript.id = 'twitter-widget-retry';
         retryScript.src = 'https://platform.twitter.com/widgets.js';
@@ -99,19 +89,14 @@ export function useTwitterEmbed() {
 
     // Set up a callback for when the script loads
     script.onload = () => {
-      console.log('[Twitter Embed] Twitter widget script loaded');
-      
       // Add a small delay to ensure the script is fully initialized
       setTimeout(() => {
         try {
           if ((window as any).twttr && (window as any).twttr.widgets) {
-            console.log('[Twitter Embed] Initializing Twitter widgets');
             (window as any).twttr.widgets.load();
             
             // Add event listeners for widget rendering
             (window as any).twttr.events.bind('rendered', function(event: any) {
-              console.log('[Twitter Embed] Tweet rendered:', event);
-              
               // Hide loading indicators
               document.querySelectorAll('.tweet-embed-loading').forEach(el => {
                 el.classList.add('hidden');
@@ -120,7 +105,6 @@ export function useTwitterEmbed() {
             
             // Force a second load after a delay to catch any missed embeds
             setTimeout(() => {
-              console.log('[Twitter Embed] Forcing second widget load');
               (window as any).twttr.widgets.load();
             }, 1000);
           } else {
@@ -159,7 +143,6 @@ export function useTwitterEmbed() {
         }
         
         (window as any).twitterReloadTimeout = setTimeout(() => {
-          console.log('[Twitter Embed] Detected new Twitter embeds, reloading widgets');
           loadTwitterWidgets();
         }, 300);
       }
@@ -178,8 +161,6 @@ export function useTwitterEmbed() {
       
       // Only reload if we have actual unprocessed tweets and haven't reloaded recently
       if (unprocessedTweets.length > 0 && !window.recentlyReloaded) {
-        console.log(`[Twitter Embed] Fallback timer found ${unprocessedTweets.length} unprocessed tweets`);
-        
         // Set a flag to prevent multiple reloads in quick succession
         window.recentlyReloaded = true;
         forceWidgetReload();

@@ -35,6 +35,7 @@ import {
   ChatBubble,
   ChatInput,
   ExportOptionsDialog,
+  MessageActions,
   MessageReactions,
   markdownComponents,
 } from "@/components/chat"
@@ -150,64 +151,6 @@ function QuoteModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function MessageActions({ 
-  message, 
-  isUser,
-  onQuote 
-}: { 
-  message: Message
-  isUser: boolean
-  onQuote: (content: string) => void
-}) {
-  const handleCopy = async () => {
-    const text = Array.isArray(message.content) 
-      ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
-      : message.content
-    await navigator.clipboard.writeText(text)
-  }
-
-  return (
-    <div className="absolute -left-14 top-0 h-full flex items-start pt-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className={cn(
-              "h-6 w-6 rounded-full p-0 hover:bg-primary/10 hover:text-primary transition-colors",
-              "opacity-0 group-hover:opacity-100 focus:opacity-100"
-            )}
-          >
-            <MoreVertical className="h-3.5 w-3.5" />
-            <span className="sr-only">Message actions</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent 
-          align="start"
-          className="w-[120px] p-1"
-        >
-          <DropdownMenuItem 
-            onClick={handleCopy}
-            className="flex items-center gap-2 text-xs py-1.5 px-2 cursor-pointer"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            Copy
-          </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => onQuote(Array.isArray(message.content) 
-              ? message.content.filter(c => c.type === 'text').map(c => (c as TextContent).text).join('\n')
-              : message.content)}
-            className="flex items-center gap-2 text-xs py-1.5 px-2 cursor-pointer"
-          >
-            <Quote className="h-3.5 w-3.5" />
-            Quote
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
   )
 }
 
@@ -1017,8 +960,8 @@ function BaseAnimatedChatInput() {
               WebkitOverflowScrolling: 'touch' // Add touch scrolling for mobile
             }}
           >
-            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-8 sm:py-4 w-full overflow-hidden">
-              <div className="space-y-3 sm:space-y-4 w-full overflow-hidden">
+            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-8 sm:py-4 w-full overflow-visible">
+              <div className="space-y-3 sm:space-y-4 w-full overflow-visible pt-6">
                 {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
                     No chat history yet. Start a conversation!

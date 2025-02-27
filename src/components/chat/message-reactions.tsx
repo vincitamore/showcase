@@ -24,28 +24,27 @@ export function MessageReactions({
   onReactionChange,
   messageReactions
 }: MessageReactionsProps) {
-  const currentMessageReactions = messageReactions[messageId] || { heart: false, thumbsDown: false }
-
+  // Initialize with empty reactions to avoid setState during render
   const [reactions, setReactions] = React.useState<MessageReaction[]>([
     { 
       emoji: (active: boolean) => active ? 
-        <Heart className="h-3.5 w-3.5 sm:h-3 sm:w-3 fill-red-500 text-red-500" /> : 
-        <Heart className="h-3.5 w-3.5 sm:h-3 sm:w-3" />,
-      count: currentMessageReactions.heart ? 1 : 0,
-      active: currentMessageReactions.heart,
+        <Heart className="h-4 w-4 sm:h-3.5 sm:w-3.5 fill-red-500 text-red-500" /> : 
+        <Heart className="h-4 w-4 sm:h-3.5 sm:w-3.5" />,
+      count: 0,
+      active: false,
       type: 'heart' as const
     },
     { 
       emoji: (active: boolean) => active ? 
-        <ThumbsDown className="h-3.5 w-3.5 sm:h-3 sm:w-3 fill-foreground text-foreground" /> : 
-        <ThumbsDown className="h-3.5 w-3.5 sm:h-3 sm:w-3" />,
-      count: currentMessageReactions.thumbsDown ? 1 : 0,
-      active: currentMessageReactions.thumbsDown,
+        <ThumbsDown className="h-4 w-4 sm:h-3.5 sm:w-3.5 fill-foreground text-foreground" /> : 
+        <ThumbsDown className="h-4 w-4 sm:h-3.5 sm:w-3.5" />,
+      count: 0,
+      active: false,
       type: 'thumbsDown' as const
     },
   ])
 
-  // Update reactions when the global state changes
+  // Initialize reactions from props on mount and when props change
   React.useEffect(() => {
     const currentReactions = messageReactions[messageId] || { heart: false, thumbsDown: false }
     setReactions(prev => prev.map(reaction => ({
@@ -56,18 +55,24 @@ export function MessageReactions({
   }, [messageId, messageReactions])
 
   const handleReaction = (index: number) => {
-    setReactions(prev => prev.map((reaction, i) => {
-      if (i === index) {
-        const newActive = !reaction.active;
-        onReactionChange(messageId, reaction.type, newActive);
-        return {
-          ...reaction,
-          count: newActive ? 1 : 0,
-          active: newActive
+    setReactions(prev => {
+      const updatedReactions = prev.map((reaction, i) => {
+        if (i === index) {
+          const newActive = !reaction.active;
+          // Move the side effect outside of render
+          setTimeout(() => {
+            onReactionChange(messageId, reaction.type, newActive);
+          }, 0);
+          return {
+            ...reaction,
+            count: newActive ? 1 : 0,
+            active: newActive
+          }
         }
-      }
-      return reaction
-    }))
+        return reaction
+      });
+      return updatedReactions;
+    })
   }
 
   return (
@@ -75,9 +80,13 @@ export function MessageReactions({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        "flex gap-1 -mt-1",
+        "flex gap-1.5",
+        "-mt-1",
         isAssistant ? "justify-start" : "justify-end",
-        "touch-none select-none"
+        "touch-none select-none",
+        "bg-background/95 backdrop-blur-sm py-1 px-2 rounded-full shadow-md",
+        "border border-border/10",
+        "will-change-transform"
       )}
     >
       {reactions.map((reaction, index) => (
@@ -86,7 +95,7 @@ export function MessageReactions({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
+            "h-8 w-8 sm:h-7 sm:w-7 rounded-full p-0",
             "hover:bg-primary/10 active:scale-95",
             !reaction.active && "text-muted-foreground/60 hover:text-muted-foreground",
             "transition-all duration-200"
@@ -95,12 +104,12 @@ export function MessageReactions({
         >
           <motion.div
             whileTap={{ scale: 0.8 }}
-            className="flex items-center gap-1"
+            className="flex items-center gap-1.5"
           >
             {reaction.emoji(reaction.active)}
             {reaction.count > 0 && (
               <span className={cn(
-                "text-xs font-medium",
+                "text-sm font-medium",
                 reaction.active && reaction.type === 'heart' && "text-red-500",
                 reaction.active && reaction.type === 'thumbsDown' && "text-foreground"
               )}>

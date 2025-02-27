@@ -255,42 +255,12 @@ const BlogSection = () => {
         return;
       }
 
-      console.log('[Tweet Rendering DEBUG] Raw tweets from API:', {
-        count: data.tweets.length,
-        firstTweet: data.tweets[0] ? {
-          id: data.tweets[0].id,
-          text: data.tweets[0].text ? data.tweets[0].text.substring(0, 50) + '...' : 'No text',
-          entitiesCount: data.tweets[0].entities?.length || 0
-        } : 'No tweets'
-      });
-
       // Log the raw tweet dates for debugging
       console.log('[Tweet Rendering] Raw tweet dates:', 
         data.tweets.map((t: any) => ({
           id: t.id,
           createdAt: t.createdAt,
           parsedDate: t.createdAt ? new Date(t.createdAt).toISOString() : null
-        }))
-      );
-
-      // Log detailed entity information for debugging
-      console.log('[Tweet Rendering DEBUG] Detailed entity information:', 
-        data.tweets.map((t: any) => ({
-          id: t.id,
-          entitiesCount: t.entities?.length || 0,
-          entities: t.entities?.map((e: any) => ({
-            id: e.id,
-            type: e.type,
-            text: e.text,
-            url: e.url,
-            expandedUrl: e.expandedUrl,
-            displayUrl: e.displayUrl,
-            mediaKey: e.mediaKey,
-            metadataType: typeof e.metadata,
-            metadataPreview: typeof e.metadata === 'string' 
-              ? e.metadata.substring(0, 100) + '...' 
-              : JSON.stringify(e.metadata).substring(0, 100) + '...'
-          }))
         }))
       );
 
@@ -348,12 +318,6 @@ const BlogSection = () => {
             entities
           };
 
-          console.log('[Tweet Rendering DEBUG] Processed tweet:', {
-            id: processedTweet.id,
-            textLength: processedTweet.text?.length || 0,
-            entitiesCount: processedTweet.entities?.length || 0
-          });
-
           return processedTweet;
         } catch (tweetError) {
           console.error('[Tweet Rendering ERROR] Error processing tweet:', tweetError);
@@ -367,15 +331,6 @@ const BlogSection = () => {
 
       // Filter out null values and set tweets
       const validTweets = processedTweets.filter(Boolean);
-      
-      console.log('[Tweet Rendering DEBUG] Final processed tweets:', {
-        count: validTweets.length,
-        firstTweet: validTweets[0] ? {
-          id: validTweets[0].id,
-          textLength: validTweets[0].text?.length || 0,
-          entitiesCount: validTweets[0].entities?.length || 0
-        } : 'No valid tweets'
-      });
       
       performance.end('tweet_processing', { 
         processed_count: processedTweets.length,
@@ -462,13 +417,6 @@ const BlogSection = () => {
 
   // Memoize the renderTweetText function to prevent unnecessary re-renders
   const renderTweetText = React.useCallback((text: string, entities: TweetEntity[]) => {
-    console.log('[Tweet Rendering DEBUG] renderTweetText called:', {
-      textLength: text?.length || 0,
-      textPreview: text ? (text.substring(0, 50) + (text.length > 50 ? '...' : '')) : 'No text',
-      entitiesCount: entities?.length || 0,
-      entitiesTypes: entities?.map(e => e.type) || []
-    });
-
     if (!text) {
       console.error('[Tweet Rendering ERROR] No text provided to renderTweetText');
       return <div className="text-red-500">Error: No tweet text available</div>;
@@ -476,7 +424,6 @@ const BlogSection = () => {
 
     // If no entities are provided or the array is empty, just return the plain text
     if (!entities || entities.length === 0) {
-      console.log('[Tweet Rendering DEBUG] No entities provided, returning plain text');
       return <div className="whitespace-pre-wrap break-words">{text}</div>;
     }
 
@@ -485,46 +432,21 @@ const BlogSection = () => {
     
     // Check if we have mention entities, if not, detect them
     if (!enhancedEntities.some(e => e.type === 'mention')) {
-      console.log('[Tweet Rendering DEBUG] No mention entities found, detecting mentions');
       const detectedMentions = detectMentions(text);
-      console.log('[Tweet Rendering DEBUG] Detected mentions:', {
-        count: detectedMentions.length,
-        mentions: detectedMentions.map(m => m.text)
-      });
       enhancedEntities = [...enhancedEntities, ...detectedMentions];
     }
     
     // Check if we have hashtag entities, if not, detect them
     if (!enhancedEntities.some(e => e.type === 'hashtag')) {
-      console.log('[Tweet Rendering DEBUG] No hashtag entities found, detecting hashtags');
       const detectedHashtags = detectHashtags(text);
-      console.log('[Tweet Rendering DEBUG] Detected hashtags:', {
-        count: detectedHashtags.length,
-        hashtags: detectedHashtags.map(h => h.text)
-      });
       enhancedEntities = [...enhancedEntities, ...detectedHashtags];
     }
     
     // Check if we have URL entities, if not, detect them
     if (!enhancedEntities.some(e => e.type === 'url')) {
-      console.log('[Tweet Rendering DEBUG] No URL entities found, detecting URLs');
       const detectedUrls = detectUrls(text);
-      console.log('[Tweet Rendering DEBUG] Detected URLs:', {
-        count: detectedUrls.length,
-        urls: detectedUrls.map(u => ({
-          text: u.text,
-          expandedUrl: u.expandedUrl,
-          displayUrl: u.displayUrl
-        }))
-      });
       enhancedEntities = [...enhancedEntities, ...detectedUrls];
     }
-
-    console.log('[Tweet Rendering DEBUG] Enhanced entities:', {
-      originalCount: entities?.length || 0,
-      enhancedCount: enhancedEntities.length,
-      types: enhancedEntities.map(e => e.type)
-    });
 
     // Sort entities by their position in the text
     const sortedEntities = enhancedEntities
@@ -546,22 +468,12 @@ const BlogSection = () => {
         }
       });
 
-    console.log('[Tweet Rendering DEBUG] Sorted entities:', {
-      sortedCount: sortedEntities.length,
-      sortedEntities: sortedEntities.map(e => ({
-        type: e.type,
-        text: e.text,
-        indices: e.metadata?.indices
-      }))
-    });
-
     // Create segments of text and entities
     const segments: JSX.Element[] = [];
     let lastIndex = 0;
 
     // If we have no entities after sorting, just return the plain text
     if (sortedEntities.length === 0) {
-      console.log('[Tweet Rendering DEBUG] No sorted entities, returning plain text');
       return <div className="whitespace-pre-wrap break-words">{text}</div>;
     }
 
@@ -577,14 +489,6 @@ const BlogSection = () => {
           : (metadata.indices ? JSON.parse(JSON.stringify(metadata.indices)) : [0, 0]);
         
         const [start, end] = indices;
-
-        console.log(`[Tweet Rendering DEBUG] Processing entity ${index}:`, {
-          type: entity.type,
-          text: entity.text,
-          start,
-          end,
-          lastIndex
-        });
 
         // Add text before entity
         if (start > lastIndex) {
@@ -695,10 +599,6 @@ const BlogSection = () => {
         </span>
       );
     }
-
-    console.log('[Tweet Rendering DEBUG] Final segments:', {
-      segmentsCount: segments.length
-    });
 
     // If we somehow ended up with no segments, return the plain text as a fallback
     if (segments.length === 0) {
@@ -847,17 +747,9 @@ const BlogSection = () => {
 
   // Memoize the renderUrlPreviews function to prevent unnecessary re-renders
   const renderUrlPreviews = React.useCallback((entities: TweetEntity[], tweetId?: string) => {
-    // Add detailed logging at the start of the function
-    console.log('[Tweet Rendering DEBUG] renderUrlPreviews called:', {
-      entitiesCount: entities?.length || 0,
-      urlEntitiesCount: entities?.filter(e => e.type === 'url').length || 0,
-      tweetId
-    });
-    
     // Ensure URL entities have the correct structure
     const enhancedEntities = entities.map(entity => {
       if (entity.type === 'url' && entity.url && !entity.expandedUrl) {
-        console.log('[Tweet Rendering DEBUG] Enhancing URL entity with missing expandedUrl:', entity.url);
         return {
           ...entity,
           expandedUrl: entity.url,
@@ -867,27 +759,18 @@ const BlogSection = () => {
       return entity;
     });
     
-    // Log enhanced entities
-    console.log('[Tweet Rendering DEBUG] Enhanced URL entities:', {
-      originalCount: entities.filter(e => e.type === 'url').length,
-      enhancedCount: enhancedEntities.filter(e => e.type === 'url').length
-    });
-    
     // Deduplicate URL entities by their expanded URL
     const uniqueUrlEntities = enhancedEntities
       .filter(e => e.type === 'url' && e.expandedUrl) // Only include entities with expanded URLs
       .filter(e => {
         // Skip URLs that expand to Twitter/X URLs as they will be handled separately
         if (e.expandedUrl?.includes('twitter.com') || e.expandedUrl?.includes('x.com')) {
-          console.log('[Tweet Rendering DEBUG] Skipping Twitter URL:', e.expandedUrl);
-          
           // If this is a self-reference (links to the current tweet), skip it
           if (tweetId) {
             try {
               const match = e.expandedUrl?.match(/\/status\/(\d+)/);
               const urlTweetId = match ? match[1] : null;
               if (urlTweetId === tweetId) {
-                console.log('[Tweet Rendering DEBUG] Skipping self-referential URL:', e.expandedUrl);
                 return false;
               }
             } catch (err) {
@@ -905,17 +788,7 @@ const BlogSection = () => {
         return acc;
       }, []);
 
-    console.log('[Tweet Rendering DEBUG] Unique URL entities after filtering:', {
-      uniqueCount: uniqueUrlEntities.length,
-      entities: uniqueUrlEntities.map(e => ({
-        id: e.id,
-        url: e.url,
-        expandedUrl: e.expandedUrl
-      }))
-    });
-
     if (!uniqueUrlEntities?.length) {
-      console.log('[Tweet Rendering DEBUG] No unique URL entities to render');
       return null;
     }
 
@@ -934,14 +807,6 @@ const BlogSection = () => {
         {uniqueUrlEntities.map((entity, index) => {
           const entityKey = entity.expandedUrl || entity.url || entity.id;
           const isLoading = isLoadingUrlPreviews[entityKey];
-          
-          console.log('[Tweet Rendering DEBUG] Rendering URL preview:', {
-            index,
-            entityKey,
-            isLoading,
-            url: entity.url,
-            expandedUrl: entity.expandedUrl
-          });
           
           if (isLoading) {
             return <UrlPreviewShimmer key={`shimmer-${entityKey}`} />;
@@ -974,13 +839,6 @@ const BlogSection = () => {
             if (!metadata.images && metadata.image) {
               metadata.images = [{ url: metadata.image }];
             }
-            
-            console.log('[Tweet Rendering DEBUG] Parsed URL preview metadata:', {
-              hasMetadata: true,
-              title: metadata?.title,
-              description: metadata?.description?.substring(0, 50),
-              hasImages: !!(metadata?.images?.length || metadata?.image)
-            });
           } catch (error) {
             console.error('[Tweet Rendering ERROR] Error parsing metadata:', error);
             metadata = {};
@@ -988,8 +846,6 @@ const BlogSection = () => {
 
           // If no metadata, create a basic preview with just the URL
           if (!metadata?.title && !metadata?.description && !metadata?.images?.length && !metadata?.image) {
-            console.log('[Tweet Rendering DEBUG] No metadata, creating basic preview for URL:', entity.expandedUrl || entity.url);
-            
             // Get the domain from the expanded URL
             const domain = (() => {
               try {
@@ -1105,28 +961,7 @@ const BlogSection = () => {
   const renderTweet = (tweet: Tweet) => {
     const entities = tweet.entities || [];
     
-    console.log('[Tweet Rendering DEBUG] renderTweet called:', {
-      tweetId: tweet.id,
-      textLength: tweet.text?.length || 0,
-      textPreview: tweet.text ? (tweet.text.substring(0, 50) + (tweet.text.length > 50 ? '...' : '')) : 'No text',
-      entitiesCount: entities.length
-    });
-    
     try {
-      // Log detailed entity information
-      entities.forEach((entity, index) => {
-        if (entity.type === 'url') {
-          console.log('[Tweet Rendering DEBUG] URL entity details:', {
-            index,
-            url: entity.url,
-            expandedUrl: entity.expandedUrl,
-            displayUrl: entity.displayUrl,
-            metadata: entity.metadata ? 'present' : 'missing',
-            type: entity.type
-          });
-        }
-      });
-      
       // Enhanced Twitter URL detection with self-reference filtering
       const twitterUrls = entities
         .filter(e => {
@@ -1156,43 +991,21 @@ const BlogSection = () => {
           // Skip if this URL points to the current tweet (self-reference)
           const isSelfReference = urlTweetId === tweet.id;
           
-          console.log('[Tweet Rendering DEBUG] Twitter URL check:', {
-            url: e.url,
-            expandedUrl: e.expandedUrl,
-            isTwitterDomain,
-            isStatusUrl,
-            urlTweetId,
-            currentTweetId: tweet.id,
-            isSelfReference,
-            result: isTwitterDomain && isStatusUrl && !isSelfReference
-          });
-          
           // Only include Twitter URLs that aren't self-references
           return isTwitterDomain && isStatusUrl && !isSelfReference;
         })
         .reduce((acc: string[], entity) => {
           const url = entity.expandedUrl;
           if (url && !acc.includes(url)) {
-            console.log('[Tweet Rendering DEBUG] Adding Twitter URL for embedding:', url);
             acc.push(url);
           }
           return acc;
         }, []);
 
-      console.log('[Tweet Rendering DEBUG] Twitter URLs for embedding:', {
-        count: twitterUrls.length,
-        urls: twitterUrls
-      });
-
       // Only render Twitter embeds if there are any
       const twitterEmbedsSection = twitterUrls.length > 0 ? (
         <div className="mt-3 space-y-3">
           {twitterUrls.map((twitterUrl, embedIndex) => {
-            console.log('[Tweet Rendering DEBUG] Creating Twitter embed for URL:', {
-              index: embedIndex,
-              url: twitterUrl
-            });
-            
             // Extract tweet ID from URL for direct embedding
             const tweetId = (() => {
               try {
@@ -1203,8 +1016,6 @@ const BlogSection = () => {
                 return null;
               }
             })();
-            
-            console.log('[Tweet Rendering DEBUG] Extracted tweet ID:', tweetId);
             
             // For Twitter embeds, use the tweet ID directly if available
             if (tweetId) {
@@ -1261,12 +1072,6 @@ const BlogSection = () => {
       const displayText = isLongTweet && !isExpanded 
         ? tweet.text.substring(0, 280) + '...' 
         : tweet.text;
-
-      console.log('[Tweet Rendering DEBUG] About to render tweet text:', {
-        displayTextLength: displayText?.length || 0,
-        isLongTweet,
-        isExpanded
-      });
 
       // Render the tweet content
       const tweetContent = (

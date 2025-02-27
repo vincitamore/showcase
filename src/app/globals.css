@@ -89,8 +89,10 @@
   }
 }
 
-.perspective-[1000px] {
-  perspective: 1000px;
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
 }
 
 /* Smooth transitions */

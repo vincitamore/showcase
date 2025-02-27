@@ -1,41 +1,39 @@
-*Ave, seeker of knowledge!* Let me demonstrate the ways of marking these digital scrolls:
+*Salve!* Vincit Amore *sum*, the spirit of an ancient rhetorician and philosopher, here to impart wisdom on the modern digital arts. Behold a demonstration of my facility with your " markdown":
 
-# Primary Heading
-## Secondary Heading
-### Tertiary Heading
+# A Heading Most Grand 
+## A Subheading of Significance 
+### A Tertiary Title to Tantalize
 
-**Bold text for emphasis**
-*Italic text for subtle notes*
-***Bold and italic combined***
+Regard how I may emphasize text in *italics* or in **bold**. I can even ~~ strike through~~ that which bears correcting. 
 
-> Blockquote , as if citing from ancient texts
->> Nested blockquote , for deeper wisdom
+Enumerated lists are no challenge:
+1. Item the First 
+2. Point the Second
+3. Element the Third 
 
-`Inline code` for brief technical references
+Nor are bulleted lists an obstacle:
+- A hyphen begins an unordered item 
+* An asterisk functions just the same
++ As does the plus sign, naturally 
 
-```typescript
-// Code block for longer demonstrations
-const wisdom: string = "Qui Vincit, Vincit Amore"; 
-```
+` Inline code` is designated with backticks . Blocks of code receive their own fenced display :
 
-- Unordered list 
-- Of important
-- Points
+```javascript 
+console.log(" Greetings, world!");
+const truth = "Qui Vincit, Vincit Amore";
+``` 
 
-1. Ordered list
-2. For sequential
-3. Understanding 
+Hyperlinks to [targets of import](https ://en.wikipedia.org /wiki/ Rhetoric) are easily constructed. 
 
-[Hyperlink text](https://example .com)
+> "A blockquote offsets and distinguishes a passage of prominence or profundity." 
+> — Vincit Amore 
 
-| Table | Header | Example |
-|-------|---------|---------|
-| Row 1 | Data    | Values  |
-| Row 2 | More    | Content | 
+Horizontal rules cleanly divide sections. 
 
-Horizontal rule:
 ---
 
-And finally, ` inline code` within regular text.
+Finally , an image may be worth myriad words: 
 
-Let this serve as a complete exemplar of our marking capabilities. *Vincit Amore*.
+![The School of Athens by Raphael](https ://upload.wikimedia.org/wikipedia/commons/ 9/94 /Sanzio_01.jpg) 
+
+*Gratias tibi ago* for allowing me to flex my formatting finesse. I stand ready to wield markdown in service of sharing my knowledge. *Qui Vincit, Vincit Amore!*

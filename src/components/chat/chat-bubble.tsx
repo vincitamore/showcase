@@ -195,14 +195,15 @@ export function ChatBubble({
         "group relative flex gap-3 px-4 py-4 w-full",
         isAssistant ? "flex-row" : "flex-row-reverse"
       )}
-      style={{ isolation: 'isolate' }}
+      style={{ isolation: 'isolate', position: 'relative', overflow: 'visible' }}
     >
       <div className={cn(
         "flex min-h-[32px] flex-1 flex-col",
         isAssistant ? "items-start" : "items-end",
-        "max-w-full sm:max-w-[90%] w-full"
+        "max-w-full sm:max-w-[90%] w-full",
+        "overflow-visible"
       )}>
-        <div className="relative flex items-start gap-2 w-full">
+        <div className="relative flex items-start gap-2 w-full overflow-visible">
           {/* Message actions - positioned on the side for desktop, top for mobile */}
           <div className={cn(
             "flex items-center gap-1", 
@@ -213,8 +214,8 @@ export function ChatBubble({
               : "-top-8 right-0",
             // Hide on desktop, show on mobile only
             "md:hidden",
-            "sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity", // Always visible on mobile
-            "z-10 py-1 px-1.5 rounded-md bg-background/95 shadow-sm border border-border/10", // Enhanced background
+            "opacity-0 group-hover:opacity-100 transition-opacity duration-300", // Show on hover for all devices
+            "z-20 py-1 px-1.5 rounded-md bg-background shadow-sm border border-border", // Enhanced background with solid border
           )}>
             <MessageActions 
               message={message} 
@@ -225,13 +226,15 @@ export function ChatBubble({
           
           {/* Desktop-only message actions (side) */}
           <div className={cn(
-            "hidden md:flex items-start pt-2",
+            "hidden md:flex items-center",
             "absolute",
             isAssistant 
-              ? "sm:-left-12 -left-2 sm:translate-x-0 -translate-x-full" 
-              : "sm:-right-12 -right-2 sm:translate-x-0 translate-x-full left-auto",
-            "sm:opacity-0 group-hover:opacity-100 transition-opacity",
-            "z-10"
+              ? "-left-10" 
+              : "-right-10",
+            "top-2",
+            "opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+            "z-30 bg-background/95 backdrop-blur-sm shadow-md p-1.5 rounded-md border border-border",
+            "will-change-transform"
           )}>
             <MessageActions 
               message={message} 
@@ -242,7 +245,7 @@ export function ChatBubble({
           
           <div className={cn(
             "relative group space-y-2 rounded-2xl px-4 py-3",
-            "max-w-full w-full overflow-hidden",
+            "max-w-full w-full overflow-visible",
             isAssistant 
               ? "bg-card/95 text-card-foreground backdrop-blur-sm border border-border/5" 
               : "bg-primary/70 text-primary-foreground dark:bg-primary/95",
@@ -265,9 +268,11 @@ export function ChatBubble({
               </div>
             )}
             <div className={cn(
-              "absolute -bottom-7",
+              "absolute -bottom-8",
               isAssistant ? "left-0" : "right-0",
-              "sm:opacity-0 group-hover:opacity-100 transition-opacity"
+              "opacity-100 sm:opacity-0 group-hover:sm:opacity-100 transition-opacity duration-200",
+              "z-30",
+              "overflow-visible"
             )}>
               <MessageReactions 
                 isAssistant={isAssistant}
