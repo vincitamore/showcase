@@ -28,7 +28,8 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
 
   return (
     <div className={cn(
-      "flex flex-col items-center gap-1.5",
+      "flex flex-col sm:flex-col md:flex-col items-center gap-1.5",
+      "flex-row md:flex-col",
       "opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
       "touch-none select-none"
     )}>

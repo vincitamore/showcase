@@ -1017,8 +1017,8 @@ function BaseAnimatedChatInput() {
               WebkitOverflowScrolling: 'touch' // Add touch scrolling for mobile
             }}
           >
-            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-8 sm:py-4 overflow-hidden">
-              <div className="space-y-3 sm:space-y-4">
+            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-8 sm:py-4 w-full overflow-hidden">
+              <div className="space-y-3 sm:space-y-4 w-full overflow-hidden">
                 {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
                     No chat history yet. Start a conversation!

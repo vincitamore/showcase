@@ -29,6 +29,9 @@ export function ChatBubble({
 }: ChatBubbleProps) {
   const isAssistant = message.role === 'assistant'
   const [isQuoteModalOpen, setIsQuoteModalOpen] = React.useState(false)
+  
+  // Single debug flag for all markdown processing
+  const DEBUG_MARKDOWN = false;
 
   const handleQuote = (content: string) => {
     setIsQuoteModalOpen(false)
@@ -80,7 +83,10 @@ export function ChatBubble({
         if (indentSize === 1) {
           // Add one more space for proper nesting
           fixedLine = ' ' + fixedLine;
-          console.log("Fixed single-space indented list item:", fixedLine);
+          // Only log when debug flag is enabled
+          if (DEBUG_MARKDOWN) {
+            console.log("Fixed single-space indented list item:", fixedLine);
+          }
         }
       } else if (fixedLine.trim() === '') {
         insideList = false;
@@ -131,11 +137,6 @@ export function ChatBubble({
       processed = processed.replace(/\|\s*:?-+:?\s*\|/g, '| --- |');
     }
     
-    // Debug for lists
-    if (processed.includes('List Item')) {
-      console.log("Final processed markdown for list items:", processed);
-    }
-    
     // Step 8: Fix horizontal rules
     // Ensure proper formatting for horizontal rules (three or more hyphens)
     // Look for standalone "---" lines and ensure they're properly formatted
@@ -153,6 +154,16 @@ export function ChatBubble({
       // Clean up any excessive newlines that might have been introduced
       .replace(/\n{3,}/g, '\n\n');
     
+    // Only log when debug flag is on
+    if (DEBUG_MARKDOWN) {
+      if (processed.includes('List Item')) {
+        console.log("Final processed markdown for list items:", processed);
+      }
+      
+      if (processed.includes('Table Header')) {
+        console.log("Final processed markdown for tables:", processed);
+      }
+    }
     
     return processed;
   };
@@ -170,7 +181,7 @@ export function ChatBubble({
     : preprocessMarkdown(message.content)
 
   // Debug log for troubleshooting table rendering
-  if (messageContent.includes('Table Header')) {
+  if (DEBUG_MARKDOWN && messageContent.includes('Table Header')) {
     console.log('Raw message before preprocessing:', message.content);
     console.log('Processed markdown content:', messageContent);
   }
@@ -181,7 +192,7 @@ export function ChatBubble({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className={cn(
-        "group relative flex gap-3 px-4 py-4",
+        "group relative flex gap-3 px-4 py-4 w-full",
         isAssistant ? "flex-row" : "flex-row-reverse"
       )}
       style={{ isolation: 'isolate' }}
@@ -189,11 +200,32 @@ export function ChatBubble({
       <div className={cn(
         "flex min-h-[32px] flex-1 flex-col",
         isAssistant ? "items-start" : "items-end",
-        "max-w-full sm:max-w-[90%]"
+        "max-w-full sm:max-w-[90%] w-full"
       )}>
-        <div className="relative flex items-start gap-2">
+        <div className="relative flex items-start gap-2 w-full">
+          {/* Message actions - positioned on the side for desktop, top for mobile */}
           <div className={cn(
-            "flex items-start pt-2",
+            "flex items-center gap-1", 
+            "absolute",
+            // Mobile positioning (top)
+            isAssistant
+              ? "-top-8 left-0" 
+              : "-top-8 right-0",
+            // Hide on desktop, show on mobile only
+            "md:hidden",
+            "sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity", // Always visible on mobile
+            "z-10 py-1 px-1.5 rounded-md bg-background/95 shadow-sm border border-border/10", // Enhanced background
+          )}>
+            <MessageActions 
+              message={message} 
+              isUser={!isAssistant}
+              onQuote={() => setIsQuoteModalOpen(true)}
+            />
+          </div>
+          
+          {/* Desktop-only message actions (side) */}
+          <div className={cn(
+            "hidden md:flex items-start pt-2",
             "absolute",
             isAssistant 
               ? "sm:-left-12 -left-2 sm:translate-x-0 -translate-x-full" 
@@ -207,20 +239,21 @@ export function ChatBubble({
               onQuote={() => setIsQuoteModalOpen(true)}
             />
           </div>
+          
           <div className={cn(
             "relative group space-y-2 rounded-2xl px-4 py-3",
-            "max-w-full",
+            "max-w-full w-full overflow-hidden",
             isAssistant 
               ? "bg-card/95 text-card-foreground backdrop-blur-sm border border-border/5" 
               : "bg-primary/70 text-primary-foreground dark:bg-primary/95",
             isAssistant ? "rounded-tl-sm" : "rounded-tr-sm",
             "shadow-sm hover:shadow-md transition-shadow duration-200"
           )}>
-            <div className="overflow-hidden markdown-content">
+            <div className="overflow-hidden w-full markdown-content">
               <ReactMarkdown 
                 components={markdownComponents}
                 remarkPlugins={[remarkGfm]}
-                className="markdown-body"
+                className="markdown-body break-words"
                 skipHtml={false}
               >
                 {messageContent}
