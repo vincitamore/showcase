@@ -36,6 +36,7 @@ import {
   ChatInput,
   ExportOptionsDialog,
   MessageReactions,
+  markdownComponents,
 } from "@/components/chat"
 import ReactMarkdown, { type Components } from "react-markdown"
 import { MODEL_CONFIGS } from "@/lib/chat-config"
@@ -63,63 +64,6 @@ interface MarkdownComponentProps extends React.HTMLAttributes<HTMLElement> {
 interface MarkdownImageProps {
   src?: string
   alt?: string
-}
-
-const markdownComponents: Components = {
-  p: ({ children, ...props }) => {
-    if (typeof children === 'string') {
-      return (
-        <>
-          {children.split('\n').map((line, i) => (
-            <p key={i} className="mb-2 last:mb-0" {...props}>{line}</p>
-          ))}
-        </>
-      )
-    }
-    return <p className="mb-2 last:mb-0" {...props}>{children}</p>
-  },
-  code: ({ className, children, inline, ...props }: CodeComponentProps) => (
-    <code
-      className={cn(
-        "rounded bg-primary/10 px-1 py-0.5 font-mono text-sm",
-        inline ? "inline" : "block p-2",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </code>
-  ),
-  ul: ({ children, ...props }) => (
-    <ul className="mb-2 list-disc pl-4 last:mb-0" {...props}>{children}</ul>
-  ),
-  ol: ({ children, ...props }) => (
-    <ol className="mb-2 list-decimal pl-4 last:mb-0" {...props}>{children}</ol>
-  ),
-  li: ({ children, ...props }) => (
-    <li className="mb-1 last:mb-0" {...props}>{children}</li>
-  ),
-  h3: ({ children, ...props }) => (
-    <h3 className="mb-2 text-lg font-semibold last:mb-0" {...props}>{children}</h3>
-  ),
-  h4: ({ children, ...props }) => (
-    <h4 className="mb-2 text-base font-semibold last:mb-0" {...props}>{children}</h4>
-  ),
-  img: ({ src, alt, ...props }: MarkdownImageProps) => (
-    <div className="relative w-full max-w-[300px] my-4">
-      <img 
-        src={src} 
-        alt={alt || 'Chat image'} 
-        className="rounded-lg w-full h-auto object-contain"
-        loading="lazy"
-        onError={(e) => {
-          console.error('[Chat Client] Image failed to load:', e)
-          e.currentTarget.alt = 'Failed to load image'
-        }}
-        {...props}
-      />
-    </div>
-  ),
 }
 
 function ChatSkeleton() {
@@ -1065,8 +1009,15 @@ function BaseAnimatedChatInput() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto" style={{ position: 'relative', zIndex: 40 }}>
-            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-4 sm:py-4">
+          <div 
+            className="flex-1 overflow-y-auto" 
+            style={{ 
+              position: 'relative', 
+              zIndex: 40, 
+              WebkitOverflowScrolling: 'touch' // Add touch scrolling for mobile
+            }}
+          >
+            <div className="mx-auto max-w-[600px] px-3 py-3 sm:px-8 sm:py-4 overflow-hidden">
               <div className="space-y-3 sm:space-y-4">
                 {localMessages.filter(msg => msg.model === selectedModel).length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
@@ -1166,6 +1117,6 @@ function AnimatedChatInput() {
   )
 }
 
-// Export the wrapped component
-export { AnimatedChatInput } 
+// Export the component
+export default AnimatedChatInput 
 

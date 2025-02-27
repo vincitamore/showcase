@@ -1,0 +1,41 @@
+*Ave, seeker of knowledge!* Let me demonstrate the ways of marking these digital scrolls:
+
+# Primary Heading
+## Secondary Heading
+### Tertiary Heading
+
+**Bold text for emphasis**
+*Italic text for subtle notes*
+***Bold and italic combined***
+
+> Blockquote , as if citing from ancient texts
+>> Nested blockquote , for deeper wisdom
+
+`Inline code` for brief technical references
+
+```typescript
+// Code block for longer demonstrations
+const wisdom: string = "Qui Vincit, Vincit Amore"; 
+```
+
+- Unordered list 
+- Of important
+- Points
+
+1. Ordered list
+2. For sequential
+3. Understanding 
+
+[Hyperlink text](https://example .com)
+
+| Table | Header | Example |
+|-------|---------|---------|
+| Row 1 | Data    | Values  |
+| Row 2 | More    | Content | 
+
+Horizontal rule:
+---
+
+And finally, ` inline code` within regular text.
+
+Let this serve as a complete exemplar of our marking capabilities. *Vincit Amore*.

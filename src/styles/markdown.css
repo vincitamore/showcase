@@ -1,0 +1,224 @@
+/* Markdown specific styles */
+.markdown-content table {
+  width: 100%;
+  margin-bottom: 1rem;
+  border-collapse: collapse;
+}
+
+/* Strikethrough styling */
+.markdown-content del,
+.markdown-body del {
+  text-decoration: line-through;
+  color: hsl(var(--muted-foreground) / 0.8);
+  display: inline-block;
+  position: relative;
+}
+
+/* Add a subtle line effect */
+.markdown-content del::after,
+.markdown-body del::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-bottom: 1px solid hsl(var(--muted-foreground) / 0.5);
+  z-index: 1;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid hsl(var(--border) / 0.2);
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content table th {
+  background-color: hsl(var(--primary) / 0.05);
+  font-weight: 500;
+}
+
+.markdown-content table tr:nth-child(even) {
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-content ul ul,
+.markdown-content ol ol,
+.markdown-content ul ol,
+.markdown-content ol ul {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+  position: relative;
+}
+
+/* Better styling for nested lists */
+.markdown-content ul > li,
+.markdown-body ul > li {
+  list-style-type: disc;
+  position: relative;
+}
+
+.markdown-content ol > li,
+.markdown-body ol > li {
+  list-style-type: decimal;
+  position: relative;
+}
+
+/* Enhanced indentation and spacing for nested lists */
+.markdown-content ul > li > ul,
+.markdown-body ul > li > ul,
+.markdown-content ol > li > ul,
+.markdown-body ol > li > ul {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+  padding-left: 2rem; /* Increased from 1.5rem for better visual nesting */
+}
+
+/* Enhanced styling for different nesting levels */
+.markdown-content ul > li > ul > li,
+.markdown-body ul > li > ul > li,
+.markdown-content ol > li > ul > li,
+.markdown-body ol > li > ul > li {
+  list-style-type: circle;
+}
+
+.markdown-content ol > li > ol > li,
+.markdown-body ol > li > ol > li {
+  list-style-type: lower-alpha;
+}
+
+.markdown-content ul > li > ul > li > ul > li,
+.markdown-body ul > li > ul > li > ul > li {
+  list-style-type: square;
+}
+
+.markdown-content ol > li > ol > li > ol > li,
+.markdown-body ol > li > ol > li > ol > li {
+  list-style-type: lower-roman;
+}
+
+/* Force proper indentation for list items and their children */
+.markdown-body ul, 
+.markdown-body ol {
+  padding-left: 2rem !important;
+  margin-bottom: 1rem;
+}
+
+.markdown-body ul ul, 
+.markdown-body ol ol,
+.markdown-body ul ol, 
+.markdown-body ol ul {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+  padding-left: 2rem !important;
+}
+
+.markdown-body li {
+  margin-bottom: 0.25rem;
+  padding-left: 0.25rem;
+}
+
+/* Ensure spacing between list items for better readability */
+.markdown-body li + li {
+  margin-top: 0.25rem;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.5rem 0;
+}
+
+.markdown-content blockquote {
+  padding-left: 1rem;
+  border-left: 2px solid hsl(var(--primary) / 0.3);
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 1rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Table styles */
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.markdown-body thead {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.markdown-body th {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.markdown-body td {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+}
+
+.markdown-body tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.markdown-body tr:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Ensure nested elements have correct spacing */
+.markdown-content > * {
+  margin-bottom: 1rem;
+}
+
+.markdown-content > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Ensure tables are visible even if component styles fail */
+.markdown-content table {
+  display: table !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+.markdown-content td,
+.markdown-content th {
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  padding: 8px !important;
+}
+
+.markdown-content tr {
+  display: table-row !important;
+}
+
+.markdown-content tbody {
+  display: table-row-group !important;
+}
+
+.markdown-content thead {
+  display: table-header-group !important;
+}
+
+/* Ensure tables can be scrolled on small screens */
+.markdown-content .table-container {
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+} 

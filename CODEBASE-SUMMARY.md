@@ -3,11 +3,12 @@
 ## Project Overview
 This is a Next.js application that appears to be a personal showcase/portfolio site with multiple features including:
 - Chat functionality (using AI models including Anthropic models)
-- Twitter integration
+- Twitter/X integration with enhanced caching and rate limiting
 - Monitoring dashboard
 - Blog section
 - Projects section
 - Image processing capabilities
+- Scheduled tasks via cron jobs
 
 ## Tech Stack
 
@@ -19,13 +20,14 @@ This is a Next.js application that appears to be a personal showcase/portfolio s
 - **Styling**: Tailwind CSS
 - **AI Integration**: Anthropic and XAI APIs
 - **Authentication**: NextAuth.js
+- **Scheduled Tasks**: Vercel Cron Jobs
 
 ### Notable Dependencies
 - Various Radix UI components (`@radix-ui/react-*`)
 - Chart.js for data visualization
 - Framer Motion for animations
 - TanStack Table and Virtual for data display
-- Twitter API integration (twitter-api-v2)
+- Twitter API integration (twitter-api-v2) with advanced caching and filtering
 
 ## Project Structure
 
@@ -36,11 +38,13 @@ This is a Next.js application that appears to be a personal showcase/portfolio s
   - `/src/components/ui`: Shadcn UI components
   - `/src/components/chat`: Chat-related components
   - `/src/components/monitoring`: Monitoring dashboard components
+  - `/src/components/logs`: Logging components
 - `/src/lib`: Utilities, services, and configuration
   - `/src/lib/server`: Server-specific utilities
+  - Key files: `x-api.ts`, `tweet-storage.ts`, `tweet-utils.ts`, `url-utils.ts` (Twitter integration)
 - `/src/middleware`: Request processing and authentication
   - `monitoring-auth.ts`: Authentication for monitoring dashboard
-  - `cron.ts`: Cron job middleware
+  - `cron.ts`: Cron job authentication middleware
   - `auth.ts`: General authentication middleware
 - `/src/hooks`: Custom React hooks
 - `/src/types`: TypeScript type definitions
@@ -52,6 +56,13 @@ This is a Next.js application that appears to be a personal showcase/portfolio s
 - `/api/twitter`: Twitter integration
 - `/api/monitoring`: System monitoring
 - `/api/cron`: Scheduled tasks
+  - `/api/cron/fetch-tweets`: Regular tweet fetching
+  - `/api/cron/rotate-logs`: Log maintenance
+  - `/api/cron/expand-urls`: URL expansion for tweets
+  - `/api/cron/recreate-entities`: Tweet entity management
+- `/api/dev`: Development utilities
+  - `/api/dev/reset-rate-limits`: Reset API rate limits
+  - `/api/dev/test-cron`: Test cron job execution
 - `/api/images` and `/api/upload`: Image processing
 
 ## Database Schema
@@ -64,6 +75,27 @@ The Prisma schema defines several models:
 - `TempImage`: Temporary storage for image data
 - `Log` and `DatabaseMetric`: System monitoring data
 
+## Recent Enhancements
+
+### Twitter/X Integration
+- Enhanced caching mechanism with selective tweet storage
+- Relevance scoring for tech-related tweets
+- Automatic URL expansion for embedded links
+- Rate limit tracking and management
+- Entity extraction and processing
+
+### Scheduled Tasks
+- Implemented cron functionality for regular maintenance
+- Tweet fetching with intelligent filtering
+- Log rotation for improved performance
+- URL expansion for tweet entities
+- Tweet entity management and optimization
+
+### Development Tools
+- Added developer endpoints for testing and maintenance
+- Rate limit reset functionality
+- Cron job testing utilities
+
 ## Peculiarities and Important Notes
 
 ### Hybrid Routing Pattern
@@ -73,10 +105,11 @@ The Prisma schema defines several models:
 
 ### Middleware Configuration
 - The main middleware (`src/middleware.ts`) is configured to specifically handle monitoring routes
-- Middleware is applied to:
+- Additional middleware modules exist for cron jobs and authentication
+- Middleware is applied to specific path patterns:
   - `/monitoring/:path*`
   - `/api/monitoring/:path*`
-- Additional middleware modules exist for specific features in `/src/middleware/`
+  - `/api/cron/:path*`
 
 ### Next.js Configuration
 - Remote image sources are configured for Twitter images
@@ -88,10 +121,12 @@ The Prisma schema defines several models:
 - Various keys required for AI services and Twitter API
 - Monitoring authentication credentials
 - Feature flags for enabling/disabling AI services and monitoring
+- CRON_SECRET for securing scheduled tasks
 
 ### Authentication
 - Custom authentication middleware for the monitoring dashboard
 - Secured routes with proper authentication checks
+- Token-based authentication for cron jobs
 
 ### Performance Monitoring
 - Custom logging system with detailed metrics
@@ -99,8 +134,9 @@ The Prisma schema defines several models:
 - Rate limiting implementation
 
 ### Rate Limiting
-- Custom rate limiting for API endpoints to prevent abuse
+- Enhanced rate limiting for API endpoints to prevent abuse
 - Twitter API rate limit tracking to avoid exceeding quotas
+- Configurable limits per endpoint
 
 ### AI Integration
 - Support for multiple AI models (Anthropic, XAI)
@@ -113,9 +149,11 @@ The Prisma schema defines several models:
 - Next.js Image component configuration for external sources
 
 ### Twitter Integration
-- Comprehensive Twitter API integration
-- Cache mechanism for Twitter data to reduce API calls
+- Comprehensive Twitter API integration with advanced caching
+- Tech relevance scoring for tweets
+- URL expansion and entity extraction
 - Rate limit tracking for Twitter API
+- Selective tweet storage based on relevance
 
 ### Monitoring Dashboard
 - Protected by authentication
@@ -127,6 +165,7 @@ The Prisma schema defines several models:
 1. **Environment Setup**
    - Ensure all necessary environment variables are set (see `.env.local.example`)
    - PostgreSQL database connection required
+   - Set CRON_SECRET for scheduled tasks
 
 2. **Database**
    - Run Prisma migrations before starting development
@@ -151,7 +190,8 @@ The Prisma schema defines several models:
    - Never expose API keys in client-side code
    - Use proper authentication for protected routes
    - Validate all user inputs
-   
+   - Protect cron job endpoints with proper authentication
+
 7. **TypeScript Best Practices**
    - Use TypeScript for all code; prefer interfaces over types
    - Create proper type definitions in `/src/types`
@@ -173,4 +213,9 @@ The Prisma schema defines several models:
 10. **Code Style**
     - Use functional and declarative programming patterns
     - Prefer iteration and modularization over code duplication
-    - Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError) 
+    - Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError)
+
+11. **Scheduled Tasks**
+    - Secure cron endpoints with proper authentication
+    - Log execution details for debugging
+    - Implement proper error handling for asynchronous operations 

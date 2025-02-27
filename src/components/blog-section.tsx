@@ -1224,7 +1224,7 @@ const BlogSection = () => {
                     data-align="center"
                     data-dnt="true"
                   >
-                    <a href={`https://twitter.com/i/status/${tweetId}`}></a>
+                    <a href={`https://x.com/i/status/${tweetId}`}></a>
                   </blockquote>
                 </div>
               );

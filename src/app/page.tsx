@@ -4,7 +4,7 @@ import { Github, Mail } from "lucide-react"
 import { NavWrapper } from "@/components/nav-wrapper"
 import { motion } from 'framer-motion';
 
-const AnimatedChatInput = dynamic(() => import('@/components/animated-chat-input').then(mod => mod.AnimatedChatInput), {
+const AnimatedChatInput = dynamic(() => import('@/components/animated-chat-input'), {
   loading: () => <div className="w-full max-w-3xl mx-auto opacity-0" />,
   ssr: false
 });

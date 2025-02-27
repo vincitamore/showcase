@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
-import "./globals.css"
+import "@/app/globals.css"
+import "@/styles/markdown.css"
 import { Analytics } from "@vercel/analytics/react"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"

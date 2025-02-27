@@ -29,7 +29,7 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
   return (
     <div className={cn(
       "flex flex-col items-center gap-1.5",
-      "sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
+      "opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
       "touch-none select-none"
     )}>
       <Button
@@ -37,6 +37,7 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
         size="icon"
         className={cn(
           "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
+          "bg-background/80 backdrop-blur-sm sm:bg-transparent",
           "hover:bg-primary/10 hover:text-primary active:scale-95",
           "transition-all duration-200"
         )}
@@ -51,6 +52,7 @@ export function MessageActions({ message, isUser, onQuote }: MessageActionsProps
           size="icon"
           className={cn(
             "h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0",
+            "bg-background/80 backdrop-blur-sm sm:bg-transparent",
             "hover:bg-primary/10 hover:text-primary active:scale-95",
             "transition-all duration-200"
           )}
