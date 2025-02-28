@@ -483,7 +483,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
     // Prepare search parameters - request exactly what we'll store
     // to optimize our monthly post quota usage
     const searchParams: any = {
-      max_results: DAILY_TWEET_FETCH_LIMIT, // Request exactly what we need
+      max_results: Math.max(10, DAILY_TWEET_FETCH_LIMIT), // Ensure at least 10 results as required by Twitter API
       'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text', // Explicitly request full text
       'user.fields': 'profile_image_url,username',
       'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',
@@ -526,7 +526,7 @@ async function fetchTweetsHandler(req: Request): Promise<Response> {
       // Use client.v2.search which is the correct method for the Twitter API v2 search endpoint
       // Ensure all parameters are properly formatted according to the Twitter API v2 documentation
       response = await client.v2.search(query, {
-        max_results: DAILY_TWEET_FETCH_LIMIT, // Request exactly what we need
+        max_results: Math.max(10, DAILY_TWEET_FETCH_LIMIT), // Ensure at least 10 results as required by Twitter API
         'tweet.fields': 'created_at,public_metrics,entities,author_id,attachments,text', // Explicitly request full text
         'user.fields': 'profile_image_url,username',
         'media.fields': 'url,preview_image_url,alt_text,type,width,height,duration_ms,variants',

@@ -13,7 +13,7 @@ export const CACHE_TYPES = {
 } as const
 
 // New constants for tweet limiting and selection
-export const DAILY_TWEET_FETCH_LIMIT = 4 // Fetch only 4 tweets per day
+export const DAILY_TWEET_FETCH_LIMIT = 10 // Minimum value allowed by Twitter API
 export const TECH_SCORE_THRESHOLD = 0.5 // Minimum tech relevance score to be considered (0-1)
 
 // Default rate limits per endpoint (requests per 15 minutes)
