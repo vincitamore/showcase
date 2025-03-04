@@ -16,6 +16,7 @@ const projects = [
       "TypeScript",
       "Tailwind CSS",
       "Shadcn UI",
+      "Radix UI",
       "PostgreSQL",
       "xAI",
       "Anthropic",
@@ -43,24 +44,33 @@ const projects = [
   },
   {
     title: "Municipal Outage Management Suite",
-    description: "An enterprise-grade system for real-time utility outage tracking and response coordination. Streamlines emergency response with interactive mapping and crew management capabilities.",
+    description: "An enterprise-grade system for real-time utility outage tracking and response coordination. Streamlines emergency response with interactive mapping and crew management capabilities, featuring an advanced feedback system for continuous service improvement.",
     tags: [
       "Next.js 14",
       "TypeScript",
+      "PostgreSQL",
       "Tailwind CSS",
       "Microsoft OAuth",
       "Prisma",
-      "Google Maps"
+      "Google Maps",
+      "Custom Feedback System",
+      "Shadcn UI",
+      "Radix UI"
     ],
     highlights: [
       "Real-time outage visualization and heatmaps",
       "Automated crew dispatch and tracking",
       "Field-optimized mobile interface",
-      "Advanced analytics and reporting system"
+      "Advanced analytics and reporting system",
+      "Intelligent feedback system with archive functionality",
+      "Completion date tracking with automatic timestamps",
+      "Admin-only controls with session-based authentication"
     ],
     images: [
       "/images/projects/outage-system/dashboard.png",
-      "/images/projects/outage-system/active-reports.png"
+      "/images/projects/outage-system/active-reports.png",
+      "/images/projects/outage-system/feedback-page.png",
+      "/images/projects/outage-system/admin-feedback-dashboard.png"
     ],
     link: "#"
   },
