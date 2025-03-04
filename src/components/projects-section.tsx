@@ -88,6 +88,41 @@ const projects = [
       "/images/projects/farm-system/field-management.png"
     ],
     link: "#"
+  },
+  {
+    title: "AI-Powered PDF Scanner App",
+    description: "A sophisticated document processing solution that combines cutting-edge AI technology with a modern, responsive user interface to streamline invoice management and requisition form generation. This full-stack application leverages machine learning for intelligent document analysis while providing an intuitive user experience.",
+    tags: [
+      "Next.js 15",
+      "React 19",
+      "TypeScript",
+      "Tailwind CSS",
+      "FastAPI",
+      "Ollama",
+      "Python",
+      "Machine Learning",
+      "PDF.js",
+      "Asynchronous Processing",
+      "Shadcn UI",
+      "Radix UI"
+    ],
+    highlights: [
+      "Locally run AI architecture (llama3.2-vision) with zero cloud dependencies",
+      "Adaptive text recognition for inconsistently formatted documents",
+      "90% reduction in invoice processing time",
+      "Intelligent error recovery with fallback extraction methods",
+      "Multi-document batch processing with smart data consolidation",
+      "Side-by-side PDF comparison with real-time validation",
+      "Automatic recalculation of financial data with integrity checks",
+      "Sophisticated multi-stage processing pipeline with 98% accuracy"
+    ],
+    images: [
+      "/images/projects/pdf-scanner/dashboard-view.png",
+      "/images/projects/pdf-scanner/document-extraction.png",
+      "/images/projects/pdf-scanner/form-editor.png",
+      "/images/projects/pdf-scanner/generated-form.png"
+    ],
+    link: "#"
   }
 ]
 
