@@ -19,13 +19,13 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {}
 
 // Initialize models based on environment configuration
 if (env.NEXT_PUBLIC_XAI_ENABLED) {
-  MODEL_CONFIGS['grok-2-latest'] = {
+  MODEL_CONFIGS['grok-3-mini-beta'] = {
     temperature: 0.7,
     maxTokens: 4096,
     streamingFunctionCall: false,
     provider: 'grok',
-    name: 'Grok-2',
-    description: 'Latest Grok-2 model, with the latest updates and improvements.',
+    name: 'Grok-3-mini',
+    description: 'Mini model of the latest Grok-3 release',
     features: ['text']
   }
 }
